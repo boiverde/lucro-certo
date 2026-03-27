@@ -1,0 +1,167 @@
+import { FastifyInstance } from 'fastify'
+import { ZodTypeProvider } from 'fastify-type-provider-zod'
+import { z } from 'zod'
+import { prisma } from '../lib/prisma'
+
+export async function comprasRoutes(app: FastifyInstance) {
+    app.addHook('onRequest', app.authenticate)
+
+    // Listar Compras
+    app.withTypeProvider<ZodTypeProvider>().get('/', {
+        schema: {
+            querystring: z.object({
+                data_inicio: z.string().optional(),
+                data_fim: z.string().optional(),
+                fornecedor: z.string().optional(),
+            }),
+        },
+    }, async (request) => {
+        const { data_inicio, data_fim, fornecedor } = request.query
+        const userId = request.user.sub
+
+        const where: any = { userId }
+
+        if (data_inicio) {
+            where.data_compra = {
+                gte: new Date(data_inicio),
+                lte: data_fim ? new Date(data_fim) : undefined,
+            }
+        }
+
+        if (fornecedor) {
+            where.fornecedor_nome = { contains: fornecedor, mode: 'insensitive' }
+        }
+
+        const compras = await prisma.compra.findMany({
+            where,
+            include: {
+                itens: true,
+            },
+            orderBy: { data_compra: 'desc' },
+        })
+
+        return { results: compras }
+    })
+
+    // Criar Compra (Transacional)
+    app.withTypeProvider<ZodTypeProvider>().post('/', {
+        schema: {
+            body: z.object({
+                data_compra: z.string().datetime().or(z.string()),
+                data_pagamento: z.string().optional().or(z.literal('')),
+                valor_total: z.number(),
+                fornecedor: z.string().optional(), // Nome livre
+                observacoes: z.string().optional(),
+                adicionar_estoque: z.boolean().optional(),
+
+                // Dados do item único (padrão do form atual)
+                produto: z.string().optional(), // Nome do produto
+                produto_estoque_id: z.string().optional(), // ID se selecionado
+                quantidade: z.number(),
+                unidade_compra: z.string().optional(),
+                valor_por_unidade: z.number().optional(),
+            }),
+        },
+    }, async (request) => {
+        const userId = request.user.sub
+        const data = request.body
+
+        // Definir data pagamento
+        let data_pagamento = null
+        if (data.data_pagamento) {
+            data_pagamento = new Date(data.data_pagamento)
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Criar a Compra
+            const compra = await tx.compra.create({
+                data: {
+                    userId,
+                    data_compra: new Date(data.data_compra),
+                    data_pagamento,
+                    valor_total: data.valor_total,
+                    fornecedor_nome: data.fornecedor,
+                    observacoes: data.observacoes,
+                    itens: {
+                        create: [{
+                            nome_produto: data.produto || 'Item sem nome',
+                            produtoId: data.produto_estoque_id || null,
+                            quantidade: data.quantidade,
+                            unidade: data.unidade_compra,
+                            preco_unitario: data.valor_por_unidade || 0,
+                            subtotal: data.valor_total // Assumindo 1 item
+                        }]
+                    }
+                },
+                include: { itens: true }
+            })
+
+            // 2. Atualizar Estoque (Se solicitado e tiver ID de produto)
+            if (data.adicionar_estoque && data.produto_estoque_id) {
+                await tx.produto.update({
+                    where: { id: data.produto_estoque_id },
+                    data: { estoque_atual: { increment: data.quantidade } }
+                })
+
+                // 3. Registrar Movimentação de Entrada
+                await tx.movimentacaoEstoque.create({
+                    data: {
+                        userId,
+                        produtoId: data.produto_estoque_id,
+                        tipo: 'entrada',
+                        quantidade: data.quantidade,
+                        origem: 'compra',
+                        observacoes: `Compra #${compra.id.slice(0, 8)}`,
+                        data: new Date(data.data_compra)
+                    }
+                })
+            }
+            // TODO: Se não tiver ID (produto novo), deveríamos criar o produto?
+            // O frontend atual sugere "Criar produto no estoque" texto, mas não manda dados completos do produto no payload da compra.
+            // Vou assumir que o usuário deve criar o produto antes ou o frontend melhorado mandaria, mas por enquanto seguimos o flow simples.
+
+            return compra
+        })
+
+        return result
+    })
+
+    // Deletar Compra (Com estorno de estoque)
+    app.withTypeProvider<ZodTypeProvider>().delete('/:id', {
+        schema: { params: z.object({ id: z.string().uuid() }) }
+    }, async (request, reply) => {
+        const { id } = request.params
+        const userId = request.user.sub
+
+        const compra = await prisma.compra.findFirst({
+            where: { id, userId },
+            include: { itens: true }
+        })
+
+        if (!compra) return reply.status(404).send()
+
+        await prisma.$transaction(async (tx) => {
+            for (const item of compra.itens) {
+                if (item.produtoId) {
+                    await tx.produto.update({
+                        where: { id: item.produtoId },
+                        data: { estoque_atual: { decrement: item.quantidade } }
+                    })
+                    await tx.movimentacaoEstoque.create({
+                        data: {
+                            userId,
+                            produtoId: item.produtoId,
+                            tipo: 'saida',
+                            quantidade: item.quantidade,
+                            origem: 'compra',
+                            observacoes: `Estorno Compra Excluída #${compra.id.slice(0, 8)}`,
+                        }
+                    })
+                }
+            }
+            await tx.compra.delete({ where: { id } })
+        })
+
+        return reply.status(204).send()
+    })
+}

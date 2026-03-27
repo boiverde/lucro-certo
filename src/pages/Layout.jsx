@@ -1,0 +1,350 @@
+
+import React, { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { createPageUrl } from "@/utils";
+import { base44 } from "@/api/base44Client";
+import {
+  LayoutDashboard,
+  DollarSign,
+  BarChart3,
+  LogOut,
+  Menu,
+  X,
+  Store,
+  Users,
+  Sliders,
+  Settings,
+  Smartphone
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+
+const navigationItems = [
+  {
+    title: "Dashboard",
+    url: createPageUrl("Dashboard"),
+    icon: LayoutDashboard,
+  },
+  {
+    title: "Controle",
+    url: createPageUrl("Controle"),
+    icon: Sliders,
+  },
+  {
+    title: "Revendas",
+    url: createPageUrl("Revendas"),
+    icon: Store,
+  },
+  {
+    title: "Clientes",
+    url: createPageUrl("Clientes"),
+    icon: Users,
+  },
+  {
+    title: "Pessoais",
+    url: createPageUrl("Pessoais"),
+    icon: DollarSign,
+  },
+  {
+    title: "Relatórios",
+    url: createPageUrl("Relatorios"),
+    icon: BarChart3,
+  },
+  {
+    title: "Markup",
+    url: createPageUrl("Configuracoes"),
+    icon: Settings,
+  },
+  {
+    title: "Play Store",
+    url: createPageUrl("GuiaExportacao"),
+    icon: Smartphone,
+  },
+];
+
+export default function Layout({ children, currentPageName }) {
+  const location = useLocation();
+  const [user, setUser] = useState(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Páginas públicas (sem autenticação)
+  const paginasPublicas = ["Home", "PoliticaDePrivacidade", "MarketingAssets", "GuiaPlayStore", "GuiaGooglePlay", "Login"];
+  const isPaginaPublica = paginasPublicas.includes(currentPageName);
+
+  useEffect(() => {
+    // Páginas públicas não precisam de autenticação
+    if (isPaginaPublica) {
+      setUser({ public: true }); // Define um user dummy para evitar loading
+      return;
+    }
+
+    const checkUser = async () => {
+      try {
+        const currentUser = await base44.auth.me();
+        setUser(currentUser);
+      } catch (error) {
+        console.log('Usuário não autenticado, redirecionando para login...');
+        window.location.href = '/Login';
+      }
+    };
+
+    checkUser();
+  }, [currentPageName, isPaginaPublica]);
+
+  const handleLogout = async () => {
+    await base44.auth.logout();
+    window.location.href = createPageUrl("Home");
+  };
+
+  // Retornar páginas públicas sem layout
+  if (isPaginaPublica) {
+    return (
+      <>
+        <div style={{ display: 'none' }}>
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+          <meta name="theme-color" content="#16a34a" />
+          <meta name="apple-mobile-web-app-capable" content="yes" />
+          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+          <meta name="apple-mobile-web-app-title" content="Lucro Certo" />
+          <meta name="mobile-web-app-capable" content="yes" />
+          <link rel="apple-touch-icon" href="/icon-192.png" />
+          <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+          <link rel="manifest" href="/manifest.json" />
+        </div>
+        {children}
+      </>
+    );
+  }
+
+  // Loading para páginas privadas
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: 'none' }}>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+        <meta name="theme-color" content="#16a34a" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Lucro Certo" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="manifest" href="/manifest.json" />
+      </div>
+
+      {/* Layout Desktop */}
+      <div className="hidden md:block">
+        <SidebarProvider>
+          <div className="min-h-screen flex w-full bg-gray-50">
+            <Sidebar className="border-r border-gray-200">
+              <SidebarHeader className="border-b border-gray-200 p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-gray-900">Lucro Certo</h2>
+                    <p className="text-xs text-gray-500">Gestão do seu negócio</p>
+                  </div>
+                </div>
+              </SidebarHeader>
+
+              <SidebarContent className="p-2">
+                <SidebarGroup>
+                  <SidebarGroupLabel className="text-xs font-medium text-gray-500 uppercase tracking-wider px-2 py-2">
+                    Menu Principal
+                  </SidebarGroupLabel>
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {navigationItems.map((item) => (
+                        <SidebarMenuItem key={item.title}>
+                          <SidebarMenuButton
+                            asChild
+                            className={`hover:bg-green-50 hover:text-green-700 transition-colors duration-200 rounded-lg mb-1 ${location.pathname === item.url ? 'bg-green-50 text-green-700' : ''
+                              }`}
+                          >
+                            <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                              <item.icon className="w-4 h-4" />
+                              <span className="font-medium">{item.title}</span>
+                            </Link>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              </SidebarContent>
+
+              <SidebarFooter className="border-t border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-green-700 font-medium text-sm">
+                        {user?.full_name?.charAt(0) || 'U'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 text-sm truncate">
+                        {user?.full_name || 'Usuário'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleLogout}
+                    className="text-gray-500 hover:text-red-600"
+                    title="Sair"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                </div>
+              </SidebarFooter>
+            </Sidebar>
+
+            <main className="flex-1 flex flex-col overflow-auto">
+              {children}
+            </main>
+          </div>
+        </SidebarProvider>
+      </div>
+
+      {/* Layout Mobile */}
+      <div className="md:hidden min-h-screen flex flex-col bg-gray-50">
+        {/* Header Mobile */}
+        <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 safe-area-top">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="font-bold text-gray-900">Lucro Certo</h1>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="hover:bg-gray-100"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </Button>
+          </div>
+        </header>
+
+        {/* Menu Mobile Dropdown */}
+        {mobileMenuOpen && (
+          <div className="bg-white border-b border-gray-200 px-4 py-3 shadow-lg">
+            <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-3">
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                <span className="text-green-700 font-medium">
+                  {user?.full_name?.charAt(0) || 'U'}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 text-sm truncate">
+                  {user?.full_name || 'Usuário'}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {user?.email}
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleLogout}
+              className="w-full text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair
+            </Button>
+
+            {/* Mobile Nav items in dropdown when menu is open */}
+            <div className="mt-4">
+              {navigationItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.url}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 mb-1 ${location.pathname === item.url ? 'bg-green-50 text-green-700' : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="font-medium">{item.title}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Content Area */}
+        <main className="flex-1 overflow-auto pb-20">
+          {children}
+        </main>
+
+        {/* Bottom Navigation */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-bottom z-50">
+          <div className="flex justify-around items-center px-1 py-2">
+            {/* Show first 5 items on the bottom navigation for mobile */}
+            {navigationItems.slice(0, 5).map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.url;
+              return (
+                <Link
+                  key={item.title}
+                  to={item.url}
+                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all ${isActive
+                      ? 'text-green-600 bg-green-50'
+                      : 'text-gray-500'
+                    }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Icon className="w-6 h-6 mb-1" />
+                  <span className="text-xs font-medium">{item.title}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+      </div>
+
+      <style>{`
+        .safe-area-top {
+          padding-top: env(safe-area-inset-top);
+        }
+        .safe-area-bottom {
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+        @media (max-width: 768px) {
+          body {
+            overscroll-behavior-y: none;
+          }
+        }
+      `}</style>
+    </>
+  );
+}

@@ -1,0 +1,331 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Settings, Save, CheckCircle, Calculator } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import CalculadoraMarkup from "../components/configuracoes/CalculadoraMarkup";
+import TemplatesNegocio from "../components/configuracoes/TemplatesNegocio";
+
+export default function ConfiguracoesPage() {
+  const [user, setUser] = useState(null);
+  const [margemPadrao, setMargemPadrao] = useState("");
+  const [faturamentoMedio, setFaturamentoMedio] = useState("");
+  const [custoFixo, setCustoFixo] = useState("");
+  const [taxaImpostos, setTaxaImpostos] = useState("");
+  const [taxaCartao, setTaxaCartao] = useState("");
+  const [markupCalculado, setMarkupCalculado] = useState(0);
+  const [custoMaoObraHora, setCustoMaoObraHora] = useState("");
+  const [custoFixoUnidade, setCustoFixoUnidade] = useState("");
+  const [producaoMensalEstimada, setProducaoMensalEstimada] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [sucesso, setSucesso] = useState(false);
+
+  useEffect(() => {
+    carregarDados();
+  }, []);
+
+  const carregarDados = async () => {
+    try {
+      const currentUser = await base44.auth.me();
+      setUser(currentUser);
+      setMargemPadrao(currentUser.margem_lucro_padrao || 30);
+      setFaturamentoMedio(currentUser.faturamento_medio_mensal || "");
+      setCustoFixo(currentUser.custo_fixo_mensal || "");
+      setTaxaImpostos(currentUser.taxa_impostos || 5);
+      setTaxaCartao(currentUser.taxa_cartao || 4);
+      setMarkupCalculado(currentUser.markup_calculado || 0);
+      setCustoMaoObraHora(currentUser.custo_mao_obra_hora || "");
+      setCustoFixoUnidade(currentUser.custo_fixo_por_unidade || "");
+      setProducaoMensalEstimada(currentUser.producao_mensal_estimada || "");
+    } catch (error) {
+      console.error('Erro ao carregar usuário:', error);
+    }
+  };
+
+  const aplicarTemplate = async (config) => {
+    setMargemPadrao(config.margem_lucro_padrao);
+    setTaxaImpostos(config.taxa_impostos);
+    setTaxaCartao(config.taxa_cartao);
+    setCustoMaoObraHora(config.custo_mao_obra_hora);
+
+    // Aplicar automaticamente
+    try {
+      await base44.auth.updateMe({
+        margem_lucro_padrao: config.margem_lucro_padrao,
+        taxa_impostos: config.taxa_impostos,
+        taxa_cartao: config.taxa_cartao,
+        custo_mao_obra_hora: config.custo_mao_obra_hora,
+        faturamento_medio_mensal: parseFloat(faturamentoMedio) || 0,
+        custo_fixo_mensal: parseFloat(custoFixo) || 0,
+        producao_mensal_estimada: parseFloat(producaoMensalEstimada) || 0,
+        custo_fixo_por_unidade: parseFloat(custoFixoUnidade) || 0,
+        markup_calculado: markupCalculado
+      });
+
+      alert('✅ Template aplicado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao aplicar template:', error);
+      alert('Erro ao aplicar template');
+    }
+  };
+
+  const salvarConfiguracoes = async (e) => {
+    e.preventDefault();
+    setSalvando(true);
+    setSucesso(false);
+
+    try {
+      const custoMaoObraVal = parseFloat(custoMaoObraHora) || 0;
+      const producaoEstimada = parseFloat(producaoMensalEstimada) || 0;
+      const custoFixoVal = parseFloat(custoFixo) || 0;
+
+      // Calcular custo fixo por unidade automaticamente
+      const custoFixoPorUnidadeCalc = producaoEstimada > 0 
+        ? custoFixoVal / producaoEstimada 
+        : parseFloat(custoFixoUnidade) || 0;
+
+      await base44.auth.updateMe({
+        margem_lucro_padrao: parseFloat(margemPadrao) || 30,
+        faturamento_medio_mensal: parseFloat(faturamentoMedio) || 0,
+        custo_fixo_mensal: custoFixoVal,
+        taxa_impostos: parseFloat(taxaImpostos) || 5,
+        taxa_cartao: parseFloat(taxaCartao) || 4,
+        markup_calculado: markupCalculado,
+        custo_mao_obra_hora: custoMaoObraVal,
+        custo_fixo_por_unidade: custoFixoPorUnidadeCalc,
+        producao_mensal_estimada: producaoEstimada
+      });
+
+      setSucesso(true);
+      setTimeout(() => setSucesso(false), 3000);
+    } catch (error) {
+      console.error('Erro ao salvar:', error);
+      alert('Erro ao salvar configurações');
+    }
+
+    setSalvando(false);
+  };
+
+  if (!user) {
+    return (
+      <div className="p-4 md:p-8 bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <Settings className="w-8 h-8" />
+            Configurações
+          </h1>
+          <p className="text-gray-500 mt-1">Personalize as configurações do sistema</p>
+        </div>
+
+        {sucesso && (
+          <Alert className="mb-6 bg-green-50 border-green-200">
+            <CheckCircle className="w-4 h-4 text-green-600" />
+            <AlertDescription className="text-green-800">
+              Configurações salvas com sucesso!
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-6">
+            <TemplatesNegocio onAplicar={aplicarTemplate} />
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-900 mb-2">💡 Configuração Manual</h3>
+              <p className="text-sm text-blue-800">
+                Use os templates acima para configuração rápida baseada em benchmarks de mercado, 
+                ou preencha manualmente os campos abaixo. Para margem de lucro das receitas, 
+                vá em <strong>Controle → Lanches → Config</strong>.
+              </p>
+            </div>
+
+            <Card className="shadow-lg">
+              <CardHeader>
+                <CardTitle>Dados do Negócio</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={salvarConfiguracoes} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Faturamento Médio Mensal (R$) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={faturamentoMedio}
+                        onChange={(e) => setFaturamentoMedio(e.target.value)}
+                        placeholder="50000.00"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Quanto você fatura por mês em média</p>
+                    </div>
+
+                    <div>
+                      <Label>Custo Fixo Mensal (R$) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={custoFixo}
+                        onChange={(e) => setCustoFixo(e.target.value)}
+                        placeholder="16000.00"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Aluguel, salários, energia, etc</p>
+                    </div>
+
+                    <div>
+                      <Label>Taxa de Impostos (%) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={taxaImpostos}
+                        onChange={(e) => setTaxaImpostos(e.target.value)}
+                        placeholder="5"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Simples Nacional, ISS, etc</p>
+                    </div>
+
+                    <div>
+                      <Label>Taxa de Cartão/Delivery (%) *</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={taxaCartao}
+                        onChange={(e) => setTaxaCartao(e.target.value)}
+                        placeholder="4"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Taxas de pagamento</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                      💰 Custos de Produção
+                    </h4>
+                    <div className="space-y-3">
+                      <div>
+                        <Label>Custo de Mão de Obra (R$/hora)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={custoMaoObraHora}
+                          onChange={(e) => setCustoMaoObraHora(e.target.value)}
+                          placeholder="0.00"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Custo médio por hora de trabalho (salário + encargos ÷ horas trabalhadas)
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label>Produção Mensal Estimada (unidades)</Label>
+                        <Input
+                          type="number"
+                          value={producaoMensalEstimada}
+                          onChange={(e) => {
+                            setProducaoMensalEstimada(e.target.value);
+                            // Calcular custo fixo por unidade automaticamente
+                            const prod = parseFloat(e.target.value) || 0;
+                            const fixo = parseFloat(custoFixo) || 0;
+                            if (prod > 0) {
+                              setCustoFixoUnidade((fixo / prod).toFixed(2));
+                            }
+                          }}
+                          placeholder="1000"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Quantas unidades você produz por mês em média
+                        </p>
+                      </div>
+
+                      <div>
+                        <Label>Custo Fixo por Unidade (R$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={custoFixoUnidade}
+                          onChange={(e) => setCustoFixoUnidade(e.target.value)}
+                          placeholder="Calculado automaticamente"
+                          disabled={producaoMensalEstimada > 0}
+                        />
+                        <p className="text-xs text-blue-600 mt-1">
+                          {producaoMensalEstimada > 0 
+                            ? `Calculado: R$ ${custoFixoUnidade || '0.00'} (Custo Fixo ÷ Produção Mensal)`
+                            : "Informe a produção mensal para cálculo automático"
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-orange-900 mb-2">⚠️ Importante</h4>
+                    <p className="text-sm text-orange-800">
+                      Estes dados são fundamentais para calcular o <strong>custo real</strong> e o <strong>markup ideal</strong> do seu negócio.
+                      Com custos de mão de obra e overhead configurados, você terá uma precificação muito mais precisa.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button 
+                      type="submit" 
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={salvando}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      {salvando ? 'Salvando...' : 'Salvar Configurações'}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {faturamentoMedio && custoFixo && (
+              <CalculadoraMarkup
+                faturamento={parseFloat(faturamentoMedio)}
+                custoFixo={parseFloat(custoFixo)}
+                taxaImpostos={parseFloat(taxaImpostos)}
+                taxaCartao={parseFloat(taxaCartao)}
+                margemLucro={parseFloat(margemPadrao)}
+                onMarkupCalculado={setMarkupCalculado}
+              />
+            )}
+        </div>
+
+        <Card className="shadow-lg mt-6">
+          <CardHeader>
+            <CardTitle>Informações da Conta</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <Label className="text-gray-600">Nome</Label>
+                <p className="font-medium">{user.full_name}</p>
+              </div>
+              <div>
+                <Label className="text-gray-600">Email</Label>
+                <p className="font-medium">{user.email}</p>
+              </div>
+              <div>
+                <Label className="text-gray-600">Função</Label>
+                <p className="font-medium capitalize">{user.role}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,455 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String
+  password_hash String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  clientes           Cliente[]
+  produtos           Produto[]
+  vendas             Venda[]
+  compras            Compra[]
+  fornecedores       Fornecedor[]
+  movimentacoes      MovimentacaoEstoque[]
+  empresasRevenda    EmpresaRevenda[]
+  vendasRevenda      VendaRevenda[]
+  gastosRevenda      GastoRevenda[]
+  gastosOperacionais GastoOperacional[]
+  gastosPessoais     GastoPessoal[]
+
+  ingredientes       Ingrediente[]
+  receitas           ReceitaProduto[]
+  producoes          ProducaoLanche[]
+  lotes              Lote[]
+  alertas            AlertaEstoque[]
+  pedidos            Pedido[]
+
+  funcionarios       Funcionario[]
+  diarias            Diaria[]
+
+  @@map("users")
+}
+
+model Cliente {
+  id        String   @id @default(uuid())
+  nome      String
+  telefone  String?
+  email     String?
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+
+  vendas        Venda[]
+  vendasRevenda VendaRevenda[]
+
+  @@map("clientes")
+}
+
+model Produto {
+  id              String   @id @default(uuid())
+  nome            String
+  descricao       String?
+  preco           Decimal  
+  custo           Decimal? 
+  estoque_atual   Float    @default(0)
+  unidade         String   @default("un")
+  controla_estoque Boolean @default(false)
+  ativo           Boolean  @default(true)
+  estoque_minimo  Float    @default(0)
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  movimentacoes   MovimentacaoEstoque[]
+  itensVenda      ItemVenda[]
+  itensCompra     ItemCompra[]
+  lotes           Lote[]
+  alertas         AlertaEstoque[]
+
+  @@map("produtos")
+}
+
+model Venda {
+  id             String   @id @default(uuid())
+  data_venda     DateTime
+  data_pagamento DateTime?
+  valor_total    Decimal  
+  status         String   @default("pendente")
+  observacoes    String?
+  cliente_nome   String?
+  
+  clienteId      String?
+  cliente        Cliente? @relation(fields: [clienteId], references: [id])
+  
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+
+  itens          ItemVenda[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("vendas")
+}
+
+model ItemVenda {
+  id             String   @id @default(uuid())
+  vendaId        String
+  venda          Venda    @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  
+  produtoId      String?
+  produto        Produto? @relation(fields: [produtoId], references: [id])
+  
+  nome_produto   String
+  quantidade     Float
+  preco_unitario Decimal  
+  subtotal       Decimal  
+
+  @@map("itens_venda")
+}
+
+model MovimentacaoEstoque {
+  id             String   @id @default(uuid())
+  tipo           String   
+  quantidade     Float
+  origem         String   
+  data           DateTime @default(now())
+  observacoes    String?
+  
+  produtoId      String
+  produto        Produto  @relation(fields: [produtoId], references: [id])
+  
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  
+  createdAt      DateTime @default(now())
+
+  @@map("movimentacao_estoque")
+}
+
+model Fornecedor {
+  id        String   @id @default(uuid())
+  nome      String
+  telefone  String?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  compras   Compra[]
+
+  @@map("fornecedores")
+}
+
+model Compra {
+  id             String   @id @default(uuid())
+  data_compra    DateTime
+  data_pagamento DateTime?
+  valor_total    Decimal  
+  status         String   @default("concluida")
+  observacoes    String?
+  pago           Boolean  @default(false)
+  
+  fornecedor_nome String?
+  fornecedorId   String?
+  fornecedor     Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  
+  itens          ItemCompra[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("compras")
+}
+
+model ItemCompra {
+  id             String   @id @default(uuid())
+  compraId       String
+  compra         Compra   @relation(fields: [compraId], references: [id], onDelete: Cascade)
+  
+  produtoId      String?
+  produto        Produto? @relation(fields: [produtoId], references: [id])
+  
+  nome_produto   String
+  quantidade     Float
+  unidade        String?
+  preco_unitario Decimal  
+  subtotal       Decimal  
+
+  @@map("itens_compra")
+}
+
+model EmpresaRevenda {
+  id                   String   @id @default(uuid())
+  nome                 String
+  porcentagem_comissao Float
+  cor                  String?
+  ativa                Boolean  @default(true)
+  
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+  
+  vendas               VendaRevenda[]
+  gastos               GastoRevenda[]
+
+  @@map("empresas_revenda")
+}
+
+model VendaRevenda {
+  id                   String   @id @default(uuid())
+  data_primeira_parcela DateTime
+  valor_total          Decimal  
+  numero_parcelas      Int      @default(1)
+  valor_parcela        Decimal  
+  comissao_total       Decimal  
+  status               String   @default("ativa")
+  descricao_produtos   String?
+  
+  empresaId            String
+  empresa              EmpresaRevenda @relation(fields: [empresaId], references: [id])
+  
+  clienteId            String?
+  cliente              Cliente? @relation(fields: [clienteId], references: [id])
+  
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+  
+  parcelas             ParcelaRevenda[]
+
+  created_date         DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("vendas_revenda")
+}
+
+model ParcelaRevenda {
+  id              String       @id @default(uuid())
+  vendaRevendaId  String
+  vendaRevenda    VendaRevenda @relation(fields: [vendaRevendaId], references: [id], onDelete: Cascade)
+  
+  numero          Int
+  data_vencimento DateTime
+  valor           Decimal      
+  paga            Boolean      @default(false)
+  data_pagamento  DateTime?
+
+  @@map("parcelas_revenda")
+}
+
+model GastoRevenda {
+  id          String   @id @default(uuid())
+  descricao   String
+  valor       Decimal  
+  data        DateTime
+  
+  empresaId   String?
+  empresa     EmpresaRevenda? @relation(fields: [empresaId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("gastos_revenda")
+}
+
+model GastoOperacional {
+  id          String   @id @default(uuid())
+  descricao   String
+  categoria   String?
+  valor       Decimal  
+  data        DateTime
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("gastos_operacionais")
+}
+
+model GastoPessoal {
+  id          String   @id @default(uuid())
+  descricao   String
+  categoria   String?
+  valor       Decimal  
+  data        DateTime
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("gastos_pessoais")
+}
+
+model Ingrediente {
+  id                  String   @id @default(uuid())
+  nome                String
+  quantidade_comprada Float
+  valor_pago          Decimal
+  preco_por_kg        Decimal
+  fator_correcao      Float    @default(1)
+  preco_corrigido_kg  Decimal
+  estoque_atual       Float
+  estoque_minimo      Float    @default(0)
+  ativo               Boolean  @default(true)
+
+  userId              String
+  user                User     @relation(fields: [userId], references: [id])
+
+  receitas            ReceitaIngrediente[]
+  lotes               Lote[]
+  alertas             AlertaEstoque[]
+
+  @@map("ingredientes")
+}
+
+model ReceitaProduto {
+  id                   String   @id @default(uuid())
+  nome_produto         String
+  categoria            String
+  tempo_preparo        Int?     @default(0)
+  custo_total          Decimal
+  preco_venda_sugerido Decimal
+  margem_lucro         Decimal
+  observacoes          String?
+  ativo                Boolean  @default(true)
+
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+  
+  ingredientes         ReceitaIngrediente[]
+  producoes            ProducaoLanche[]
+
+  @@map("receitas_produto")
+}
+
+model ReceitaIngrediente {
+  id                String   @id @default(uuid())
+  quantidade        Float
+  quantidade_kg     Float
+  unidade           String
+  
+  receitaId         String
+  receita           ReceitaProduto @relation(fields: [receitaId], references: [id], onDelete: Cascade)
+  
+  ingredienteId     String
+  ingrediente       Ingrediente @relation(fields: [ingredienteId], references: [id])
+  
+  ingrediente_nome  String?
+
+  @@map("receitas_ingredientes")
+}
+
+model ProducaoLanche {
+  id                   String   @id @default(uuid())
+  quantidade_produzida Float
+  data_producao        DateTime @default(now())
+  custo_total_producao Decimal
+  observacoes          String?
+
+  receitaId            String
+  receita              ReceitaProduto @relation(fields: [receitaId], references: [id])
+  
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+
+  @@map("producoes_lanche")
+}
+
+model Lote {
+  id                 String   @id @default(uuid())
+  numero_lote        String
+  data_fabricacao    DateTime?
+  data_validade      DateTime
+  quantidade_inicial Float
+  quantidade_atual   Float
+  
+  produtoId          String?
+  produto            Produto? @relation(fields: [produtoId], references: [id])
+  
+  ingredienteId      String?
+  ingrediente        Ingrediente? @relation(fields: [ingredienteId], references: [id])
+
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+
+  @@map("lotes")
+}
+
+model AlertaEstoque {
+  id                String   @id @default(uuid())
+  tipo_alerta       String   
+  mensagem          String
+  resolvido         Boolean  @default(false)
+  
+  produtoId         String?
+  produto           Produto? @relation(fields: [produtoId], references: [id])
+  
+  ingredienteId     String?
+  ingrediente       Ingrediente? @relation(fields: [ingredienteId], references: [id])
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  
+  createdAt         DateTime @default(now())
+
+  @@map("alertas_estoque")
+}
+
+model Pedido {
+  id                String   @id @default(uuid())
+  cliente_nome      String?
+  status            String   
+  valor_total       Decimal
+  data_pedido       DateTime @default(now())
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@map("pedidos")
+}
+
+model Funcionario {
+  id                String   @id @default(uuid())
+  nome              String
+  cargo             String?
+  telefone          String?
+  ativo             Boolean  @default(true)
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  
+  diarias           Diaria[]
+
+  @@map("funcionarios")
+}
+
+model Diaria {
+  id                String   @id @default(uuid())
+  data_diaria       DateTime @default(now())
+  valor             Decimal
+  foi_pago          Boolean  @default(false)
+  observacoes       String?
+
+  funcionarioId     String
+  funcionario       Funcionario @relation(fields: [funcionarioId], references: [id], onDelete: Cascade)
+
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+
+  @@map("diarias")
+}
