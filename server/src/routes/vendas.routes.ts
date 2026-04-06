@@ -60,6 +60,34 @@ export async function vendasRoutes(app: FastifyInstance) {
         const userId = request.user.sub
         const { itens, ...vendaData } = request.body
 
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { plan: true }
+        })
+
+        if (user?.plan === 'free') {
+            const now = new Date()
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+            const total = await prisma.venda.count({
+                where: {
+                    userId,
+                    createdAt: {
+                        gte: startOfMonth,
+                        lte: endOfMonth
+                    }
+                }
+            })
+
+            if (total >= 150) {
+                return reply.status(403).send({
+                    error: "LIMIT_REACHED",
+                    message: "Você atingiu o limite de 150 vendas no plano gratuito."
+                })
+            }
+        }
+
         try {
             const result = await prisma.$transaction(async (tx) => {
                 const venda = await tx.venda.create({

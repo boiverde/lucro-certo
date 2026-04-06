@@ -15,6 +15,20 @@ export const auth = {
         return false;
     },
 
+    // Autenticação com Token OAuth (Google)
+    loginWithGoogleToken: async (supabaseAccessToken) => {
+        const data = await httpClient('/auth/google', {
+            method: 'POST',
+            body: JSON.stringify({ token: supabaseAccessToken }),
+        });
+
+        if (data.token) {
+            localStorage.setItem('auth_token', data.token);
+            return true;
+        }
+        return false;
+    },
+
     // Cadastro (Novo backend)
     register: async (name, email, password) => {
         return httpClient('/auth/register', {

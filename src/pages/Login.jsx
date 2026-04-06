@@ -1,10 +1,64 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/lib/supabase';
 
 export default function Login() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [loadingGoogle, setLoadingGoogle] = useState(false);
+
+    useEffect(() => {
+        // Observer for Supabase OAuth callback
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_IN' && session?.access_token) {
+                try {
+                    setLoadingGoogle(true);
+                    // Send Supabase token to backend to sync user & issue local JWT
+                    const success = await base44.auth.loginWithGoogleToken(session.access_token);
+                    if (success) {
+                        window.location.href = '/Dashboard';
+                    } else {
+                        setError('Falha ao autorizar Google no backend');
+                    }
+                } catch (err) {
+                    setError('Erro ao sincronizar login com Google');
+                } finally {
+                    setLoadingGoogle(false);
+                }
+            }
+        });
+
+        // Caso a sessão já tenha sido processada e recarregue a page
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.access_token) {
+                setLoadingGoogle(true);
+                base44.auth.loginWithGoogleToken(session.access_token).then(success => {
+                    if (success) window.location.href = '/Dashboard';
+                    else setLoadingGoogle(false);
+                }).catch(() => setLoadingGoogle(false));
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    const handleGoogleLogin = async () => {
+        setLoadingGoogle(true);
+        setError('');
+        try {
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: window.location.origin + '/Login'
+                }
+            });
+            if (error) throw error;
+        } catch (err) {
+            setError(err.message || 'Erro ao abrir login com Google');
+            setLoadingGoogle(false);
+        }
+    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -23,9 +77,24 @@ export default function Login() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-gray-100">
             <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-                <h1 className="text-2xl font-bold mb-6 text-center">Login Local</h1>
+                <h1 className="text-2xl font-bold mb-6 text-center">Acessar Sistema</h1>
 
                 {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+
+                <button 
+                    onClick={handleGoogleLogin} 
+                    disabled={loadingGoogle}
+                    className="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded hover:bg-gray-50 flex items-center justify-center gap-2 mb-4 transition-colors"
+                >
+                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                    {loadingGoogle ? 'Autenticando...' : 'Entrar com Google'}
+                </button>
+
+                <div className="flex items-center my-4">
+                    <div className="flex-1 border-t border-gray-300"></div>
+                    <span className="px-3 text-sm text-gray-500">ou</span>
+                    <div className="flex-1 border-t border-gray-300"></div>
+                </div>
 
                 <form onSubmit={handleLogin}>
                     <div className="mb-4">

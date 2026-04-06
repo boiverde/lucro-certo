@@ -71,6 +71,58 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.status(201).send({ id: user.id, email: user.email })
     })
 
+    // Login com Google via Supabase Auth
+    app.withTypeProvider<ZodTypeProvider>().post('/google', {
+        schema: {
+            body: z.object({
+                token: z.string(), // Access Token do Supabase
+            }),
+        },
+    }, async (request, reply) => {
+        const { token } = request.body
+
+        // Ideal é ler as chaves de process.env, usando dummy fallback temporário
+        const supabaseUrl = process.env.SUPABASE_URL || 'https://qfahagyxugfjzrigkmkp.supabase.co';
+        const supabaseKey = process.env.SUPABASE_ANON_KEY || 'SUBNSTITUA_PELA_SUA_ANON_KEY';
+        
+        const { createClient } = require('@supabase/supabase-js');
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const { data: { user: sbUser }, error } = await supabase.auth.getUser(token);
+
+        if (error || !sbUser) {
+            return reply.status(401).send({ message: 'Token Google inválido ou expirado.' });
+        }
+
+        // Buscar usuário local ou criar
+        let userLocal = await prisma.user.findUnique({
+            where: { email: sbUser.email },
+        })
+
+        if (!userLocal) {
+            // Conta associada pelo Google, sem senha
+            const crypto = require('crypto');
+            const randomPassword = crypto.randomUUID();
+            const password_hash = await bcrypt.hash(randomPassword, 6);
+            
+            userLocal = await prisma.user.create({
+                data: {
+                    name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Nome não informado',
+                    email: sbUser.email!,
+                    password_hash,
+                },
+            });
+        }
+
+        // Emitir o JWT próprio e inquebrável da aplicação
+        const localToken = app.jwt.sign(
+            { name: userLocal.name, email: userLocal.email },
+            { sub: userLocal.id, expiresIn: '7d' }
+        )
+
+        return reply.send({ token: localToken, email: userLocal.email });
+    })
+
     // Me
     app.withTypeProvider<ZodTypeProvider>().get('/me', {
         onRequest: [app.authenticate]
