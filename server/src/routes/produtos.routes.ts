@@ -21,7 +21,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         const produtos = await prisma.produto.findMany({
             where: {
                 userId,
-                nome: nome ? { contains: nome, mode: 'insensitive' } : undefined,
+                nome: nome ? { contains: nome } : undefined,
                 ativo: ativo !== undefined ? ativo : undefined,
             },
             orderBy: { nome: 'asc' },

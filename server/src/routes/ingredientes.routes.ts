@@ -19,7 +19,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
 
         const where: any = { userId }
         if (nome) {
-            where.nome = { contains: nome, mode: 'insensitive' }
+            where.nome = { contains: nome }
         }
 
         const ingredientes = await prisma.ingrediente.findMany({

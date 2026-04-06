@@ -39,24 +39,19 @@ const navigationItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Controle",
+    title: "PDV e Controle",
     url: createPageUrl("Controle"),
     icon: Sliders,
   },
   {
-    title: "Revendas",
-    url: createPageUrl("Revendas"),
+    title: "Estoque",
+    url: createPageUrl("Estoque"),
     icon: Store,
   },
   {
     title: "Clientes",
     url: createPageUrl("Clientes"),
     icon: Users,
-  },
-  {
-    title: "Pessoais",
-    url: createPageUrl("Pessoais"),
-    icon: DollarSign,
   },
   {
     title: "Relatórios",

@@ -22,7 +22,7 @@ export async function clientesRoutes(app: FastifyInstance) {
 
         const where = {
             userId,
-            nome: nome ? { contains: nome, mode: 'insensitive' as const } : undefined,
+            nome: nome ? { contains: nome } : undefined,
         }
 
         const [clientes, total] = await Promise.all([

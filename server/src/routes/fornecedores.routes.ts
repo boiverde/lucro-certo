@@ -19,7 +19,7 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
 
         const where: any = { userId }
         if (nome) {
-            where.nome = { contains: nome, mode: 'insensitive' }
+            where.nome = { contains: nome }
         }
 
         const fornecedores = await prisma.fornecedor.findMany({

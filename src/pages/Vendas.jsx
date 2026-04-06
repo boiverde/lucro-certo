@@ -56,33 +56,8 @@ export default function VendasPage() {
         throw new Error('offline');
       }
 
-      // Criar a venda
+      // Criar a venda (o backend já processará o estoque e movimentação em transação)
       const vendaCriada = await base44.entities.Venda.create(data);
-      
-      // Se deve descontar do estoque e tem produto vinculado
-      if (data.descontar_estoque && data.produto_estoque_id) {
-        const produto = produtos.find(p => p.id === data.produto_estoque_id);
-        
-        if (produto && produto.controla_estoque) {
-          // Atualizar estoque do produto
-          const novoEstoque = Math.max(0, produto.estoque_atual - data.quantidade);
-          await base44.entities.Produto.update(produto.id, {
-            estoque_atual: novoEstoque
-          });
-          
-          // Criar movimentação de estoque
-          await base44.entities.MovimentacaoEstoque.create({
-            produto_id: produto.id,
-            produto_nome: produto.nome,
-            tipo: 'saida',
-            quantidade: data.quantidade,
-            data: data.data_venda,
-            origem: 'venda',
-            observacoes: `Venda - ${data.cliente || 'Cliente não informado'}`
-          });
-        }
-      }
-      
       return vendaCriada;
     },
     onSuccess: () => {
@@ -97,6 +72,8 @@ export default function VendasPage() {
         alert('✅ Venda salva! Será sincronizada quando voltar online.');
         setShowForm(false);
         setEditando(null);
+      } else {
+        alert(`❌ Erro ao salvar venda: ${error.message}`);
       }
     }
   });
@@ -137,32 +114,14 @@ export default function VendasPage() {
   const handleSync = async (item) => {
     if (item.type === 'create_venda') {
       const data = item.data;
-      const vendaCriada = await base44.entities.Venda.create(data);
-      
-      if (data.descontar_estoque && data.produto_estoque_id) {
-        const produto = produtos.find(p => p.id === data.produto_estoque_id);
-        
-        if (produto && produto.controla_estoque) {
-          const novoEstoque = Math.max(0, produto.estoque_atual - data.quantidade);
-          await base44.entities.Produto.update(produto.id, {
-            estoque_atual: novoEstoque
-          });
-          
-          await base44.entities.MovimentacaoEstoque.create({
-            produto_id: produto.id,
-            produto_nome: produto.nome,
-            tipo: 'saida',
-            quantidade: data.quantidade,
-            data: data.data_venda,
-            origem: 'venda',
-            observacoes: `Venda - ${data.cliente || 'Cliente não informado'}`
-          });
-        }
+      try {
+        await base44.entities.Venda.create(data);
+        queryClient.invalidateQueries({ queryKey: ['vendas'] });
+        queryClient.invalidateQueries({ queryKey: ['produtos'] });
+        queryClient.invalidateQueries({ queryKey: ['movimentacoes-estoque'] });
+      } catch (err) {
+        alert(`❌ Erro ao sincronizar venda offline: ${err.message}`);
       }
-      
-      queryClient.invalidateQueries({ queryKey: ['vendas'] });
-      queryClient.invalidateQueries({ queryKey: ['produtos'] });
-      queryClient.invalidateQueries({ queryKey: ['movimentacoes-estoque'] });
     }
   };
 

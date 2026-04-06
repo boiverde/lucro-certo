@@ -29,7 +29,7 @@ export async function comprasRoutes(app: FastifyInstance) {
         }
 
         if (fornecedor) {
-            where.fornecedor_nome = { contains: fornecedor, mode: 'insensitive' }
+            where.fornecedor_nome = { contains: fornecedor }
         }
 
         const compras = await prisma.compra.findMany({
@@ -73,7 +73,25 @@ export async function comprasRoutes(app: FastifyInstance) {
         }
 
         const result = await prisma.$transaction(async (tx) => {
-            // 1. Criar a Compra
+            let finalProdutoId = data.produto_estoque_id || null
+
+            // 1. Criar novo produto se solicitado e não enviado ID
+            if (data.adicionar_estoque && !finalProdutoId) {
+                const novoProduto = await tx.produto.create({
+                    data: {
+                        userId,
+                        nome: data.produto || 'Item sem nome',
+                        preco: data.valor_por_unidade || 0,
+                        custo: data.valor_por_unidade || 0,
+                        estoque_atual: 0,
+                        unidade: data.unidade_compra || 'un',
+                        controla_estoque: true
+                    }
+                })
+                finalProdutoId = novoProduto.id
+            }
+
+            // 2. Criar a Compra
             const compra = await tx.compra.create({
                 data: {
                     userId,
@@ -85,7 +103,7 @@ export async function comprasRoutes(app: FastifyInstance) {
                     itens: {
                         create: [{
                             nome_produto: data.produto || 'Item sem nome',
-                            produtoId: data.produto_estoque_id || null,
+                            produtoId: finalProdutoId,
                             quantidade: data.quantidade,
                             unidade: data.unidade_compra,
                             preco_unitario: data.valor_por_unidade || 0,
@@ -96,18 +114,17 @@ export async function comprasRoutes(app: FastifyInstance) {
                 include: { itens: true }
             })
 
-            // 2. Atualizar Estoque (Se solicitado e tiver ID de produto)
-            if (data.adicionar_estoque && data.produto_estoque_id) {
+            // 3. Atualizar Estoque
+            if (data.adicionar_estoque && finalProdutoId) {
                 await tx.produto.update({
-                    where: { id: data.produto_estoque_id },
+                    where: { id: finalProdutoId },
                     data: { estoque_atual: { increment: data.quantidade } }
                 })
 
-                // 3. Registrar Movimentação de Entrada
                 await tx.movimentacaoEstoque.create({
                     data: {
                         userId,
-                        produtoId: data.produto_estoque_id,
+                        produtoId: finalProdutoId,
                         tipo: 'entrada',
                         quantidade: data.quantidade,
                         origem: 'compra',
@@ -116,9 +133,6 @@ export async function comprasRoutes(app: FastifyInstance) {
                     }
                 })
             }
-            // TODO: Se não tiver ID (produto novo), deveríamos criar o produto?
-            // O frontend atual sugere "Criar produto no estoque" texto, mas não manda dados completos do produto no payload da compra.
-            // Vou assumir que o usuário deve criar o produto antes ou o frontend melhorado mandaria, mas por enquanto seguimos o flow simples.
 
             return compra
         })

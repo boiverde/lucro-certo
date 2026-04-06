@@ -19,7 +19,7 @@ export async function funcionariosRoutes(app: FastifyInstance) {
 
         const where: any = { userId }
         if (nome) {
-            where.nome = { contains: nome, mode: 'insensitive' }
+            where.nome = { contains: nome }
         }
 
         const funcionarios = await prisma.funcionario.findMany({

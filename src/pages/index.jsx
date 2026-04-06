@@ -1,89 +1,50 @@
+import React, { Suspense, lazy } from 'react';
 import Layout from "./Layout.jsx";
-
-import Compras from "./Compras";
-
-import Dashboard from "./Dashboard";
-
-import Vendas from "./Vendas";
-
-import Relatorios from "./Relatorios";
-
-import Home from "./Home";
-
-import Pessoais from "./Pessoais";
-
-import PoliticaDePrivacidade from "./PoliticaDePrivacidade";
-
-import MarketingAssets from "./MarketingAssets";
-
-import Revendas from "./Revendas";
-
-import Clientes from "./Clientes";
-
-import GuiaPlayStore from "./GuiaPlayStore";
-
-import ConfiguracaoManifest from "./ConfiguracaoManifest";
-
-import Estoque from "./Estoque";
-
-import Controle from "./Controle";
-
-import GuiaPublicacao from "./GuiaPublicacao";
-
-import Configuracoes from "./Configuracoes";
-
-import GuiaGooglePlay from "./GuiaGooglePlay";
-
-import CorrigirDNS from "./CorrigirDNS";
-
-import GuiaExportacao from "./GuiaExportacao";
-import Login from "./Login";
-
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
+const Compras = lazy(() => import("./Compras"));
+const Dashboard = lazy(() => import("./Dashboard"));
+const Vendas = lazy(() => import("./Vendas"));
+const Relatorios = lazy(() => import("./Relatorios"));
+const Home = lazy(() => import("./Home"));
+const Pessoais = lazy(() => import("./Pessoais"));
+const PoliticaDePrivacidade = lazy(() => import("./PoliticaDePrivacidade"));
+const MarketingAssets = lazy(() => import("./MarketingAssets"));
+const Revendas = lazy(() => import("./Revendas"));
+const Clientes = lazy(() => import("./Clientes"));
+const GuiaPlayStore = lazy(() => import("./GuiaPlayStore"));
+const ConfiguracaoManifest = lazy(() => import("./ConfiguracaoManifest"));
+const Estoque = lazy(() => import("./Estoque"));
+const Controle = lazy(() => import("./Controle"));
+const GuiaPublicacao = lazy(() => import("./GuiaPublicacao"));
+const Configuracoes = lazy(() => import("./Configuracoes"));
+const GuiaGooglePlay = lazy(() => import("./GuiaGooglePlay"));
+const CorrigirDNS = lazy(() => import("./CorrigirDNS"));
+const GuiaExportacao = lazy(() => import("./GuiaExportacao"));
+const Login = lazy(() => import("./Login"));
+
 const PAGES = {
-
-    Compras: Compras,
-
-    Dashboard: Dashboard,
-
-    Vendas: Vendas,
-
-    Relatorios: Relatorios,
-
-    Home: Home,
-
-    Pessoais: Pessoais,
-
-    PoliticaDePrivacidade: PoliticaDePrivacidade,
-
-    MarketingAssets: MarketingAssets,
-
-    Revendas: Revendas,
-
-    Clientes: Clientes,
-
-    GuiaPlayStore: GuiaPlayStore,
-
-    ConfiguracaoManifest: ConfiguracaoManifest,
-
-    Estoque: Estoque,
-
-    Controle: Controle,
-
-    GuiaPublicacao: GuiaPublicacao,
-
-    Configuracoes: Configuracoes,
-
-    GuiaGooglePlay: GuiaGooglePlay,
-
-    CorrigirDNS: CorrigirDNS,
-
-    GuiaExportacao: GuiaExportacao,
-
-    Login: Login,
-
-}
+    Compras,
+    Dashboard,
+    Vendas,
+    Relatorios,
+    Home,
+    Pessoais,
+    PoliticaDePrivacidade,
+    MarketingAssets,
+    Revendas,
+    Clientes,
+    GuiaPlayStore,
+    ConfiguracaoManifest,
+    Estoque,
+    Controle,
+    GuiaPublicacao,
+    Configuracoes,
+    GuiaGooglePlay,
+    CorrigirDNS,
+    GuiaExportacao,
+    Login
+};
 
 function _getCurrentPage(url) {
     if (url.endsWith('/')) {
@@ -105,52 +66,31 @@ function PagesContent() {
 
     return (
         <Layout currentPageName={currentPage}>
-            <Routes>
-
-                <Route path="/" element={<Compras />} />
-
-
-                <Route path="/Compras" element={<Compras />} />
-
-                <Route path="/Dashboard" element={<Dashboard />} />
-
-                <Route path="/Vendas" element={<Vendas />} />
-
-                <Route path="/Relatorios" element={<Relatorios />} />
-
-                <Route path="/Home" element={<Home />} />
-
-                <Route path="/Pessoais" element={<Pessoais />} />
-
-                <Route path="/PoliticaDePrivacidade" element={<PoliticaDePrivacidade />} />
-
-                <Route path="/MarketingAssets" element={<MarketingAssets />} />
-
-                <Route path="/Revendas" element={<Revendas />} />
-
-                <Route path="/Clientes" element={<Clientes />} />
-
-                <Route path="/GuiaPlayStore" element={<GuiaPlayStore />} />
-
-                <Route path="/ConfiguracaoManifest" element={<ConfiguracaoManifest />} />
-
-                <Route path="/Estoque" element={<Estoque />} />
-
-                <Route path="/Controle" element={<Controle />} />
-
-                <Route path="/GuiaPublicacao" element={<GuiaPublicacao />} />
-
-                <Route path="/Configuracoes" element={<Configuracoes />} />
-
-                <Route path="/GuiaGooglePlay" element={<GuiaGooglePlay />} />
-
-                <Route path="/CorrigirDNS" element={<CorrigirDNS />} />
-
-                <Route path="/GuiaExportacao" element={<GuiaExportacao />} />
-
-                <Route path="/Login" element={<Login />} />
-
-            </Routes>
+            <Suspense fallback={<div className="flex h-[50vh] w-full items-center justify-center text-gray-500">Carregando página...</div>}>
+                <Routes>
+                    <Route path="/" element={<Compras />} />
+                    <Route path="/Compras" element={<Compras />} />
+                    <Route path="/Dashboard" element={<Dashboard />} />
+                    <Route path="/Vendas" element={<Vendas />} />
+                    <Route path="/Relatorios" element={<Relatorios />} />
+                    <Route path="/Home" element={<Home />} />
+                    <Route path="/Pessoais" element={<Pessoais />} />
+                    <Route path="/PoliticaDePrivacidade" element={<PoliticaDePrivacidade />} />
+                    <Route path="/MarketingAssets" element={<MarketingAssets />} />
+                    <Route path="/Revendas" element={<Revendas />} />
+                    <Route path="/Clientes" element={<Clientes />} />
+                    <Route path="/GuiaPlayStore" element={<GuiaPlayStore />} />
+                    <Route path="/ConfiguracaoManifest" element={<ConfiguracaoManifest />} />
+                    <Route path="/Estoque" element={<Estoque />} />
+                    <Route path="/Controle" element={<Controle />} />
+                    <Route path="/GuiaPublicacao" element={<GuiaPublicacao />} />
+                    <Route path="/Configuracoes" element={<Configuracoes />} />
+                    <Route path="/GuiaGooglePlay" element={<GuiaGooglePlay />} />
+                    <Route path="/CorrigirDNS" element={<CorrigirDNS />} />
+                    <Route path="/GuiaExportacao" element={<GuiaExportacao />} />
+                    <Route path="/Login" element={<Login />} />
+                </Routes>
+            </Suspense>
         </Layout>
     );
 }
