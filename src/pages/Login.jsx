@@ -8,35 +8,48 @@ export default function Login() {
     const [error, setError] = useState('');
     const [loadingGoogle, setLoadingGoogle] = useState(false);
 
+    const processingRef = React.useRef(false);
+
     useEffect(() => {
-        // Observer for Supabase OAuth callback
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (event === 'SIGNED_IN' && session?.access_token) {
-                try {
-                    setLoadingGoogle(true);
-                    // Send Supabase token to backend to sync user & issue local JWT
-                    const success = await base44.auth.loginWithGoogleToken(session.access_token);
-                    if (success) {
-                        window.location.href = '/Dashboard';
-                    } else {
-                        setError('Falha ao autorizar Google no backend');
-                    }
-                } catch (err) {
-                    setError('Erro ao sincronizar login com Google');
-                } finally {
-                    setLoadingGoogle(false);
+        const handleAuth = async (session) => {
+            if (processingRef.current || !session?.access_token) return;
+            processingRef.current = true;
+            
+            try {
+                setLoadingGoogle(true);
+                setError('');
+                console.log('[Auth] Iniciando sincronização com backend...');
+                
+                const success = await base44.auth.loginWithGoogleToken(session.access_token);
+                if (success) {
+                    console.log('[Auth] Login validado. Redirecionando...');
+                    window.location.href = '/Dashboard';
+                } else {
+                    setError('O servidor não emitiu uma sessão válida para este login do Google.');
+                    processingRef.current = false;
                 }
+            } catch (err) {
+                console.error('[Auth] Erro na ponte do backend:', err);
+                setError(err.message || 'Erro ao sincronizar login com Google');
+                processingRef.current = false;
+            } finally {
+                setLoadingGoogle(false);
+            }
+        };
+
+        // Escuta mudanças de estado (Callbacks de Redirect caem aqui)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('[Auth] Evento Supabase:', event);
+            if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
+                handleAuth(session);
             }
         });
 
-        // Caso a sessão já tenha sido processada e recarregue a page
+        // Verificação imediata (Fallback)
         supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.access_token) {
-                setLoadingGoogle(true);
-                base44.auth.loginWithGoogleToken(session.access_token).then(success => {
-                    if (success) window.location.href = '/Dashboard';
-                    else setLoadingGoogle(false);
-                }).catch(() => setLoadingGoogle(false));
+            if (session) {
+                console.log('[Auth] Sessão encontrada no carregamento inicial');
+                handleAuth(session);
             }
         });
 
