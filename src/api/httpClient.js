@@ -1,4 +1,4 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
+﻿export const API_URL = import.meta.env.VITE_API_URL || 'https://lucro-certolucro-certo-api.onrender.com';
 
 export async function httpClient(endpoint, options = {}) {
     const token = localStorage.getItem('auth_token');
@@ -20,11 +20,11 @@ export async function httpClient(endpoint, options = {}) {
     const response = await fetch(`${API_URL}${endpoint}`, config);
 
     if (response.status === 401) {
-        // Token expirado ou inválido
+        // Token expirado ou invÃ¡lido
         localStorage.removeItem('auth_token');
         // Opcional: Redirecionar para login via window.location ou evento
         // window.location.href = '/login'; 
-        // Melhor não forçar reload aqui para não quebrar SPA, deixar quem chamou lidar ou usar evento.
+        // Melhor nÃ£o forÃ§ar reload aqui para nÃ£o quebrar SPA, deixar quem chamou lidar ou usar evento.
     }
 
     // Tratamento de resposta vazia (204 No Content)
@@ -35,7 +35,7 @@ export async function httpClient(endpoint, options = {}) {
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
-        const error = new Error(data?.message || 'Erro na requisição');
+        const error = new Error(data?.message || 'Erro na requisiÃ§Ã£o');
         error.status = response.status;
         error.data = data;
         throw error;
