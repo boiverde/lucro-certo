@@ -1,20 +1,41 @@
-# Base44 App
+# Lucro Certo
 
+Sistema de gestao com arquitetura independente.
 
-This app was created automatically by Base44.
-It's a Vite+React app that communicates with the Base44 API.
+## Stack
 
-## Running the app
+* Frontend: React (Vite)
+* Backend: Node.js (Fastify)
+* ORM: Prisma
+* Banco: PostgreSQL (Supabase)
 
-```bash
+## Estrutura
+
+* /src -> Frontend (React SPA)
+* /server -> Backend (API Fastify + Prisma)
+
+## Execucao local
+
+### Backend
+
+\cd server
 npm install
 npm run dev
-```
+\
+### Frontend
 
-## Building the app
+\npm install
+npm run dev
+\
+## Banco de dados
 
-```bash
-npm run build
-```
+O projeto utiliza PostgreSQL via Supabase.
 
-For more information and support, please contact Base44 support at app@base44.com.
+As variaveis de ambiente necessarias estao em:
+
+server/.env.example
+
+## Observacoes
+
+* Este projeto foi originalmente iniciado em outra plataforma, mas hoje opera com backend e banco independentes.
+* Nao ha dependencia atual de Base44.
