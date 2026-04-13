@@ -1,6 +1,7 @@
 import fastify from 'fastify'
 import cors from '@fastify/cors'
 import jwt from '@fastify/jwt'
+import formbody from '@fastify/formbody'
 import { validatorCompiler, serializerCompiler, ZodTypeProvider } from 'fastify-type-provider-zod'
 import { authRoutes } from './routes/auth.routes'
 import { clientesRoutes } from './routes/clientes.routes'
@@ -22,6 +23,8 @@ import { fornecedoresRoutes } from './routes/fornecedores.routes'
 import { pedidosRoutes } from './routes/pedidos.routes'
 import { funcionariosRoutes } from './routes/funcionarios.routes'
 import { diariasRoutes } from './routes/diarias.routes'
+import { adminRoutes } from './routes/admin.routes'
+import { paymentsRoutes } from './routes/payments.routes'
 
 export const app = fastify().withTypeProvider<ZodTypeProvider>()
 
@@ -31,9 +34,10 @@ app.setSerializerCompiler(serializerCompiler)
 
 // Plugins
 app.register(fastifyMultipart)
+app.register(formbody) // Suporte para Webhook do PagSeguro (x-www-form-urlencoded)
 
 app.register(cors, {
-    origin: '*', // Ajustar para produção depois
+    origin: '*',
 })
 
 app.register(jwt, {
@@ -69,6 +73,8 @@ app.register(fornecedoresRoutes, { prefix: '/fornecedores' })
 app.register(pedidosRoutes, { prefix: '/pedidos' })
 app.register(funcionariosRoutes, { prefix: '/funcionarios' })
 app.register(diariasRoutes, { prefix: '/diarias' })
+app.register(adminRoutes, { prefix: '/admin' })
+app.register(paymentsRoutes, { prefix: '/payments' })
 
 app.get('/health', async () => {
     return { status: 'ok', server: 'fastify', db: 'postgres' }
