@@ -17,7 +17,6 @@ export default function ConfiguracoesPage() {
   const [custoFixo, setCustoFixo] = useState("");
   const [taxaImpostos, setTaxaImpostos] = useState("");
   const [taxaCartao, setTaxaCartao] = useState("");
-  const [markupCalculado, setMarkupCalculado] = useState(0);
   const [custoMaoObraHora, setCustoMaoObraHora] = useState("");
   const [custoFixoUnidade, setCustoFixoUnidade] = useState("");
   const [producaoMensalEstimada, setProducaoMensalEstimada] = useState("");
@@ -37,7 +36,6 @@ export default function ConfiguracoesPage() {
       setCustoFixo(currentUser.custo_fixo_mensal || "");
       setTaxaImpostos(currentUser.taxa_impostos || 5);
       setTaxaCartao(currentUser.taxa_cartao || 4);
-      setMarkupCalculado(currentUser.markup_calculado || 0);
       setCustoMaoObraHora(currentUser.custo_mao_obra_hora || "");
       setCustoFixoUnidade(currentUser.custo_fixo_por_unidade || "");
       setProducaoMensalEstimada(currentUser.producao_mensal_estimada || "");
@@ -62,8 +60,7 @@ export default function ConfiguracoesPage() {
         faturamento_medio_mensal: parseFloat(faturamentoMedio) || 0,
         custo_fixo_mensal: parseFloat(custoFixo) || 0,
         producao_mensal_estimada: parseFloat(producaoMensalEstimada) || 0,
-        custo_fixo_por_unidade: parseFloat(custoFixoUnidade) || 0,
-        markup_calculado: markupCalculado
+        custo_fixo_por_unidade: parseFloat(custoFixoUnidade) || 0
       });
 
       alert('✅ Template aplicado com sucesso!');
@@ -83,18 +80,29 @@ export default function ConfiguracoesPage() {
       const producaoEstimada = parseFloat(producaoMensalEstimada) || 0;
       const custoFixoVal = parseFloat(custoFixo) || 0;
 
-      // Calcular custo fixo por unidade automaticamente
       const custoFixoPorUnidadeCalc = producaoEstimada > 0 
         ? custoFixoVal / producaoEstimada 
         : parseFloat(custoFixoUnidade) || 0;
 
+      const faturamentoVal = parseFloat(faturamentoMedio) || 0;
+      const impostosVal = parseFloat(taxaImpostos) || 5;
+      const cartaoVal = parseFloat(taxaCartao) || 4;
+      const margemVal = parseFloat(margemPadrao) || 30;
+
+      let finalMarkup = 0;
+      if (faturamentoVal > 0) {
+        const custoFixoPct = (custoFixoVal / faturamentoVal) * 100;
+        const custosTotais = custoFixoPct + impostosVal + cartaoVal;
+        finalMarkup = 100 / (100 - custosTotais - margemVal);
+      }
+
       await base44.auth.updateMe({
-        margem_lucro_padrao: parseFloat(margemPadrao) || 30,
-        faturamento_medio_mensal: parseFloat(faturamentoMedio) || 0,
+        margem_lucro_padrao: margemVal,
+        faturamento_medio_mensal: faturamentoVal,
         custo_fixo_mensal: custoFixoVal,
-        taxa_impostos: parseFloat(taxaImpostos) || 5,
-        taxa_cartao: parseFloat(taxaCartao) || 4,
-        markup_calculado: markupCalculado,
+        taxa_impostos: impostosVal,
+        taxa_cartao: cartaoVal,
+        markup_calculado: finalMarkup,
         custo_mao_obra_hora: custoMaoObraVal,
         custo_fixo_por_unidade: custoFixoPorUnidadeCalc,
         producao_mensal_estimada: producaoEstimada
@@ -299,7 +307,6 @@ export default function ConfiguracoesPage() {
                 taxaImpostos={parseFloat(taxaImpostos)}
                 taxaCartao={parseFloat(taxaCartao)}
                 margemLucro={parseFloat(margemPadrao)}
-                onMarkupCalculado={setMarkupCalculado}
               />
             )}
         </div>

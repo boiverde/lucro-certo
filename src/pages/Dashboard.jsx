@@ -26,6 +26,12 @@ import WelcomeMessage from "../components/dashboard/WelcomeMessage";
 import BannerAcessoWeb from "../components/dashboard/BannerAcessoWeb";
 import PainelEstoque from "../components/dashboard/PainelEstoque";
 
+const hoje = new Date();
+const inicioMesObj = startOfMonth(hoje);
+const fimMesObj = endOfMonth(hoje);
+const inicioMesStr = format(inicioMesObj, "yyyy-MM-dd");
+const fimMesStr = format(fimMesObj, "yyyy-MM-dd");
+
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -47,31 +53,38 @@ export default function Dashboard() {
   const { data: compras = [] } = useQuery({
     queryKey: ['compras', user?.email],
     queryFn: async () => {
-      return await base44.entities.Compra.filter({ created_by: user.email }, '-data_compra', 50);
+      // Optimizado: busca apenas do mês atual no banco
+      return await base44.entities.Compra.filter({ 
+        created_by: user.email,
+        data_inicio: inicioMesStr,
+        data_fim: fimMesStr
+      }, '-data_compra');
     },
     enabled: !!user?.email && !loading,
-    retry: false,
-    staleTime: 30000,
   });
 
   const { data: vendas = [] } = useQuery({
     queryKey: ['vendas', user?.email],
     queryFn: async () => {
-      return await base44.entities.Venda.filter({ created_by: user.email }, '-data_venda', 50);
+      return await base44.entities.Venda.filter({ 
+        created_by: user.email,
+        data_inicio: inicioMesStr,
+        data_fim: fimMesStr
+      }, '-data_venda');
     },
     enabled: !!user?.email && !loading,
-    retry: false,
-    staleTime: 30000,
   });
 
   const { data: gastos = [] } = useQuery({
     queryKey: ['gastos', user?.email],
     queryFn: async () => {
-      return await base44.entities.GastoOperacional.filter({ created_by: user.email }, '-data', 50);
+      return await base44.entities.GastoOperacional.filter({ 
+        created_by: user.email,
+        data_inicio: inicioMesStr,
+        data_fim: fimMesStr
+      }, '-data');
     },
     enabled: !!user?.email && !loading,
-    retry: false,
-    staleTime: 30000,
   });
 
   const { data: vendasRevenda = [] } = useQuery({
@@ -80,8 +93,6 @@ export default function Dashboard() {
       return await base44.entities.VendaRevenda.filter({ created_by: user.email }, '-data_primeira_parcela');
     },
     enabled: !!user?.email && !loading,
-    retry: false,
-    staleTime: 30000,
   });
 
   const { data: produtos = [] } = useQuery({
@@ -90,8 +101,6 @@ export default function Dashboard() {
       return await base44.entities.Produto.filter({ created_by: user.email }, '-created_date');
     },
     enabled: !!user?.email && !loading,
-    retry: false,
-    staleTime: 30000,
   });
 
   const { data: ingredientes = [] } = useQuery({
@@ -100,28 +109,14 @@ export default function Dashboard() {
       return await base44.entities.Ingrediente.filter({ created_by: user.email }, 'nome');
     },
     enabled: !!user?.email && !loading,
-    retry: false,
-    staleTime: 30000,
   });
 
-  const hoje = new Date();
-  const inicioMes = startOfMonth(hoje);
-  const fimMes = endOfMonth(hoje);
-
-  const comprasMes = compras.filter(c => {
-    const dataCompra = new Date(c.data_compra);
-    return dataCompra >= inicioMes && dataCompra <= fimMes;
-  });
-
-  const vendasMes = vendas.filter(v => {
-    const dataVenda = new Date(v.data_venda);
-    return dataVenda >= inicioMes && dataVenda <= fimMes;
-  });
-
-  const gastosMes = gastos.filter(g => {
-    const dataGasto = new Date(g.data);
-    return dataGasto >= inicioMes && dataGasto <= fimMes;
-  });
+  // Como já filtramos no backend, e a querystring filtra por data_venda (compras, vendas, gastos),
+  // as arrays principais são virtualmente apenas do mês atual. 
+  // Removendo o filtro cliente-side pra evitar varredura em N elementos.
+  const comprasMes = compras;
+  const vendasMes = vendas;
+  const gastosMes = gastos;
 
   // Calcular comissões de revenda (apenas parcelas pagas)
   const comissoesDoMes = vendasRevenda.reduce((total, venda) => {
@@ -132,7 +127,7 @@ export default function Dashboard() {
     // Verificar quais parcelas foram pagas este mês
     for (let i = 0; i < venda.parcelas_pagas; i++) {
       const dataParcela = addMonths(new Date(venda.data_primeira_parcela), i);
-      if (dataParcela >= inicioMes && dataParcela <= fimMes) {
+      if (dataParcela >= inicioMesObj && dataParcela <= fimMesObj) {
         total += comissaoPorParcela;
       }
     }

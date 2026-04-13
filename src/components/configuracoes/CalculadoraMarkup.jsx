@@ -10,8 +10,7 @@ export default function CalculadoraMarkup({
   custoFixo, 
   taxaImpostos, 
   taxaCartao, 
-  margemLucro,
-  onMarkupCalculado 
+  margemLucro
 }) {
   const [markup, setMarkup] = useState(0);
   const [custoFixoPercent, setCustoFixoPercent] = useState(0);
@@ -39,9 +38,6 @@ export default function CalculadoraMarkup({
     const markupCalculado = 100 / (100 - custosTotais - parseFloat(margemLucro || 0));
     
     setMarkup(markupCalculado);
-    if (onMarkupCalculado) {
-      onMarkupCalculado(markupCalculado);
-    }
   };
 
   const custosVariaveisTotal = parseFloat(taxaImpostos || 0) + parseFloat(taxaCartao || 0);
