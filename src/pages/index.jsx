@@ -22,6 +22,8 @@ const GuiaGooglePlay = lazy(() => import("./GuiaGooglePlay"));
 const CorrigirDNS = lazy(() => import("./CorrigirDNS"));
 const GuiaExportacao = lazy(() => import("./GuiaExportacao"));
 const Login = lazy(() => import("./Login"));
+const AdminUpgrade = lazy(() => import("./AdminUpgrade"));
+const Plano = lazy(() => import("./Plano"));
 
 const PAGES = {
     Compras,
@@ -43,7 +45,9 @@ const PAGES = {
     GuiaGooglePlay,
     CorrigirDNS,
     GuiaExportacao,
-    Login
+    Login,
+    AdminUpgrade,
+    Plano
 };
 
 function _getCurrentPage(url) {
@@ -89,6 +93,8 @@ function PagesContent() {
                     <Route path="/CorrigirDNS" element={<CorrigirDNS />} />
                     <Route path="/GuiaExportacao" element={<GuiaExportacao />} />
                     <Route path="/Login" element={<Login />} />
+                    <Route path="/AdminUpgrade" element={<AdminUpgrade />} />
+                    <Route path="/Plano" element={<Plano />} />
                 </Routes>
             </Suspense>
         </Layout>

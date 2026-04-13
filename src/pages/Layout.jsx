@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
+import { usePlan } from "@/api/usePlan";
 import {
   LayoutDashboard,
   DollarSign,
@@ -14,7 +15,9 @@ import {
   Users,
   Sliders,
   Settings,
-  Smartphone
+  Rocket,
+  Crown,
+  Zap,
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,64 +31,55 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarProvider,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
+// ── Menu principal (Play Store removido) ──────────────────────────
 const navigationItems = [
-  {
-    title: "Dashboard",
-    url: createPageUrl("Dashboard"),
-    icon: LayoutDashboard,
-  },
-  {
-    title: "PDV e Controle",
-    url: createPageUrl("Controle"),
-    icon: Sliders,
-  },
-  {
-    title: "Estoque",
-    url: createPageUrl("Estoque"),
-    icon: Store,
-  },
-  {
-    title: "Clientes",
-    url: createPageUrl("Clientes"),
-    icon: Users,
-  },
-  {
-    title: "Relatórios",
-    url: createPageUrl("Relatorios"),
-    icon: BarChart3,
-  },
-  {
-    title: "Markup",
-    url: createPageUrl("Configuracoes"),
-    icon: Settings,
-  },
-  {
-    title: "Play Store",
-    url: createPageUrl("GuiaExportacao"),
-    icon: Smartphone,
-  },
+  { title: "Dashboard", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
+  { title: "Plano",     url: createPageUrl("Plano"),     icon: Rocket },
+  { title: "PDV e Controle", url: createPageUrl("Controle"), icon: Sliders },
+  { title: "Estoque",   url: createPageUrl("Estoque"),   icon: Store },
+  { title: "Clientes",  url: createPageUrl("Clientes"),  icon: Users },
+  { title: "Relatórios",url: createPageUrl("Relatorios"),icon: BarChart3 },
+  { title: "Markup",    url: createPageUrl("Configuracoes"), icon: Settings },
 ];
+
+// ── Badge de plano ─────────────────────────────────────────────────
+function PlanBadge({ plan, onClick }) {
+  if (plan === 'pro') {
+    return (
+      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold cursor-default select-none">
+        <Crown className="w-3 h-3" />
+        Plano PRO
+      </div>
+    );
+  }
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold hover:bg-indigo-100 transition-colors animate-pulse"
+    >
+      <Zap className="w-3 h-3" />
+      Plano FREE
+    </button>
+  );
+}
 
 export default function Layout({ children, currentPageName }) {
   const location = useLocation();
   const [user, setUser] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { plan } = usePlan();
 
-  // Páginas públicas (sem autenticação)
   const paginasPublicas = ["Home", "PoliticaDePrivacidade", "MarketingAssets", "GuiaPlayStore", "GuiaGooglePlay", "Login"];
   const isPaginaPublica = paginasPublicas.includes(currentPageName);
 
   useEffect(() => {
-    // Páginas públicas não precisam de autenticação
     if (isPaginaPublica) {
-      setUser({ public: true }); // Define um user dummy para evitar loading
+      setUser({ public: true });
       return;
     }
-
     const checkUser = async () => {
       try {
         const currentUser = await base44.auth.me();
@@ -93,18 +87,12 @@ export default function Layout({ children, currentPageName }) {
       } catch (error) {
         console.error('Falha ao validar sessão:', error);
         if (error.status === 401 || !localStorage.getItem('auth_token')) {
-            console.log('Usuário não autenticado, redirecionando para login...');
-            window.location.href = '/Login';
+          window.location.href = '/Login';
         } else {
-            // Se for erro 500 (transiente de BD), permite passar mantendo user 'dummy' 
-            // ou redireciona só depois de falhas contínuas, 
-            // mas por agora não vamos quebrar o loop do frontend.
-            console.log('Tentativa de acesso com API instável.');
-            setUser({ full_name: 'Admin', email: 'admin@lucrocerto.com' });
+          setUser({ full_name: 'Admin', email: 'admin@lucrocerto.com' });
         }
       }
     };
-
     checkUser();
   }, [currentPageName, isPaginaPublica]);
 
@@ -113,7 +101,10 @@ export default function Layout({ children, currentPageName }) {
     window.location.href = createPageUrl("Home");
   };
 
-  // Retornar páginas públicas sem layout
+  const goToPlano = () => {
+    window.location.href = createPageUrl("Plano");
+  };
+
   if (isPaginaPublica) {
     return (
       <>
@@ -133,7 +124,6 @@ export default function Layout({ children, currentPageName }) {
     );
   }
 
-  // Loading para páginas privadas
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -156,7 +146,7 @@ export default function Layout({ children, currentPageName }) {
         <link rel="manifest" href="/manifest.json" />
       </div>
 
-      {/* Layout Desktop */}
+      {/* ── Desktop ──────────────────────────────────────────── */}
       <div className="hidden md:block">
         <SidebarProvider>
           <div className="min-h-screen flex w-full bg-gray-50">
@@ -180,26 +170,46 @@ export default function Layout({ children, currentPageName }) {
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {navigationItems.map((item) => (
-                        <SidebarMenuItem key={item.title}>
-                          <SidebarMenuButton
-                            asChild
-                            className={`hover:bg-green-50 hover:text-green-700 transition-colors duration-200 rounded-lg mb-1 ${location.pathname === item.url ? 'bg-green-50 text-green-700' : ''
-                              }`}
-                          >
-                            <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
-                              <item.icon className="w-4 h-4" />
-                              <span className="font-medium">{item.title}</span>
-                            </Link>
-                          </SidebarMenuButton>
-                        </SidebarMenuItem>
-                      ))}
+                      {navigationItems.map((item) => {
+                        const isPlano = item.title === 'Plano';
+                        const isActive = location.pathname === item.url;
+                        return (
+                          <SidebarMenuItem key={item.title}>
+                            <SidebarMenuButton
+                              asChild
+                              className={`hover:bg-green-50 hover:text-green-700 transition-colors duration-200 rounded-lg mb-1 ${isActive ? 'bg-green-50 text-green-700' : ''}`}
+                            >
+                              <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
+                                <item.icon className="w-4 h-4" />
+                                <span className="font-medium flex-1">{item.title}</span>
+                                {/* Badge FREE piscando apenas no item Plano quando free */}
+                                {isPlano && plan === 'free' && (
+                                  <span className="text-[10px] font-bold bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full animate-pulse">
+                                    FREE
+                                  </span>
+                                )}
+                                {isPlano && plan === 'pro' && (
+                                  <span className="text-[10px] font-bold bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded-full">
+                                    PRO
+                                  </span>
+                                )}
+                              </Link>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
                     </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
               </SidebarContent>
 
-              <SidebarFooter className="border-t border-gray-200 p-4">
+              <SidebarFooter className="border-t border-gray-200 p-4 space-y-3">
+                {/* Plan badge */}
+                {plan && (
+                  <div className="flex justify-center">
+                    <PlanBadge plan={plan} onClick={goToPlano} />
+                  </div>
+                )}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3 flex-1">
                     <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
@@ -211,9 +221,7 @@ export default function Layout({ children, currentPageName }) {
                       <p className="font-medium text-gray-900 text-sm truncate">
                         {user?.full_name || 'Usuário'}
                       </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {user?.email}
-                      </p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email}</p>
                     </div>
                   </div>
                   <Button
@@ -236,46 +244,40 @@ export default function Layout({ children, currentPageName }) {
         </SidebarProvider>
       </div>
 
-      {/* Layout Mobile */}
+      {/* ── Mobile ───────────────────────────────────────────── */}
       <div className="md:hidden min-h-screen flex flex-col bg-gray-50">
-        {/* Header Mobile */}
         <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-40 safe-area-top">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-5 h-5 text-white" />
               </div>
-              <div>
-                <h1 className="font-bold text-gray-900">Lucro Certo</h1>
-              </div>
+              <h1 className="font-bold text-gray-900">Lucro Certo</h1>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="hover:bg-gray-100"
-            >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Badge plano no header mobile */}
+              {plan && <PlanBadge plan={plan} onClick={goToPlano} />}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="hover:bg-gray-100"
+              >
+                {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </Button>
+            </div>
           </div>
         </header>
 
-        {/* Menu Mobile Dropdown */}
         {mobileMenuOpen && (
           <div className="bg-white border-b border-gray-200 px-4 py-3 shadow-lg">
             <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-3">
               <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                <span className="text-green-700 font-medium">
-                  {user?.full_name?.charAt(0) || 'U'}
-                </span>
+                <span className="text-green-700 font-medium">{user?.full_name?.charAt(0) || 'U'}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 text-sm truncate">
-                  {user?.full_name || 'Usuário'}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {user?.email}
-                </p>
+                <p className="font-medium text-gray-900 text-sm truncate">{user?.full_name || 'Usuário'}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
               </div>
             </div>
             <Button
@@ -286,15 +288,12 @@ export default function Layout({ children, currentPageName }) {
               <LogOut className="w-4 h-4 mr-2" />
               Sair
             </Button>
-
-            {/* Mobile Nav items in dropdown when menu is open */}
             <div className="mt-4">
               {navigationItems.map((item) => (
                 <Link
                   key={item.title}
                   to={item.url}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 mb-1 ${location.pathname === item.url ? 'bg-green-50 text-green-700' : 'text-gray-700 hover:bg-gray-50'
-                    }`}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 mb-1 ${location.pathname === item.url ? 'bg-green-50 text-green-700' : 'text-gray-700 hover:bg-gray-50'}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <item.icon className="w-5 h-5" />
@@ -305,15 +304,11 @@ export default function Layout({ children, currentPageName }) {
           </div>
         )}
 
-        {/* Content Area */}
-        <main className="flex-1 overflow-auto pb-20">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto pb-20">{children}</main>
 
-        {/* Bottom Navigation */}
+        {/* Bottom nav mobile — 5 primeiros itens */}
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 safe-area-bottom z-50">
           <div className="flex justify-around items-center px-1 py-2">
-            {/* Show first 5 items on the bottom navigation for mobile */}
             {navigationItems.slice(0, 5).map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.url;
@@ -321,10 +316,7 @@ export default function Layout({ children, currentPageName }) {
                 <Link
                   key={item.title}
                   to={item.url}
-                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all ${isActive
-                      ? 'text-green-600 bg-green-50'
-                      : 'text-gray-500'
-                    }`}
+                  className={`flex flex-col items-center justify-center px-3 py-2 rounded-lg transition-all ${isActive ? 'text-green-600 bg-green-50' : 'text-gray-500'}`}
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   <Icon className="w-6 h-6 mb-1" />
@@ -337,17 +329,9 @@ export default function Layout({ children, currentPageName }) {
       </div>
 
       <style>{`
-        .safe-area-top {
-          padding-top: env(safe-area-inset-top);
-        }
-        .safe-area-bottom {
-          padding-bottom: env(safe-area-inset-bottom);
-        }
-        @media (max-width: 768px) {
-          body {
-            overscroll-behavior-y: none;
-          }
-        }
+        .safe-area-top { padding-top: env(safe-area-inset-top); }
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        @media (max-width: 768px) { body { overscroll-behavior-y: none; } }
       `}</style>
     </>
   );

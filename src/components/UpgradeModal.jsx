@@ -196,10 +196,10 @@ export function UpgradeModal() {
                 <div className="p-6 pt-8">
                     <DialogHeader className="mb-6">
                         <DialogTitle className="text-2xl font-bold leading-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
-                            🚀 Seu negócio está crescendo — você atingiu o limite do plano gratuito.
+                            🚀 Seu negócio está crescendo rápido
                         </DialogTitle>
                         <DialogDescription className="text-slate-300 text-base mt-4">
-                            Você já registrou <span className="font-bold text-white">150 vendas</span> este mês.
+                            Você atingiu o limite do plano gratuito de <span className="font-bold text-white">150 vendas</span> no mês.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -207,8 +207,8 @@ export function UpgradeModal() {
                         <div className="flex items-start gap-3 bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 group hover:border-blue-500 transition-colors">
                             <Zap className="w-6 h-6 text-yellow-400 shrink-0 mt-0.5" />
                             <div>
-                                <p className="font-semibold text-white">Vendas sem limites</p>
-                                <p className="text-sm text-slate-400">Libere o acesso ilimitado e continue registrando seu lucro em tempo real.</p>
+                                <p className="font-semibold text-white">Vendas ilimitadas</p>
+                                <p className="text-sm text-slate-400">Libere vendas ilimitadas por R$ 29,99/mês e continue crescendo sem restrições.</p>
                             </div>
                         </div>
 
