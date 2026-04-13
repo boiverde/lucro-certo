@@ -12,10 +12,14 @@ export async function produtosRoutes(app: FastifyInstance) {
             querystring: z.object({
                 nome: z.string().optional(),
                 ativo: z.string().transform(v => v === 'true').optional(),
+                limit: z.string().optional(),
+                page: z.string().optional(),
             }),
         },
     }, async (request) => {
-        const { nome, ativo } = request.query
+        const { nome, ativo, limit, page } = request.query
+        const take = Math.min(Number(limit) || 50, 100)
+        const skip = (Math.max(Number(page) || 1, 1) - 1) * take
         const userId = request.user.sub
 
         const produtos = await prisma.produto.findMany({
@@ -25,9 +29,16 @@ export async function produtosRoutes(app: FastifyInstance) {
                 ativo: ativo !== undefined ? ativo : undefined,
             },
             orderBy: { nome: 'asc' },
+            take,
+            skip,
         })
 
-        return { results: produtos } // Formato Base44-like
+        const total = await prisma.produto.count({ where: { userId, nome: nome ? { contains: nome } : undefined, ativo: ativo !== undefined ? ativo : undefined } })
+
+        return { 
+            results: produtos,
+            meta: { page: Math.max(Number(page) || 1, 1), limit: take, total, totalPages: Math.ceil(total / take) }
+        }
     })
 
     // Criar Produto

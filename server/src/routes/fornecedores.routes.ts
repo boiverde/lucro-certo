@@ -11,10 +11,14 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
         schema: {
             querystring: z.object({
                 nome: z.string().optional(),
+                limit: z.string().optional(),
+                page: z.string().optional(),
             }),
         },
     }, async (request) => {
-        const { nome } = request.query
+        const { nome, limit, page } = request.query
+        const take = Math.min(Number(limit) || 50, 100)
+        const skip = (Math.max(Number(page) || 1, 1) - 1) * take
         const userId = request.user.sub
 
         const where: any = { userId }
@@ -24,10 +28,17 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
 
         const fornecedores = await prisma.fornecedor.findMany({
             where,
+            take,
+            skip,
             orderBy: { nome: 'asc' },
         })
 
-        return { results: fornecedores }
+        const total = await prisma.fornecedor.count({ where })
+
+        return { 
+            results: fornecedores,
+            meta: { page: Math.max(Number(page) || 1, 1), limit: take, total, totalPages: Math.ceil(total / take) }
+        }
     })
 
     // Adicionar Fornecedor

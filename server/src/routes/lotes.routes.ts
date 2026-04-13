@@ -12,10 +12,14 @@ export async function lotesRoutes(app: FastifyInstance) {
             querystring: z.object({
                 produto_id: z.string().optional(),
                 ingrediente_id: z.string().optional(),
+                limit: z.string().optional(),
+                page: z.string().optional(),
             }),
         },
     }, async (request) => {
-        const { produto_id, ingrediente_id } = request.query
+        const { produto_id, ingrediente_id, limit, page } = request.query
+        const take = Math.min(Number(limit) || 50, 100)
+        const skip = (Math.max(Number(page) || 1, 1) - 1) * take
         const userId = request.user.sub
 
         const where: any = { userId }
@@ -25,10 +29,17 @@ export async function lotesRoutes(app: FastifyInstance) {
         const lotes = await prisma.lote.findMany({
             where,
             include: { produto: true, ingrediente: true },
+            take,
+            skip,
             orderBy: { data_validade: 'asc' },
         })
 
-        return { results: lotes }
+        const total = await prisma.lote.count({ where })
+
+        return { 
+            results: lotes,
+            meta: { page: Math.max(Number(page) || 1, 1), limit: take, total, totalPages: Math.ceil(total / take) }
+        }
     })
 
     // Adicionar Lote

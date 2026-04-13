@@ -11,10 +11,14 @@ export async function receitasRoutes(app: FastifyInstance) {
         schema: {
             querystring: z.object({
                 categoria: z.string().optional(),
+                limit: z.string().optional(),
+                page: z.string().optional(),
             }),
         },
     }, async (request) => {
-        const { categoria } = request.query
+        const { categoria, limit, page } = request.query
+        const take = Math.min(Number(limit) || 50, 100)
+        const skip = (Math.max(Number(page) || 1, 1) - 1) * take
         const userId = request.user.sub
 
         const where: any = { userId }
@@ -23,10 +27,17 @@ export async function receitasRoutes(app: FastifyInstance) {
         const receitas = await prisma.receitaProduto.findMany({
             where,
             include: { ingredientes: true },
+            take,
+            skip,
             orderBy: { nome_produto: 'asc' },
         })
 
-        return { results: receitas }
+        const total = await prisma.receitaProduto.count({ where })
+
+        return { 
+            results: receitas,
+            meta: { page: Math.max(Number(page) || 1, 1), limit: take, total, totalPages: Math.ceil(total / take) }
+        }
     })
 
     // Detalhe

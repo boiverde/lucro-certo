@@ -12,10 +12,14 @@ export async function vendasRoutes(app: FastifyInstance) {
             querystring: z.object({
                 data_inicio: z.string().optional(), // YYYY-MM-DD
                 data_fim: z.string().optional(),
+                limit: z.string().optional(),
+                page: z.string().optional(),
             }),
         },
     }, async (request) => {
-        const { data_inicio, data_fim } = request.query
+        const { data_inicio, data_fim, limit, page } = request.query
+        const take = Math.min(Number(limit) || 50, 100)
+        const skip = (Math.max(Number(page) || 1, 1) - 1) * take
         const userId = request.user.sub
 
         const where: any = { userId }
@@ -32,10 +36,17 @@ export async function vendasRoutes(app: FastifyInstance) {
                 itens: true,
                 cliente: true,
             },
+            take,
+            skip,
             orderBy: { data_venda: 'desc' },
         })
 
-        return { results: vendas }
+        const total = await prisma.venda.count({ where })
+
+        return { 
+            results: vendas,
+            meta: { page: Math.max(Number(page) || 1, 1), limit: take, total, totalPages: Math.ceil(total / take) }
+        }
     })
 
     // Criar Venda Completa

@@ -13,10 +13,14 @@ export async function comprasRoutes(app: FastifyInstance) {
                 data_inicio: z.string().optional(),
                 data_fim: z.string().optional(),
                 fornecedor: z.string().optional(),
+                limit: z.string().optional(),
+                page: z.string().optional(),
             }),
         },
     }, async (request) => {
-        const { data_inicio, data_fim, fornecedor } = request.query
+        const { data_inicio, data_fim, fornecedor, limit, page } = request.query
+        const take = Math.min(Number(limit) || 50, 100)
+        const skip = (Math.max(Number(page) || 1, 1) - 1) * take
         const userId = request.user.sub
 
         const where: any = { userId }
@@ -37,10 +41,17 @@ export async function comprasRoutes(app: FastifyInstance) {
             include: {
                 itens: true,
             },
+            take,
+            skip,
             orderBy: { data_compra: 'desc' },
         })
 
-        return { results: compras }
+        const total = await prisma.compra.count({ where })
+
+        return { 
+            results: compras,
+            meta: { page: Math.max(Number(page) || 1, 1), limit: take, total, totalPages: Math.ceil(total / take) }
+        }
     })
 
     // Criar Compra (Transacional)

@@ -124,6 +124,7 @@ model Venda {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@index([userId, data_venda])
   @@map("vendas")
 }
 
@@ -159,6 +160,7 @@ model MovimentacaoEstoque {
   
   createdAt      DateTime @default(now())
 
+  @@index([userId, data])
   @@map("movimentacao_estoque")
 }
 
@@ -197,6 +199,7 @@ model Compra {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  @@index([userId, data_compra])
   @@map("compras")
 }
 
@@ -259,6 +262,7 @@ model VendaRevenda {
   created_date         DateTime @default(now()) // Mantendo nome original se possivel ou mapeando
   updatedAt            DateTime @updatedAt
 
+  @@index([userId, data_primeira_parcela])
   @@map("vendas_revenda")
 }
 
@@ -288,6 +292,7 @@ model GastoRevenda {
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 
+  @@index([userId, data])
   @@map("gastos_revenda")
 }
 
@@ -301,6 +306,7 @@ model GastoOperacional {
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 
+  @@index([userId, data])
   @@map("gastos_operacionais")
 }
 
@@ -314,6 +320,7 @@ model GastoPessoal {
   userId      String
   user        User     @relation(fields: [userId], references: [id])
 
+  @@index([userId, data])
   @@map("gastos_pessoais")
 }
 
