@@ -39,8 +39,24 @@ model User {
 
   funcionarios       Funcionario[]
   diarias            Diaria[]
+  transactions       Transaction[]
 
   @@map("users")
+}
+
+model Transaction {
+  id                String   @id @default(uuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id])
+  provider          String   @default("pagseguro")
+  externalReference String?  @unique // PagSeguro checkout reference
+  externalId        String?  @unique // PagSeguro transaction code
+  amount            Decimal
+  status            String   @default("pending") // pending, approved, rejected, cancelled
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("transactions")
 }
 
 model Cliente {
