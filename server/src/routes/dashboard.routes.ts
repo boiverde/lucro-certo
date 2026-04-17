@@ -7,6 +7,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     app.get('/stats', async (request, reply) => {
         const userId = request.user.sub
+        
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { plan: true }
+        })
 
         // 1. Produtos
         const totalProdutos = await prisma.produto.count({ where: { userId, ativo: true } })
@@ -70,6 +75,23 @@ export async function dashboardRoutes(app: FastifyInstance) {
                 comissoesAReceber += (parcelasRestantes * comissaoPorParcela)
             }
         })
+        
+        // 4. Uso do Plano (Vendas no mês para Barra de Progresso)
+        const startOfMonth = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+        const endOfMonth = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
+        
+        const salesCount = await prisma.venda.count({
+            where: {
+                userId,
+                createdAt: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                }
+            }
+        })
+        
+        const planLimit = 150
+        const usagePercentage = Math.min(100, Math.round((salesCount / planLimit) * 100))
 
         return {
             estoque: {
@@ -82,6 +104,12 @@ export async function dashboardRoutes(app: FastifyInstance) {
             comissoes: {
                 comissoesDoMes,
                 comissoesAReceber
+            },
+            usage: {
+                count: salesCount,
+                limit: planLimit,
+                percentage: usagePercentage,
+                plan: user?.plan || 'free'
             }
         }
     })

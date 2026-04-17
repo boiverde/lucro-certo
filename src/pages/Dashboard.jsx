@@ -26,6 +26,7 @@ import UltimasTransacoes from "../components/dashboard/UltimasTransacoes";
 import WelcomeMessage from "../components/dashboard/WelcomeMessage";
 import BannerAcessoWeb from "../components/dashboard/BannerAcessoWeb";
 import PainelEstoque from "../components/dashboard/PainelEstoque";
+import UsageTracker from "../components/dashboard/UsageTracker";
 
 const hoje = new Date();
 const inicioMesObj = startOfMonth(hoje);
@@ -154,6 +155,8 @@ export default function Dashboard() {
         <WelcomeMessage user={user} hasData={hasData} />
 
         <BannerAcessoWeb />
+
+        <UsageTracker usage={dashboardStats?.usage} />
 
         {/* Cards de Resumo - Mobile Optimized */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6">

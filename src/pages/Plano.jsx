@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Zap, CheckCircle2, Crown, Rocket, ShieldCheck, ArrowRight, QrCode, Copy, Check, Loader2, Clock, BarChart3, Store, Users } from 'lucide-react';
 import { usePlan } from '@/api/usePlan';
+import { useQuery } from "@tanstack/react-query";
+import UsageTracker from "../components/dashboard/UsageTracker";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +26,12 @@ export default function Plano() {
     const [pollCount, setPollCount] = useState(0);
     const [copied, setCopied] = useState(false);
     const pollRef = useRef(null);
+
+    const { data: dashboardStats } = useQuery({
+        queryKey: ['dashboard-stats-plano'],
+        queryFn: async () => await httpClient('/dashboard/stats'),
+        enabled: plan === 'free'
+    });
 
     // ── Polling ────────────────────────────────────────────────────
     const stopPolling = useCallback(() => {
@@ -328,6 +336,7 @@ export default function Plano() {
     // ── PLANO FREE (call to action) ───────────────────────────────
     return (
         <div className="max-w-xl mx-auto px-4 py-10">
+            <UsageTracker usage={dashboardStats?.usage} />
             <div className="rounded-2xl overflow-hidden shadow-xl border border-slate-200">
                 <div className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 p-8 flex flex-col items-center text-white text-center relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10">
