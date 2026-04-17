@@ -110,7 +110,7 @@ export function UpgradeModal() {
         } catch (err) {
             console.error('[PIX ERROR]', err);
             toast.error('Erro ao gerar PIX', {
-                description: err?.data?.detail || 'Não foi possível criar a cobrança. Tente novamente.'
+                description: typeof err?.data?.message === 'string' ? err.data.message : 'Não foi possível criar a cobrança. Tente novamente.'
             });
             setStep('cpf');
         }

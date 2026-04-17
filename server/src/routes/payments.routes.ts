@@ -167,10 +167,18 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 expiresAt: pix.expiresAt
             })
         } catch (err: any) {
-            console.error('[PIX ROUTE ERROR]', err.response?.data || err.message)
+            const errorData = err.response?.data;
+            console.error('[PIX ROUTE ERROR]', JSON.stringify(errorData, null, 2) || err.message);
+
+            // Tentar extrair mensagem amigável da PagSeguro
+            let friendlyMessage = 'Erro ao criar cobrança Pix';
+            if (errorData?.error_messages?.[0]?.description) {
+                friendlyMessage = errorData.error_messages[0].description;
+            }
+
             return reply.status(500).send({
-                message: 'Erro ao criar cobrança Pix',
-                detail: err.response?.data || err.message
+                message: friendlyMessage,
+                detail: errorData || err.message
             })
         }
     })
