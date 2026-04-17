@@ -130,17 +130,23 @@ model Venda {
 }
 
 model ItemVenda {
-  id             String   @id @default(uuid())
-  vendaId        String
-  venda          Venda    @relation(fields: [vendaId], references: [id], onDelete: Cascade)
+  id                    String   @id @default(uuid())
+  vendaId               String
+  venda                 Venda    @relation(fields: [vendaId], references: [id], onDelete: Cascade)
   
-  produtoId      String?
-  produto        Produto? @relation(fields: [produtoId], references: [id])
+  produtoId             String?
+  produto               Produto? @relation(fields: [produtoId], references: [id])
   
-  nome_produto   String   // Snapshot do nome ou nome manual
-  quantidade     Float
-  preco_unitario Decimal  
-  subtotal       Decimal  
+  nome_produto          String   // Snapshot do nome ou nome manual
+  quantidade            Float
+  preco_unitario        Decimal  
+  subtotal              Decimal  
+
+  // Persistência PRO
+  custo_total_unitario  Decimal? @db.Decimal(10, 2)
+  taxas_aplicadas       Decimal? @db.Decimal(10, 4) // Em decimal ex: 0.1500
+  lucro_unitario        Decimal? @db.Decimal(10, 2)
+  margem_liquida        Decimal? @db.Decimal(10, 2)
 
   @@map("itens_venda")
 }

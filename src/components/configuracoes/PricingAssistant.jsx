@@ -2,19 +2,22 @@ import React from 'react';
 import { calculatePriceSuggestion, analyzeCurrentPrice } from '@/utils/pricingAssistant';
 import { Crown, AlertCircle, Check, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useUpgrade } from '@/context/UpgradeContext';
 
 export default function PricingAssistant({ cost, currentPrice, configs, isPro, onApply }) {
+    const { openUpgrade } = useUpgrade();
+
     if (!isPro) {
         return (
             <div className="mt-4 p-5 border-2 border-dashed border-indigo-200 rounded-2xl bg-indigo-50/50 flex flex-col items-center text-center">
                 <Crown className="w-8 h-8 text-indigo-600 mb-3" />
                 <h4 className="text-sm font-bold text-indigo-900 uppercase tracking-tight mb-1">Análise de Lucro PRO</h4>
                 <p className="text-xs text-indigo-700 leading-relaxed mb-4 max-w-[240px]">
-                    Não corra riscos. Descubra seu lucro real e receba sugestões de preço baseadas nos seus custos fixos.
+                    Usuários PRO visualizam automaticamente o <span className="font-bold underline">lucro real</span> após impostos e taxas.
                 </p>
                 <Button 
                     type="button"
-                    onClick={() => window.location.href = '/Plano'}
+                    onClick={() => openUpgrade("Desbloqueie agora o cálculo automático de lucro real e evite prejuízos em cada venda.")}
                     className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-10 rounded-xl shadow-lg"
                 >
                     Calcular preço ideal automaticamente (PRO)

@@ -93,6 +93,44 @@ export async function dashboardRoutes(app: FastifyInstance) {
         const planLimit = 150
         const usagePercentage = Math.min(100, Math.round((salesCount / planLimit) * 100))
 
+        // 5. Lucratividade
+        const vendasNoMes = await prisma.venda.findMany({
+            where: {
+                userId,
+                data_venda: { gte: startOfMonth, lte: endOfMonth }
+            },
+            include: { itens: true }
+        })
+
+        let lucroMes = 0
+        let margemSomada = 0
+        let itensComMargemCount = 0
+        let lucroPotencial = 0
+
+        vendasNoMes.forEach(venda => {
+            venda.itens.forEach(item => {
+                const lucro = Number(item.lucro_unitario || 0) * item.quantidade
+                lucroMes += lucro
+
+                if (item.margem_liquida !== null) {
+                    margemSomada += Number(item.margem_liquida)
+                    itensComMargemCount++
+                }
+
+                // Cálculo simples do potencial de ganho (benchmark 30%)
+                const taxas = Number(item.taxas_aplicadas) || 0
+                const custoTotal = Number(item.custo_total_unitario) || 0
+                if (taxas > 0 && custoTotal > 0) {
+                    const divisor = 1 - (taxas + 0.30)
+                    if (divisor > 0) {
+                        const precoIdeal = custoTotal / divisor
+                        const lucroIdeal = (precoIdeal - custoTotal - (precoIdeal * taxas)) * item.quantidade
+                        if (lucroIdeal > lucro) lucroPotencial += (lucroIdeal - lucro)
+                    }
+                }
+            })
+        })
+
         return {
             estoque: {
                 totalProdutos,
@@ -110,6 +148,11 @@ export async function dashboardRoutes(app: FastifyInstance) {
                 limit: planLimit,
                 percentage: usagePercentage,
                 plan: user?.plan || 'free'
+            },
+            insights: {
+                lucroMes: Number(lucroMes.toFixed(2)),
+                margemMedia: Number((itensComMargemCount > 0 ? margemSomada / itensComMargemCount : 0).toFixed(1)),
+                lucroPotencial: Number(lucroPotencial.toFixed(2))
             }
         }
     })

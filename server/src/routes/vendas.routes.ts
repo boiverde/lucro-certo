@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
+import { calculateFinancials } from '../utils/pricing'
 
 export async function vendasRoutes(app: FastifyInstance) {
     app.addHook('onRequest', app.authenticate)
@@ -53,7 +54,7 @@ export async function vendasRoutes(app: FastifyInstance) {
     app.withTypeProvider<ZodTypeProvider>().post('/', {
         schema: {
             body: z.object({
-                data_venda: z.string().datetime().or(z.string()), // Aceita ISO ou string simples date
+                data_venda: z.string().datetime().or(z.string()),
                 cliente_nome: z.string().optional(),
                 clienteId: z.string().uuid().optional(),
                 valor_total: z.number(),
@@ -71,24 +72,25 @@ export async function vendasRoutes(app: FastifyInstance) {
         const userId = request.user.sub
         const { itens, ...vendaData } = request.body
 
+        // 1. Validar plano e buscar configurações
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { plan: true }
+            select: { 
+                plan: true,
+                taxa_impostos: true,
+                taxa_cartao: true,
+                custo_fixo_por_unidade: true,
+                margem_lucro_padrao: true 
+            }
         })
 
-        if (user?.plan === 'free') {
+        if (!user) throw new Error("Usuário não encontrado")
+
+        if (user.plan === 'free') {
             const now = new Date()
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-
             const total = await prisma.venda.count({
-                where: {
-                    userId,
-                    createdAt: {
-                        gte: startOfMonth,
-                        lte: endOfMonth
-                    }
-                }
+                where: { userId, createdAt: { gte: startOfMonth } }
             })
 
             if (total >= 150) {
@@ -98,6 +100,33 @@ export async function vendasRoutes(app: FastifyInstance) {
                 })
             }
         }
+
+        // 2. Preparar Itens com Dados Financeiros
+        const itensComFinanceiro = await Promise.all(itens.map(async (item) => {
+            let custoBase = 0
+            if (item.produtoId) {
+                const prod = await prisma.produto.findUnique({ 
+                    where: { id: item.produtoId },
+                    select: { custo: true }
+                })
+                custoBase = Number(prod?.custo) || 0
+            }
+
+            const finance = calculateFinancials(custoBase, item.preco_unitario, {
+                taxa_impostos: Number(user.taxa_impostos) || 0,
+                taxa_cartao: Number(user.taxa_cartao) || 0,
+                custo_fixo_por_unidade: Number(user.custo_fixo_por_unidade) || 0,
+                margem_lucro_padrao: Number(user.margem_lucro_padrao) || 30,
+            })
+
+            return {
+                ...item,
+                custo_total_unitario: finance.custoTotalBase,
+                taxas_aplicadas: finance.taxasVariaveisDec,
+                lucro_unitario: finance.lucroRealUnitario,
+                margem_liquida: finance.margemReal
+            }
+        }))
 
         const result = await prisma.$transaction(async (tx) => {
             const venda = await tx.venda.create({
@@ -109,12 +138,16 @@ export async function vendasRoutes(app: FastifyInstance) {
                     valor_total: vendaData.valor_total,
                     observacoes: vendaData.observacoes,
                     itens: {
-                        create: itens.map(item => ({
+                        create: itensComFinanceiro.map(item => ({
                             produtoId: item.produtoId || null,
                             nome_produto: item.nome_produto,
                             quantidade: item.quantidade,
                             preco_unitario: item.preco_unitario,
-                            subtotal: item.subtotal
+                            subtotal: item.subtotal,
+                            custo_total_unitario: item.custo_total_unitario,
+                            taxas_aplicadas: item.taxas_aplicadas,
+                            lucro_unitario: item.lucro_unitario,
+                            margem_liquida: item.margem_liquida
                         }))
                     }
                 },
@@ -161,62 +194,19 @@ export async function vendasRoutes(app: FastifyInstance) {
         return result
     })
 
-    // Detalhe Venda
-    app.withTypeProvider<ZodTypeProvider>().get('/:id', {
-        schema: {
-            params: z.object({ id: z.string().uuid() })
-        }
-    }, async (request, reply) => {
-        const { id } = request.params
-        const userId = request.user.sub
-
-        const venda = await prisma.venda.findFirst({
-            where: { id, userId },
-            include: { itens: true, cliente: true }
-        })
-
-        if (!venda) return reply.status(404).send()
-        return venda
-    })
-
-    // Deletar Venda (Com estorno de estoque)
+    // Deletar Venda
     app.withTypeProvider<ZodTypeProvider>().delete('/:id', {
-        schema: { params: z.object({ id: z.string().uuid() }) }
+        schema: {
+            params: z.object({ id: z.string().uuid() }),
+        },
     }, async (request, reply) => {
         const { id } = request.params
         const userId = request.user.sub
 
-        const venda = await prisma.venda.findFirst({
-            where: { id, userId },
-            include: { itens: true }
-        })
+        const venda = await prisma.venda.findFirst({ where: { id, userId } })
+        if (!venda) throw { statusCode: 404, message: 'Venda não encontrada' }
 
-        if (!venda) return reply.status(404).send()
-
-        await prisma.$transaction(async (tx) => {
-            // Estornar estoque
-            for (const item of venda.itens) {
-                if (item.produtoId) {
-                    await tx.produto.update({
-                        where: { id: item.produtoId },
-                        data: { estoque_atual: { increment: item.quantidade } }
-                    })
-                    // Registrar movimentação
-                    await tx.movimentacaoEstoque.create({
-                        data: {
-                            userId,
-                            produtoId: item.produtoId,
-                            tipo: 'entrada',
-                            quantidade: item.quantidade,
-                            origem: 'venda',
-                            observacoes: `Estorno Venda Excluída #${venda.id.slice(0, 8)}`,
-                        }
-                    })
-                }
-            }
-            await tx.venda.delete({ where: { id } })
-        })
-
+        await prisma.venda.delete({ where: { id } })
         return reply.status(204).send()
     })
 }

@@ -1,0 +1,406 @@
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\count-sqlite.js
+  21:11  warning  'e' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\app.js
+  87:68  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\lib\storage.js
+  67:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\admin.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\alertas.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\auth.routes.js
+  20:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\clientes.routes.js
+   16:44  error    This generator function does not have 'yield'  require-yield
+  115:20  warning  'error' is defined but never used              no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\compras.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\diarias.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\fornecedores.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\funcionarios.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\gastos-operacionais.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\gastos-pessoais.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\ingredientes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\lotes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\movimentacoes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\payments.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\pedidos.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\producoes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\produtos.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\receitas.routes.js
+   16:44  error    This generator function does not have 'yield'                                           require-yield
+  143:19  warning  'result' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\revendas.routes.js
+   17:44  error    This generator function does not have 'yield'                                            require-yield
+  169:19  warning  'results' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\upload.routes.js
+  15:44  error    This generator function does not have 'yield'  require-yield
+  55:20  warning  'error' is defined but never used              no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\routes\vendas.routes.js
+  16:25  error  'p' is already defined                         no-redeclare
+  27:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\app.js
+  81:68  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\lib\storage.js
+  67:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\alertas.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\auth.routes.js
+  20:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\clientes.routes.js
+   16:44  error    This generator function does not have 'yield'  require-yield
+  115:20  warning  'error' is defined but never used              no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\compras.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\diarias.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\fornecedores.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\funcionarios.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\gastos-operacionais.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\gastos-pessoais.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\ingredientes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\lotes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\movimentacoes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\pedidos.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\producoes.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\produtos.routes.js
+  16:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\receitas.routes.js
+   16:44  error    This generator function does not have 'yield'                                           require-yield
+  133:19  warning  'result' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\revendas.routes.js
+   17:44  error    This generator function does not have 'yield'                                            require-yield
+  169:19  warning  'results' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\upload.routes.js
+  15:44  error    This generator function does not have 'yield'  require-yield
+  55:20  warning  'error' is defined but never used              no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\dist\src\routes\vendas.routes.js
+  16:25  error  'p' is already defined                         no-redeclare
+  27:44  error  This generator function does not have 'yield'  require-yield
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\get_token.js
+  18:11  warning  'url' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\test_api.js
+  16:18  warning  'e' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\server\update_schema.js
+  4:39  error  Unnecessary escape character: \"  no-useless-escape
+  4:51  error  Unnecessary escape character: \"  no-useless-escape
+  5:33  error  Unnecessary escape character: \"  no-useless-escape
+  5:47  error  Unnecessary escape character: \"  no-useless-escape
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\api\auth.js
+  55:31  warning  'redirectUrl' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\api\entities.js
+   53:15  warning  'dateFilters' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  174:7   warning  'MockAdapter' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\api\httpClient.js
+  24:14  warning  'e' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\api\integrations.js
+  1:10  warning  'httpClient' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  2:10  warning  'auth' is defined but never used. Allowed unused vars must match /^React$/u        no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\clientes\HistoricoCliente.jsx
+  102:23  warning  'proximaParcelaNumero' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\compras\FormCompra.jsx
+  1:27  warning  'useEffect' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\configuracoes\CalculadoraMarkup.jsx
+   3:10  warning  'Input' is defined but never used. Allowed unused vars must match /^React$/u                                       no-unused-vars
+   4:10  warning  'Label' is defined but never used. Allowed unused vars must match /^React$/u                                       no-unused-vars
+   5:10  warning  'Button' is defined but never used. Allowed unused vars must match /^React$/u                                      no-unused-vars
+  20:6   warning  React Hook useEffect has a missing dependency: 'calcularMarkup'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\configuracoes\TemplatesNegocio.jsx
+    4:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  120:55  warning  'configuracaoAtual' is defined but never used                                 no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\controle\CalendarioControle.jsx
+  3:63  warning  'X' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\controle\PagamentosControle.jsx
+   4:10  warning  'Button' is defined but never used. Allowed unused vars must match /^React$/u              no-unused-vars
+  11:10  warning  'filtro' is assigned a value but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+  11:18  warning  'setFiltro' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\dashboard\PainelEstoque.jsx
+  4:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\estoque\AlertasInteligentes.jsx
+    7:44  warning  'X' is defined but never used. Allowed unused vars must match /^React$/u                                                                no-unused-vars
+    8:46  warning  'subDays' is defined but never used. Allowed unused vars must match /^React$/u                                                          no-unused-vars
+   16:10  warning  'Textarea' is defined but never used. Allowed unused vars must match /^React$/u                                                         no-unused-vars
+  232:6   warning  React Hook useEffect has missing dependencies: 'alertas.length' and 'gerarAlertas'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\estoque\GerenciadorLotes.jsx
+   9:10  warning  'Tabs' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+   9:16  warning  'TabsContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+   9:29  warning  'TabsList' is defined but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+   9:39  warning  'TabsTrigger' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  13:27  warning  'motion' is defined but never used. Allowed unused vars must match /^React$/u       no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\estoque\ResumoEstoque.jsx
+  27:9  warning  'perdasMes' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\estoque\SugestaoCompras.jsx
+   11:10  warning  'ptBR' is defined but never used. Allowed unused vars must match /^React$/u                    no-unused-vars
+   73:11  warning  'periodo30Dias' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  205:14  warning  'error' is defined but never used                                                              no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\funcionarios\ListaFuncionarios.jsx
+  4:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\lanches\FormIngrediente.jsx
+   7:10  warning  'Select' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+   7:18  warning  'SelectContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+   7:33  warning  'SelectItem' is defined but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+   7:45  warning  'SelectTrigger' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+   7:60  warning  'SelectValue' is defined but never used. Allowed unused vars must match /^React$/u    no-unused-vars
+  43:22  error    Unnecessary escape character: \-                                                      no-useless-escape
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\lanches\FormReceita.jsx
+  11:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u                                                           no-unused-vars
+  64:6   warning  React Hook useEffect has missing dependencies: 'dados.margem_lucro' and 'receita'. Either include them or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\mobile\BarcodeScanner.jsx
+  2:10  warning  'Card' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+  2:16  warning  'CardContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  2:29  warning  'CardHeader' is defined but never used. Allowed unused vars must match /^React$/u   no-unused-vars
+  2:41  warning  'CardTitle' is defined but never used. Allowed unused vars must match /^React$/u    no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\mobile\NotificationManager.jsx
+  80:6  warning  React Hook useEffect has a missing dependency: 'checkLowStock'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\mobile\OfflineManager.jsx
+  207:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\receitas\CalculadoraCustoTotal.jsx
+    4:29  warning  'Briefcase' is defined but never used. Allowed unused vars must match /^React$/u                                                no-unused-vars
+  109:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\relatorios\RelatorioLucros.jsx
+  3:10  warning  'BarChart' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  3:20  warning  'Bar' is defined but never used. Allowed unused vars must match /^React$/u       no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\relatorios\RelatorioVendasDetalhado.jsx
+    8:10  warning  'ptBR' is defined but never used. Allowed unused vars must match /^React$/u                                            no-unused-vars
+   11:69  warning  'filteredData' is defined but never used                                                                               no-unused-vars
+  116:6   warning  React Hook useMemo has a missing dependency: 'calcularCustoReceita'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\revendas\CalendarioPagamentos.jsx
+  3:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\revendas\LembretePagamentos.jsx
+  6:47  warning  'isToday' is defined but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+  6:56  warning  'isTomorrow' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  6:68  warning  'isPast' is defined but never used. Allowed unused vars must match /^React$/u      no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\revendas\ListaPagamentos.jsx
+  5:16  warning  'TabsContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  8:10  warning  'ptBR' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\revendas\ListaVendasRevenda.jsx
+  225:17  warning  'proximaParcelaNumero' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\badge.jsx
+  34:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\button.jsx
+  48:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\form.jsx
+  126:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\navigation-menu.jsx
+  95:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\sidebar.jsx
+  618:3  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\toggle.jsx
+  38:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\ui\use-toast.jsx
+   2:31  warning  'createContext' is defined but never used. Allowed unused vars must match /^React$/u                  no-unused-vars
+   2:46  warning  'useContext' is defined but never used. Allowed unused vars must match /^React$/u                     no-unused-vars
+  39:7   warning  'clearFromRemoveQueue' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\components\vendas\FormVenda.jsx
+  11:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\AdminUpgrade.jsx
+  24:18  warning  'error' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Compras.jsx
+   3:10  warning  'toast' is defined but never used. Allowed unused vars must match /^React$/u          no-unused-vars
+  18:10  warning  'user' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Configuracoes.jsx
+   9:39  warning  'Calculator' is defined but never used. Allowed unused vars must match /^React$/u   no-unused-vars
+  11:10  warning  'Tabs' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+  11:16  warning  'TabsContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  11:29  warning  'TabsList' is defined but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+  11:39  warning  'TabsTrigger' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Controle.jsx
+    5:10  warning  'keepPreviousData' is defined but never used. Allowed unused vars must match /^React$/u               no-unused-vars
+   21:8   warning  'HistoricoMovimentacoes' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+   32:8   warning  'Pagination' is defined but never used. Allowed unused vars must match /^React$/u                     no-unused-vars
+   79:10  warning  'pageVendas' is assigned a value but never used. Allowed unused vars must match /^React$/u            no-unused-vars
+   79:22  warning  'setPageVendas' is assigned a value but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+   80:10  warning  'pageCompras' is assigned a value but never used. Allowed unused vars must match /^React$/u           no-unused-vars
+   80:23  warning  'setPageCompras' is assigned a value but never used. Allowed unused vars must match /^React$/u        no-unused-vars
+   81:10  warning  'pageProdutos' is assigned a value but never used. Allowed unused vars must match /^React$/u          no-unused-vars
+   81:24  warning  'setPageProdutos' is assigned a value but never used. Allowed unused vars must match /^React$/u       no-unused-vars
+   82:10  warning  'pageGastos' is assigned a value but never used. Allowed unused vars must match /^React$/u            no-unused-vars
+   82:22  warning  'setPageGastos' is assigned a value but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+   83:10  warning  'pageClientes' is assigned a value but never used. Allowed unused vars must match /^React$/u          no-unused-vars
+   83:24  warning  'setPageClientes' is assigned a value but never used. Allowed unused vars must match /^React$/u       no-unused-vars
+  133:48  warning  'loadingMovimentacoes' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  205:17  warning  'producoes' is assigned a value but never used. Allowed unused vars must match /^React$/u             no-unused-vars
+  205:44  warning  'loadingProducoes' is assigned a value but never used. Allowed unused vars must match /^React$/u      no-unused-vars
+  755:13  warning  'percentualAumento' is assigned a value but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\CorrigirDNS.jsx
+  4:10  warning  'Input' is defined but never used. Allowed unused vars must match /^React$/u               no-unused-vars
+  9:18  warning  'setUrlApp' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Dashboard.jsx
+   5:10  warning  'Button' is defined but never used. Allowed unused vars must match /^React$/u      no-unused-vars
+  11:3   warning  'Package' is defined but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+  17:3   warning  'Globe' is defined but never used. Allowed unused vars must match /^React$/u       no-unused-vars
+  18:3   warning  'Smartphone' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  21:10  warning  'ptBR' is defined but never used. Allowed unused vars must match /^React$/u        no-unused-vars
+  44:16  warning  'error' is defined but never used                                                  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Estoque.jsx
+  6:16  warning  'Package' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\GuiaGooglePlay.jsx
+  4:29  warning  'ExternalLink' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\GuiaPlayStore.jsx
+  7:3  warning  'Download' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\GuiaPublicacao.jsx
+  4:10  warning  'Badge' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Home.jsx
+  35:14  warning  'error' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Layout.jsx
+  4:10  warning  'toast' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Login.jsx
+   3:10  warning  'toast' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+  89:18  warning  'err' is defined but never used                                               no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\MarketingAssets.jsx
+  4:10  warning  'Download' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Pessoais.jsx
+   3:10  warning  'toast' is defined but never used. Allowed unused vars must match /^React$/u          no-unused-vars
+  18:10  warning  'user' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Plano.jsx
+  35:18  warning  'err' is defined but never used  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Relatorios.jsx
+   3:10  warning  'toast' is defined but never used. Allowed unused vars must match /^React$/u             no-unused-vars
+  40:10  warning  'user' is assigned a value but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+  45:10  warning  'loading' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Revendas.jsx
+    5:23  warning  'Users' is defined but never used. Allowed unused vars must match /^React$/u                  no-unused-vars
+    5:42  warning  'Calendar' is defined but never used. Allowed unused vars must match /^React$/u               no-unused-vars
+    5:60  warning  'Receipt' is defined but never used. Allowed unused vars must match /^React$/u                no-unused-vars
+    9:10  warning  'format' is defined but never used. Allowed unused vars must match /^React$/u                 no-unused-vars
+    9:18  warning  'addMonths' is defined but never used. Allowed unused vars must match /^React$/u              no-unused-vars
+   10:10  warning  'ptBR' is defined but never used. Allowed unused vars must match /^React$/u                   no-unused-vars
+  324:9   warning  'vendasAtivas' is assigned a value but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+
+C:\Users\merca\Downloads\lucro-certo-copy-8dd4f485-main\src\pages\Vendas.jsx
+    6:16  warning  'BarChart3' is defined but never used. Allowed unused vars must match /^React$/u    no-unused-vars
+    7:10  warning  'Tabs' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+    7:16  warning  'TabsContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+    7:29  warning  'TabsList' is defined but never used. Allowed unused vars must match /^React$/u     no-unused-vars
+    7:39  warning  'TabsTrigger' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+    8:10  warning  'Card' is defined but never used. Allowed unused vars must match /^React$/u         no-unused-vars
+    8:16  warning  'CardContent' is defined but never used. Allowed unused vars must match /^React$/u  no-unused-vars
+    8:29  warning  'CardHeader' is defined but never used. Allowed unused vars must match /^React$/u   no-unused-vars
+    8:41  warning  'CardTitle' is defined but never used. Allowed unused vars must match /^React$/u    no-unused-vars
+  132:16  warning  'err' is defined but never used                                                     no-unused-vars
+
+✖ 197 problems (51 errors, 146 warnings)
+
