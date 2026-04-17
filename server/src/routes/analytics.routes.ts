@@ -139,6 +139,47 @@ export async function analyticsRoutes(app: FastifyInstance) {
             conversion: segmentStats[key].views > 0 ? (segmentStats[key].sales / segmentStats[key].views * 100).toFixed(1) : 0
         }))
 
+        // Cálculo de Lift por Segmento (Variante B vs Variante A)
+        const liftStats: any = {
+            high: { A_rpv: 0, B_rpv: 0, lift: 0 },
+            medium: { A_rpv: 0, B_rpv: 0, lift: 0 },
+            low: { A_rpv: 0, B_rpv: 0, lift: 0 }
+        }
+
+        const variantData = await prisma.analyticsEvent.findMany({
+            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
+            select: { event: true, metadata: true }
+        })
+
+        const vMetrics: any = {}
+        variantData.forEach(e => {
+            const meta = e.metadata as any
+            const key = `${meta.ab_variant}_${meta.user_segment}`
+            if (!vMetrics[key]) vMetrics[key] = { views: 0, revenue: 0 }
+            
+            if (e.event === 'upgrade_view') vMetrics[key].views++
+            if (e.event === 'pix_paid') {
+                vMetrics[key].revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
+            }
+        })
+
+        Object.keys(liftStats).forEach(seg => {
+            const rpvA = vMetrics[`A_${seg}`]?.views > 0 ? vMetrics[`A_${seg}`].revenue / vMetrics[`A_${seg}`].views : 0
+            const rpvB = vMetrics[`B_${seg}`]?.views > 0 ? vMetrics[`B_${seg}`].revenue / vMetrics[`B_${seg}`].views : 0
+            
+            liftStats[seg].A_rpv = rpvA.toFixed(2)
+            liftStats[seg].B_rpv = rpvB.toFixed(2)
+            liftStats[seg].lift = rpvA > 0 ? ((rpvB - rpvA) / rpvA * 100).toFixed(1) : 0
+        })
+
+        // Comportamental: Média de tempo no modal e abandono
+        const behavioral = await prisma.analyticsEvent.aggregate({
+            where: { event: 'upgrade_close' },
+            _avg: { 
+                // Usando JSON path para acessar metadado numérico (depende do DB, mas Prisma ajuda)
+            }
+        })
+
         return { 
             stats, 
             conversion, 
@@ -149,7 +190,8 @@ export async function analyticsRoutes(app: FastifyInstance) {
             annualRate,
             abResults,
             ab_validity,
-            segmentedResults
+            segmentedResults,
+            liftStats
         }
     })
 }
