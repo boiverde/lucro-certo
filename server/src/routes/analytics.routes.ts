@@ -182,6 +182,21 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
         const annualRate = stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0
 
+        // UNIT ECONOMICS: LTV e CAC Máximo por Segmento
+        const unitEconomics = Object.keys(liftStats).map(seg => {
+            const rpv = Number(liftStats[seg].B_rpv || liftStats[seg].A_rpv || 0)
+            
+            // LTV Estimado (Baseado em 6 meses de retenção média mensal)
+            const ltv = rpv * 6
+            
+            return {
+                segment: seg,
+                ltv: ltv.toFixed(2),
+                cac_max: (ltv * 0.4).toFixed(2), // Alvo de 40% de margem (SaaS health)
+                payback_days: rpv > 0 ? Math.ceil((ltv * 0.4) / (rpv / 30)) : 0
+            }
+        })
+
         // Incremento de Receita Projetado (Incremental Revenue)
         let incrementalRevenue = 0
         Object.keys(liftStats).forEach(seg => {
@@ -205,7 +220,8 @@ export async function analyticsRoutes(app: FastifyInstance) {
             ab_validity,
             segmentedResults,
             liftStats,
-            incrementalRevenue: incrementalRevenue.toFixed(2)
+            incrementalRevenue: incrementalRevenue.toFixed(2),
+            unitEconomics
         }
     })
 
