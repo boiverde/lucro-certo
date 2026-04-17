@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Rocket, Zap, Loader2, ShieldCheck, CheckCircle2, Clock, Copy, Check, QrCode } from "lucide-react";
 import { httpClient } from '@/api/httpClient';
 import { toast } from 'sonner';
+import { usePlan } from '@/api/usePlan';
 
 // Estados do modal
 // 'idle'     → tela de upgrade (call to action)
@@ -22,6 +23,7 @@ const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 36; // 36 × 5s = 3 minutos
 
 export function UpgradeModal() {
+    const { refresh } = usePlan();
     const [isOpen, setIsOpen] = useState(false);
     const [step, setStep] = useState('idle');
     const [cpf, setCpf] = useState('');
@@ -59,6 +61,7 @@ export function UpgradeModal() {
             if (data?.status === 'PAID') {
                 stopPolling();
                 setStep('confirmed');
+                if (refresh) refresh(); // Atualiza cache global do plano
             }
         } catch {
             // Silencia erros de polling; tenta de novo no próximo ciclo

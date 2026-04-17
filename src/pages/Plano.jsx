@@ -17,7 +17,7 @@ const BENEFITS_PRO = [
 ];
 
 export default function Plano() {
-    const { plan, loading, refetch } = usePlan();
+    const { plan, loading, refresh } = usePlan();
     const [step, setStep] = useState('idle'); // 'idle' | 'cpf' | 'loading' | 'qrcode' | 'confirmed'
     const [cpf, setCpf] = useState('');
     const [pix, setPix] = useState(null);
@@ -42,6 +42,7 @@ export default function Plano() {
             if (data?.status === 'PAID') {
                 stopPolling();
                 setStep('confirmed');
+                if (refresh) refresh(); // Atualiza cache global do plano
             }
         } catch { /* silencia */ }
     }, [stopPolling]);

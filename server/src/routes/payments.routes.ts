@@ -240,9 +240,23 @@ export async function paymentsRoutes(app: FastifyInstance) {
             const charges = response.data?.qr_codes || []
             const isPaid = response.data?.charges?.some((c: any) => c.status === 'PAID')
 
+            if (isPaid && user?.plan !== 'pro') {
+                // Atualiza o banco proativamente se o webhook ainda não chegou
+                await prisma.transaction.updateMany({
+                    where: { externalId: orderId, provider: 'pagseguro_pix' },
+                    data: { status: 'approved' }
+                })
+                await prisma.user.update({
+                    where: { id: userId },
+                    data: { plan: 'pro' }
+                })
+                console.log(`[PIX-POLLING] Plan upgraded to PRO proativelly | userId: ${userId} | orderId: ${orderId}`)
+                return reply.send({ status: 'PAID', plan: 'pro' })
+            }
+
             return reply.send({
                 status: isPaid ? 'PAID' : 'PENDING',
-                plan: user?.plan || 'free'
+                plan: isPaid ? 'pro' : (user?.plan || 'free')
             })
         } catch (err: any) {
             console.error('[PIX STATUS ERROR]', err.response?.data || err.message)
