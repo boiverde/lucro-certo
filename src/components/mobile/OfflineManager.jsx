@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { toast } from 'sonner';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +92,8 @@ export default function OfflineManager({ onSync }) {
       }
       updatePendingCount();
     } catch (error) {
+      toast.error('Erro ao sincronizar:');
+      toast.error('Erro ao sincronizar:');
       console.error('Erro ao sincronizar:', error);
     } finally {
       setSyncing(false);

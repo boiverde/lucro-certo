@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from 'sonner';
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,7 @@ export default function FormProducao({ receita, ingredientes, onSubmit, onCancel
     e.preventDefault();
     
     if (estoqueInsuficiente.length > 0) {
-      alert("Estoque insuficiente para produção!");
+      toast.warning('Estoque insuficiente para produção!', { id: 'Estoque insuficiente para produção!' })
       return;
     }
 

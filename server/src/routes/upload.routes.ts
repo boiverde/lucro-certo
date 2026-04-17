@@ -10,16 +10,11 @@ export async function uploadRoutes(app: FastifyInstance) {
         const data = await request.file()
 
         if (!data) {
-            return reply.status(400).send({ message: 'Arquivo não enviado' })
+            throw { statusCode: 400, message: 'Arquivo não enviado', code: 'BAD_REQUEST' }
         }
 
-        try {
-            const result = await uploadPublic(data)
-            return result
-        } catch (error) {
-            console.error('Upload error:', error)
-            return reply.status(500).send({ message: 'Erro ao fazer upload' })
-        }
+        const result = await uploadPublic(data)
+        return result
     })
 
     // Upload Privado (Documentos, Notas)
@@ -27,28 +22,22 @@ export async function uploadRoutes(app: FastifyInstance) {
         const data = await request.file()
 
         if (!data) {
-            return reply.status(400).send({ message: 'Arquivo não enviado' })
+            throw { statusCode: 400, message: 'Arquivo não enviado', code: 'BAD_REQUEST' }
         }
 
-        try {
-            const result = await uploadPrivate(data)
-            return result
-        } catch (error) {
-            console.error('Upload error:', error)
-            return reply.status(500).send({ message: 'Erro ao fazer upload' })
-        }
+        const result = await uploadPrivate(data)
+        return result
     })
 
     // Obter URL assinada para arquivo privado
     app.get('/private/:key', async (request, reply) => {
         const { key } = request.params as { key: string } // cast simples pois Zod com multipart é chato
-        // Idealmente usaria Zod no params, mas vamos simplificar aqui pois app.register(multipart) muda o request
 
         try {
             const url = await getFileSignedUrl(key)
             return { url }
         } catch (error) {
-            return reply.status(404).send({ message: 'Arquivo não encontrado' })
+            throw { statusCode: 404, message: 'Arquivo privado não encontrado', code: 'NOT_FOUND' }
         }
     })
 }

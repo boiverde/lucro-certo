@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { Compra } from "@/api/entities";
 import { User } from "@/api/entities";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,8 @@ export default function ComprasPage() {
       const data = await Compra.filter({ created_by: currentUser.email }, '-data_compra');
       setCompras(data);
     } catch (error) {
+      handleApiError(error, 'carregar suas compras')
+      handleApiError(error, 'carregar suas compras')
       console.error('Erro ao carregar compras:', error);
     }
     setLoading(false);

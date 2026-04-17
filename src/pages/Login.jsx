@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { base44 } from '@/api/base44Client';
 import { supabase } from '@/lib/supabase';
 
@@ -29,7 +31,9 @@ export default function Login() {
                     processingRef.current = false;
                 }
             } catch (err) {
-                console.error('[Auth] Erro na ponte do backend:', err);
+                handleApiError(err, 'autenticar')
+      handleApiError(err, 'autenticar')
+      console.error('[Auth] Erro na ponte do backend:', err);
                 setError(err.message || 'Erro ao sincronizar login com Google');
                 processingRef.current = false;
             } finally {

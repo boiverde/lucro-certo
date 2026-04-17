@@ -113,6 +113,7 @@ export default function RelatorioVendasDetalhado({ vendas, pedidos, filteredData
         numeroVendas: p.vendas.length
       };
     }).sort((a, b) => b.valorTotal - a.valorTotal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vendas, pedidos, receitas, configuracoes]);
 
   // Processar vendas por cliente

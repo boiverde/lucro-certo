@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -80,6 +82,8 @@ export default function RelatoriosPage() {
       setGastosRevenda(gastosRevendaData);
       setVendasRevenda(vendasRevendaData);
     } catch (error) {
+      handleApiError(error, 'carregar dados')
+      handleApiError(error, 'carregar dados')
       console.error('Erro ao carregar dados:', error);
     }
     setLoading(false);

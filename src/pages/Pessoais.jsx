@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { GastoPessoal } from "@/api/entities";
 import { User } from "@/api/entities";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,8 @@ export default function PessoaisPage() {
       const data = await GastoPessoal.filter({ created_by: currentUser.email }, '-data');
       setGastos(data);
     } catch (error) {
+      handleApiError(error, 'carregar os gastos pessoais')
+      handleApiError(error, 'carregar os gastos pessoais')
       console.error('Erro ao carregar gastos pessoais:', error);
     }
     setLoading(false);

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, ShoppingCart, TrendingUp, Package, DollarSign, Calendar as CalendarIcon, Receipt, Users as UsersIcon, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +29,7 @@ import FormDiaria from "../components/funcionarios/FormDiaria";
 import ListaDiarias from "../components/funcionarios/ListaDiarias";
 import OfflineManager, { useOffline } from "../components/mobile/OfflineManager";
 import { Badge } from "@/components/ui/badge";
+import Pagination from "@/components/ui/pagination";
 import PagamentosControle from "../components/controle/PagamentosControle";
 import CalendarioControle from "../components/controle/CalendarioControle";
 import FormIngrediente from "../components/lanches/FormIngrediente";
@@ -71,6 +74,13 @@ export default function ControlePage() {
   const [receitaProduzir, setReceitaProduzir] = useState(null);
   const [showFormPedido, setShowFormPedido] = useState(false);
   const [diasAlertaPedido, setDiasAlertaPedido] = useState(3);
+
+
+  const [pageVendas, setPageVendas] = useState(1);
+  const [pageCompras, setPageCompras] = useState(1);
+  const [pageProdutos, setPageProdutos] = useState(1);
+  const [pageGastos, setPageGastos] = useState(1);
+  const [pageClientes, setPageClientes] = useState(1); // just in case
 
   const queryClient = useQueryClient();
   const { isOnline, addToQueue } = useOffline();
@@ -285,7 +295,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Compra salva! Será sincronizada quando voltar online.');
+        toast.success('Compra salva! Será sincronizada quando voltar online.', { id: 'Compra salva! Será sincronizada quando voltar online.' })
         setShowFormCompra(false);
         setEditandoCompra(null);
       }
@@ -368,7 +378,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Venda salva! Será sincronizada quando voltar online.');
+        toast.success('Venda salva! Será sincronizada quando voltar online.', { id: 'Venda salva! Será sincronizada quando voltar online.' })
         setShowFormVenda(false);
         setEditandoVenda(null);
       }
@@ -406,7 +416,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Produto salvo! Será sincronizado quando voltar online.');
+        toast.success('Produto salvo! Será sincronizado quando voltar online.', { id: 'Produto salvo! Será sincronizado quando voltar online.' })
         setShowFormProduto(false);
         setEditandoProduto(null);
       }
@@ -456,7 +466,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Movimentação salva! Será sincronizada quando voltar online.');
+        toast.success('Movimentação salva! Será sincronizada quando voltar online.', { id: 'Movimentação salva! Será sincronizada quando voltar online.' })
         setShowFormMovimentacao(false);
         setProdutoSelecionado(null);
       }
@@ -496,7 +506,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Gasto salvo! Será sincronizado quando voltar online.');
+        toast.success('Gasto salvo! Será sincronizado quando voltar online.', { id: 'Gasto salvo! Será sincronizado quando voltar online.' })
         setShowFormGasto(false);
         setEditandoGasto(null);
       }
@@ -534,7 +544,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Funcionário salvo! Será sincronizado quando voltar online.');
+        toast.success('Funcionário salvo! Será sincronizado quando voltar online.', { id: 'Funcionário salvo! Será sincronizado quando voltar online.' })
         setShowFormFuncionario(false);
         setEditandoFuncionario(null);
       }
@@ -589,7 +599,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Diária salva! Será sincronizada quando voltar online.');
+        toast.success('Diária salva! Será sincronizada quando voltar online.', { id: 'Diária salva! Será sincronizada quando voltar online.' })
         setShowFormDiaria(false);
         setEditandoDiaria(null);
       }
@@ -773,7 +783,7 @@ export default function ControlePage() {
 
         // Criar alerta se ultrapassar o limite
         if (aumentoReceita > limiteAlerta) {
-          alert(`⚠️ ATENÇÃO: A receita "${receita.nome_produto}" teve aumento de ${aumentoReceita.toFixed(1)}% no custo!\nIngrediente: ${data.nome}\nCusto anterior: R$ ${custoAntigo.toFixed(2)}\nNovo custo: R$ ${custoTotal.toFixed(2)}`);
+          toast.warning(`Atenção: A receita "${receita.nome_produto}" teve aumento de ${aumentoReceita.toFixed(1)}% no custo!\nIngrediente: ${data.nome}\nCusto anterior: R$ ${custoAntigo.toFixed(2)}\nNovo custo: R$ ${custoTotal.toFixed(2)}`, { duration: 10000 });
         }
       }
     },
@@ -965,7 +975,7 @@ export default function ControlePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Pedido salvo! Será sincronizado quando voltar online.');
+        toast.success('Pedido salvo! Será sincronizado quando voltar online.', { id: 'Pedido salvo! Será sincronizado quando voltar online.' })
         setShowFormPedido(false);
       }
     }
@@ -1455,9 +1465,11 @@ export default function ControlePage() {
                             await base44.auth.updateMe({
                               margem_lucro_padrao: parseFloat(e.target.value) || 30
                             });
-                            alert('✅ Margem padrão salva!');
+                            toast.success('Margem padrão salva!', { id: 'Margem padrão salva!' })
                           } catch (error) {
-                            console.error('Erro ao salvar:', error);
+                            handleApiError(error, 'salvar as alterações')
+      handleApiError(error, 'salvar as alterações')
+      console.error('Erro ao salvar:', error);
                           }
                         }}
                         placeholder="30"
@@ -1480,9 +1492,11 @@ export default function ControlePage() {
                               await base44.auth.updateMe({
                                 limite_aumento_custo_receita: parseFloat(e.target.value) || 15
                               });
-                              alert('✅ Limite de alerta salvo!');
+                              toast.success('Limite de alerta salvo!', { id: 'Limite de alerta salvo!' })
                             } catch (error) {
-                              console.error('Erro ao salvar:', error);
+                              handleApiError(error, 'salvar as alterações')
+      handleApiError(error, 'salvar as alterações')
+      console.error('Erro ao salvar:', error);
                             }
                           }}
                           placeholder="15"
@@ -1505,9 +1519,11 @@ export default function ControlePage() {
                               await base44.auth.updateMe({
                                 dias_alerta_pedido_pendente: parseInt(e.target.value) || 3
                               });
-                              alert('✅ Alerta de pedidos salvo!');
+                              toast.success('Alerta de pedidos salvo!', { id: 'Alerta de pedidos salvo!' })
                             } catch (error) {
-                              console.error('Erro ao salvar:', error);
+                              handleApiError(error, 'salvar as alterações')
+      handleApiError(error, 'salvar as alterações')
+      console.error('Erro ao salvar:', error);
                             }
                           }}
                           placeholder="3"

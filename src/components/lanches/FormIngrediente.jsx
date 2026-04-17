@@ -40,7 +40,7 @@ export default function FormIngrediente({ ingrediente, onSubmit, onCancel }) {
     str = str
       .replace(/[\u002C\u060C\u066B\u3001\uFE10\uFE11\uFE50\uFE51\uFF0C\uFF64]/g, '.') // Todas as vírgulas unicode
       .replace(/[\u0027\u2018\u2019\u201A\u201B\u2032\u02B9\u02BC]/g, '') // Aspas/apóstrofos
-      .replace(/[^\d.\-]/g, ''); // Manter só números, ponto e menos
+      .replace(/[^\d.-]/g, ''); // Manter só números, ponto e menos
 
     if (!str) return 0;
 

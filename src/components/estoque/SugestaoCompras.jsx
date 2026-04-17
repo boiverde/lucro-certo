@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -200,9 +201,9 @@ export default function SugestaoCompras() {
     try {
       await createCompraMutation.mutateAsync(sugestao);
       setComprasRealizadas([...comprasRealizadas, sugestao.id]);
-      alert(`✅ Compra de ${sugestao.nome} criada com sucesso!`);
+      toast.success('Compra de ${sugestao.nome} criada com sucesso!')
     } catch (error) {
-      alert('Erro ao criar compra');
+      toast.error('Erro ao criar compra')
     }
   };
 

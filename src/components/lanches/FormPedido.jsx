@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from 'sonner';
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -140,12 +141,12 @@ export default function FormPedido({ receitas, produtos, ingredientes, onSubmit,
     e.preventDefault();
     
     if (dados.itens.length === 0) {
-      alert("Adicione pelo menos um item ao pedido");
+      toast.warning('Adicione pelo menos um item ao pedido', { id: 'Adicione pelo menos um item ao pedido' })
       return;
     }
 
     if (estoqueProblemas.length > 0) {
-      alert("Não é possível finalizar o pedido devido a problemas de estoque");
+      toast.warning('Não é possível finalizar o pedido devido a problemas de estoque', { id: 'Não é possível finalizar o pedido devido a problemas de estoque' })
       return;
     }
 

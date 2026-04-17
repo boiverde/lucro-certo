@@ -113,12 +113,7 @@ export async function clientesRoutes(app: FastifyInstance) {
         const exists = await prisma.cliente.findFirst({ where: { id, userId } })
         if (!exists) return reply.status(404).send({ message: 'Cliente não encontrado' })
 
-        try {
-            await prisma.cliente.delete({ where: { id } })
-            return reply.status(204).send()
-        } catch (error) {
-            // Possivelmente erro de FK
-            return reply.status(400).send({ message: 'Não é possível excluir cliente com vendas vinculadas.' })
-        }
+        await prisma.cliente.delete({ where: { id } })
+        return reply.status(204).send()
     })
 }

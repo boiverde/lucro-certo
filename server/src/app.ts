@@ -12,6 +12,7 @@ import { movimentacoesRoutes } from './routes/movimentacoes.routes'
 import fastifyMultipart from '@fastify/multipart'
 import { revendasRoutes } from './routes/revendas.routes'
 import { uploadRoutes } from './routes/upload.routes'
+import { dashboardRoutes } from './routes/dashboard.routes'
 import { gastosPessoaisRoutes } from './routes/gastos-pessoais.routes'
 import { gastosOperacionaisRoutes } from './routes/gastos-operacionais.routes'
 import { ingredientesRoutes } from './routes/ingredientes.routes'
@@ -49,9 +50,81 @@ app.decorate('authenticate', async (request: any, reply: any) => {
     try {
         await request.jwtVerify()
     } catch (err) {
-        reply.send(err)
+        throw err // Joga para o organizador global de erro
     }
 })
+
+// Manipulador Global de Erros (Padronização)
+app.setErrorHandler((error: any, request, reply) => {
+    // 1. Zod / Validation Fastify
+    if (error.validation) {
+        return reply.status(400).send({
+            error: 'VALIDATION_ERROR',
+            message: 'Os dados informados não são válidos.',
+            details: error.validation,
+            statusCode: 400
+        });
+    }
+
+    // 2. JWT & Autenticação
+    const authErrors = [
+        'FST_JWT_NO_AUTHORIZATION_IN_HEADER', 
+        'FST_JWT_AUTHORIZATION_TOKEN_EXPIRED', 
+        'FST_JWT_AUTHORIZATION_TOKEN_INVALID',
+        'FST_JWT_BAD_REQUEST'
+    ];
+    if (authErrors.includes(error.code)) {
+        return reply.status(401).send({
+             error: 'UNAUTHORIZED',
+             message: 'Acesso negado: Token JWT ausente, inválido ou expirado.',
+             statusCode: 401
+        });
+    }
+
+    // 3. Regra de Negócio (Lançada com statusCode / Custom)
+    if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500) {
+        return reply.status(error.statusCode).send({
+            error: error.code || 'BAD_REQUEST',
+            message: error.message,
+            statusCode: error.statusCode
+        });
+    }
+
+    // 4. Prisma KnownRequestErrors (Caches comuns)
+    if (error.code && typeof error.code === 'string' && error.code.startsWith('P')) {
+        if (error.code === 'P2002') {
+             return reply.status(409).send({
+                 error: 'CONFLICT',
+                 message: 'O registro violou uma restrição de unicidade (já existe).',
+                 statusCode: 409
+             });
+        }
+        if (error.code === 'P2003') {
+             return reply.status(409).send({
+                 error: 'FOREIGN_KEY_CONSTRAINT_FAILED',
+                 message: 'Não é possível excluir devido a registros vinculados a ele.',
+                 statusCode: 409
+             });
+        }
+        if (error.code === 'P2025') {
+            return reply.status(404).send({
+                error: 'NOT_FOUND',
+                message: 'Registro não encontrado para a operação.',
+                statusCode: 404
+            });
+        }
+    }
+
+    // 5. Erro Sistêmico (Vazamento, Servidor, Queda)
+    console.error(`[ERROR DETECTED] ${request.method} ${request.url} - ${error.message}`);
+    // console.error(error); // Logger estruturado no servidor
+
+    return reply.status(500).send({
+        error: 'INTERNAL_SERVER_ERROR',
+        message: 'Ocorreu um erro interno imprevisto no servidor.',
+        statusCode: 500
+    });
+});
 
 // Rotas
 app.register(authRoutes, { prefix: '/auth' })
@@ -61,6 +134,7 @@ app.register(vendasRoutes, { prefix: '/vendas' })
 app.register(comprasRoutes, { prefix: '/compras' })
 app.register(movimentacoesRoutes, { prefix: '/movimentacoes-estoque' })
 app.register(revendasRoutes, { prefix: '/revendas' })
+app.register(dashboardRoutes, { prefix: '/dashboard' })
 app.register(uploadRoutes, { prefix: '/uploads' })
 app.register(gastosPessoaisRoutes, { prefix: '/gastos-pessoais' })
 app.register(gastosOperacionaisRoutes, { prefix: '/gastos-operacionais' })

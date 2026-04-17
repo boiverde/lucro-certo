@@ -1,18 +1,23 @@
 import React, { useState, useEffect } from "react";
+import { toast } from 'sonner';
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, BarChart3 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AnimatePresence } from "framer-motion";
 
 import FormVenda from "../components/vendas/FormVenda";
 import ListaVendas from "../components/vendas/ListaVendas";
+import Pagination from "@/components/ui/pagination";
 import OfflineManager, { useOffline } from "../components/mobile/OfflineManager";
 
 export default function VendasPage() {
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
   const [user, setUser] = useState(null);
+  const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
   const { isOnline, addToQueue } = useOffline();
@@ -25,17 +30,22 @@ export default function VendasPage() {
     loadUser();
   }, []);
 
-  const { data: vendas = [], isLoading: loadingVendas } = useQuery({
-    queryKey: ['vendas'],
+  const { data: vendasData = { data: [], meta: null }, isLoading: loadingVendas } = useQuery({
+    queryKey: ['vendas', page],
     queryFn: async () => {
-      const result = await base44.entities.Venda.filter(
+      const result = await base44.entities.Venda.filterPaginated(
         { created_by: user?.email },
-        '-data_venda'
+        '-data_venda',
+        page,
+        50
       );
       return result;
     },
     enabled: !!user,
+    placeholderData: keepPreviousData,
   });
+
+  const vendas = vendasData.data;
 
   const { data: produtos = [] } = useQuery({
     queryKey: ['produtos'],
@@ -69,11 +79,11 @@ export default function VendasPage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Venda salva! Será sincronizada quando voltar online.');
+        toast.success('Venda salva! Será sincronizada quando voltar online.', { id: 'Venda salva! Será sincronizada quando voltar online.' })
         setShowForm(false);
         setEditando(null);
       } else {
-        alert(`❌ Erro ao salvar venda: ${error.message}`);
+        toast.error('Erro ao salvar venda: ${error.message}')
       }
     }
   });
@@ -120,7 +130,7 @@ export default function VendasPage() {
         queryClient.invalidateQueries({ queryKey: ['produtos'] });
         queryClient.invalidateQueries({ queryKey: ['movimentacoes-estoque'] });
       } catch (err) {
-        alert(`❌ Erro ao sincronizar venda offline: ${err.message}`);
+        toast.error('Erro ao sincronizar venda offline: ${err.message}')
       }
     }
   };
@@ -166,6 +176,11 @@ export default function VendasPage() {
           loading={loadingVendas}
           onEditar={handleEditar}
           onDeletar={handleDeletar}
+        />
+
+        <Pagination 
+          meta={vendasData.meta} 
+          onPageChange={(p) => setPage(p)} 
         />
       </div>
     </div>

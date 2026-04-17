@@ -51,11 +51,26 @@ export async function createCheckoutRequest(data: {
     };
 
     try {
+        console.log("=== PAGSEGURO DIAGOSTICO START ===");
+        console.log("PAGSEGURO REQUEST PAYLOAD:", JSON.stringify(body, null, 2));
+        
         const response = await pagseguroClient.post('/v2/checkout', body);
+        
+        console.log("PAGSEGURO SUCCESS RESPONSE:", JSON.stringify(response.data, null, 2));
+        console.log("=== PAGSEGURO DIAGOSTICO END ===");
+        
         // O PagSeguro retorna o code do checkout para montar a URL
         return response.data.checkout || response.data;
     } catch (error: any) {
-        console.error('[PAGSEGURO LIB ERROR]', error.response?.data || error.message);
+        console.error("=== PAGSEGURO ERROR START ===");
+        console.error("PAGSEGURO ERROR MESSAGE:", error.message);
+        if (error.response) {
+            console.error("PAGSEGURO ERROR DATA:", JSON.stringify(error.response.data, null, 2));
+            console.error("PAGSEGURO ERROR STATUS:", error.response.status);
+        } else {
+            console.error("PAGSEGURO FULL ERROR OBJ:", error);
+        }
+        console.error("=== PAGSEGURO ERROR END ===");
         throw error;
     }
 }

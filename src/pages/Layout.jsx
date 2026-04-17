@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from "react";
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { base44 } from "@/api/base44Client";
@@ -85,7 +87,9 @@ export default function Layout({ children, currentPageName }) {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
       } catch (error) {
-        console.error('Falha ao validar sessão:', error);
+        handleApiError(error, 'validar sessão')
+      handleApiError(error, 'validar sessão')
+      console.error('Falha ao validar sessão:', error);
         if (error.status === 401 || !localStorage.getItem('auth_token')) {
           window.location.href = '/Login';
         } else {

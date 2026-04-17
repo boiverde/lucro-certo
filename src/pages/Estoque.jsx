@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { toast } from 'sonner';
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +14,7 @@ import HistoricoMovimentacoes from "../components/estoque/HistoricoMovimentacoes
 import ResumoEstoque from "../components/estoque/ResumoEstoque";
 import NotificationManager from "../components/mobile/NotificationManager";
 import OfflineManager, { useOffline } from "../components/mobile/OfflineManager";
+import Pagination from "@/components/ui/pagination";
 
 export default function EstoquePage() {
   const [showFormProduto, setShowFormProduto] = useState(false);
@@ -20,6 +22,7 @@ export default function EstoquePage() {
   const [editandoProduto, setEditandoProduto] = useState(null);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
   const [user, setUser] = useState(null);
+  const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
   const { isOnline, addToQueue } = useOffline();
@@ -32,17 +35,22 @@ export default function EstoquePage() {
     loadUser();
   }, []);
 
-  const { data: produtos = [], isLoading: loadingProdutos } = useQuery({
-    queryKey: ['produtos'],
+  const { data: produtosData = { data: [], meta: null }, isLoading: loadingProdutos } = useQuery({
+    queryKey: ['produtos', page],
     queryFn: async () => {
-      const result = await base44.entities.Produto.filter(
+      const result = await base44.entities.Produto.filterPaginated(
         { created_by: user?.email },
-        '-created_date'
+        '-created_date',
+        page,
+        50
       );
       return result;
     },
     enabled: !!user,
+    placeholderData: keepPreviousData,
   });
+
+  const produtos = produtosData.data;
 
   const { data: movimentacoes = [], isLoading: loadingMovimentacoes } = useQuery({
     queryKey: ['movimentacoes-estoque'],
@@ -71,7 +79,7 @@ export default function EstoquePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Produto salvo! Será sincronizado quando voltar online.');
+        toast.success('Produto salvo! Será sincronizado quando voltar online.', { id: 'Produto salvo! Será sincronizado quando voltar online.' })
         setShowFormProduto(false);
         setEditandoProduto(null);
       }
@@ -123,7 +131,7 @@ export default function EstoquePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        alert('✅ Movimentação salva! Será sincronizada quando voltar online.');
+        toast.success('Movimentação salva! Será sincronizada quando voltar online.', { id: 'Movimentação salva! Será sincronizada quando voltar online.' })
         setShowFormMovimentacao(false);
         setProdutoSelecionado(null);
       }
@@ -282,6 +290,11 @@ export default function EstoquePage() {
               onEditar={handleEditarProduto}
               onAdicionarEntrada={(p) => handleAdicionarMovimentacao(p, 'entrada')}
               onAdicionarSaida={(p) => handleAdicionarMovimentacao(p, 'saida')}
+            />
+
+            <Pagination 
+              meta={produtosData.meta} 
+              onPageChange={(p) => setPage(p)} 
             />
           </TabsContent>
 

@@ -1,4 +1,5 @@
-﻿export const API_URL = import.meta.env.VITE_API_URL || 'https://lucro-certolucro-certo-api.onrender.com';
+export const API_URL = import.meta.env.VITE_API_URL || 'https://lucro-certolucro-certo-api.onrender.com';
+import { handleApiError } from './errorHandler';
 
 export async function httpClient(endpoint, options = {}) {
     const token = localStorage.getItem('auth_token');
@@ -17,14 +18,14 @@ export async function httpClient(endpoint, options = {}) {
         headers,
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, config);
-
-    if (response.status === 401) {
-        // Token expirado ou invÃ¡lido
-        localStorage.removeItem('auth_token');
-        // Opcional: Redirecionar para login via window.location ou evento
-        // window.location.href = '/login'; 
-        // Melhor nÃ£o forÃ§ar reload aqui para nÃ£o quebrar SPA, deixar quem chamou lidar ou usar evento.
+    let response;
+    try {
+        response = await fetch(`${API_URL}${endpoint}`, config);
+    } catch (e) {
+        const error = new Error('offline');
+        handleApiError(error, 'conectar ao servidor');
+        error.handledGlobally = true;
+        throw error;
     }
 
     // Tratamento de resposta vazia (204 No Content)
@@ -34,10 +35,27 @@ export async function httpClient(endpoint, options = {}) {
 
     const data = await response.json().catch(() => null);
 
+    if (response.status === 401) {
+        // Token expirado ou inválido
+        localStorage.removeItem('auth_token');
+    }
+
+    // Interceptar erro de limite atingido (Plano Free)
+    if (response.status === 403 && data?.error === 'LIMIT_REACHED') {
+        window.dispatchEvent(new CustomEvent('open-upgrade-modal'));
+    }
+
     if (!response.ok) {
-        const error = new Error(data?.message || 'Erro na requisiÃ§Ã£o');
+        const error = new Error(data?.message || 'Erro na requisição');
         error.status = response.status;
         error.data = data;
+        
+        // Atravessamos o manipulador de erros global para garantir toasts não genéricos e consistentes
+        if (!error.handledGlobally) {
+            handleApiError(error, 'processar ação');
+            error.handledGlobally = true;
+        }
+
         throw error;
     }
 

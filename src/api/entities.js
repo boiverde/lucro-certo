@@ -63,6 +63,28 @@ class EntityAdapter {
         return [];
     }
 
+    async filterPaginated(filters, sort, page = 1, limit = 50) {
+        if (!this.endpoint) return { data: [], meta: { page: 1, totalPages: 1 } };
+
+        const query = buildQueryString(filters, sort);
+        const separator = query ? '&' : '';
+        const finalQuery = `${query}${separator}page=${page}&limit=${limit}`;
+        
+        const response = await httpClient(`${this.endpoint}?${finalQuery}`);
+
+        let mappedData = [];
+        if (response && response.results) {
+            mappedData = response.results.map(i => this.mapItemToFrontend(i));
+        } else if (Array.isArray(response)) {
+            mappedData = response.map(i => this.mapItemToFrontend(i));
+        }
+
+        return {
+            data: mappedData,
+            meta: response.meta || { page, limit, total: mappedData.length, totalPages: 1 }
+        };
+    }
+
     async create(data) {
         if (!this.endpoint) throw new Error('Endpoint não implementado');
         return httpClient(this.endpoint, {

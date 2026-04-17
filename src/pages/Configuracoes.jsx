@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { handleApiError } from '@/api/errorHandler';
+import { toast } from 'sonner';
 import { base44 } from "@/api/base44Client";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,26 +26,11 @@ export default function ConfiguracoesPage() {
   const [salvando, setSalvando] = useState(false);
   const [sucesso, setSucesso] = useState(false);
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
 
-  const carregarDados = async () => {
-    try {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-      setMargemPadrao(currentUser.margem_lucro_padrao || 30);
-      setFaturamentoMedio(currentUser.faturamento_medio_mensal || "");
-      setCustoFixo(currentUser.custo_fixo_mensal || "");
-      setTaxaImpostos(currentUser.taxa_impostos || 5);
-      setTaxaCartao(currentUser.taxa_cartao || 4);
-      setCustoMaoObraHora(currentUser.custo_mao_obra_hora || "");
-      setCustoFixoUnidade(currentUser.custo_fixo_por_unidade || "");
-      setProducaoMensalEstimada(currentUser.producao_mensal_estimada || "");
-    } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
-    }
-  };
+
+  const { data: userData } = useQuery({ queryKey: ['auth-me-configs'], queryFn: () => base44.auth.me(), staleTime: 1000 * 60 * 5 });
+
+  useEffect(() => { if (userData) { setUser(userData); setMargemPadrao(userData.margem_lucro_padrao || 30); setFaturamentoMedio(userData.faturamento_medio_mensal || ""); setCustoFixo(userData.custo_fixo_mensal || ""); setTaxaImpostos(userData.taxa_impostos || 5); setTaxaCartao(userData.taxa_cartao || 4); setCustoMaoObraHora(userData.custo_mao_obra_hora || ""); setCustoFixoUnidade(userData.custo_fixo_por_unidade || ""); setProducaoMensalEstimada(userData.producao_mensal_estimada || ""); } }, [userData]);
 
   const aplicarTemplate = async (config) => {
     setMargemPadrao(config.margem_lucro_padrao);
@@ -63,10 +51,12 @@ export default function ConfiguracoesPage() {
         custo_fixo_por_unidade: parseFloat(custoFixoUnidade) || 0
       });
 
-      alert('✅ Template aplicado com sucesso!');
+      toast.success('Template aplicado com sucesso!', { id: 'Template aplicado com sucesso!' })
     } catch (error) {
+      handleApiError(error, 'aplicar o tema')
+      handleApiError(error, 'aplicar o tema')
       console.error('Erro ao aplicar template:', error);
-      alert('Erro ao aplicar template');
+      toast.error('Erro ao aplicar template')
     }
   };
 
@@ -111,8 +101,10 @@ export default function ConfiguracoesPage() {
       setSucesso(true);
       setTimeout(() => setSucesso(false), 3000);
     } catch (error) {
+      handleApiError(error, 'salvar as alterações')
+      handleApiError(error, 'salvar as alterações')
       console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar configurações');
+      handleApiError(error, 'salvar as configurações')
     }
 
     setSalvando(false);
@@ -336,3 +328,5 @@ export default function ConfiguracoesPage() {
     </div>
   );
 }
+
+

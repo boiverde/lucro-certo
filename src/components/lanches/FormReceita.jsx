@@ -92,7 +92,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
     );
     const custoTotal = custoTotalCalc.custoTotal;
 
-    useEffect(() => {
+  useEffect(() => {
     if (custoTotal > 0) {
       let precoSugerido;
       if (usarMarkup && markup > 0) {
@@ -103,11 +103,11 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
         const margem = parseFloat(dados.margem_lucro) || 0;
         precoSugerido = custoTotal * (1 + margem / 100);
       }
-      if (precoSugerido) {
+      if (precoSugerido && precoSugerido.toFixed(2) !== String(dados.preco_venda_sugerido)) {
         setDados(prev => ({...prev, preco_venda_sugerido: precoSugerido.toFixed(2)}));
       }
     }
-  }, [custoTotal, dados.margem_lucro, usarMarkup, markup]);
+  }, [custoTotal, dados.margem_lucro, dados.preco_venda_sugerido, usarMarkup, markup]);
 
   const adicionarIngrediente = () => {
     if (!ingredienteSelecionado || !quantidade) return;

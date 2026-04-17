@@ -12,36 +12,19 @@ export default function CalculadoraMarkup({
   taxaCartao, 
   margemLucro
 }) {
-  const [markup, setMarkup] = useState(0);
-  const [custoFixoPercent, setCustoFixoPercent] = useState(0);
-
-  useEffect(() => {
-    calcularMarkup();
-  }, [faturamento, custoFixo, taxaImpostos, taxaCartao, margemLucro]);
-
-  const calcularMarkup = () => {
-    if (!faturamento || faturamento === 0) {
-      setMarkup(0);
-      setCustoFixoPercent(0);
-      return;
-    }
-
-    // Custo fixo em %
-    const custoFixoPct = (custoFixo / faturamento) * 100;
-    setCustoFixoPercent(custoFixoPct);
-
-    // Custos totais = Custo Fixo% + Impostos% + Taxas%
-    const custosVariaveis = parseFloat(taxaImpostos || 0) + parseFloat(taxaCartao || 0);
-    const custosTotais = custoFixoPct + custosVariaveis;
-
-    // Markup = 100 / (100 - Custos Totais% - Margem Lucro%)
-    const markupCalculado = 100 / (100 - custosTotais - parseFloat(margemLucro || 0));
-    
-    setMarkup(markupCalculado);
-  };
-
+  // Custo fixo em %
+  const custoFixoPct = (!faturamento || faturamento === 0) ? 0 : (custoFixo / faturamento) * 100;
+  
+  // Custos totais = Custo Fixo% + Impostos% + Taxas%
   const custosVariaveisTotal = parseFloat(taxaImpostos || 0) + parseFloat(taxaCartao || 0);
-  const custosTotais = custoFixoPercent + custosVariaveisTotal;
+  const custosTotais = custoFixoPct + custosVariaveisTotal;
+  
+  // Markup = 100 / (100 - Custos Totais% - Margem Lucro%)
+  const margem = parseFloat(margemLucro || 0);
+  const divisor = 100 - custosTotais - margem;
+  const markup = (!faturamento || faturamento === 0 || divisor <= 0) ? 0 : (100 / divisor);
+
+  const custoFixoPercent = custoFixoPct;
 
   return (
     <Card className="shadow-lg bg-gradient-to-br from-green-50 to-blue-50">

@@ -99,66 +99,66 @@ export async function vendasRoutes(app: FastifyInstance) {
             }
         }
 
-        try {
-            const result = await prisma.$transaction(async (tx) => {
-                const venda = await tx.venda.create({
-                    data: {
-                        userId,
-                        cliente_nome: vendaData.cliente_nome,
-                        clienteId: vendaData.clienteId,
-                        data_venda: new Date(vendaData.data_venda),
-                        valor_total: vendaData.valor_total,
-                        observacoes: vendaData.observacoes,
-                        itens: {
-                            create: itens.map(item => ({
-                                produtoId: item.produtoId || null,
-                                nome_produto: item.nome_produto,
-                                quantidade: item.quantidade,
-                                preco_unitario: item.preco_unitario,
-                                subtotal: item.subtotal
-                            }))
-                        }
-                    },
-                    include: { itens: true }
-                })
-
-                // Atualizar estoque se tiver produtoId
-                for (const item of itens) {
-                    if (item.produtoId) {
-                        const produtoInfo = await tx.produto.findUnique({ where: { id: item.produtoId } })
-                        if (!produtoInfo) throw new Error(`Produto não encontrado`)
-                        
-                        if (produtoInfo.controla_estoque && produtoInfo.estoque_atual < item.quantidade) {
-                            throw new Error(`Estoque insuficiente para o produto "${produtoInfo.nome}". Disponível: ${produtoInfo.estoque_atual}`)
-                        }
-
-                        await tx.produto.update({
-                            where: { id: item.produtoId },
-                            data: { estoque_atual: { decrement: item.quantidade } }
-                        })
-
-                        // Registrar movimentação de saída
-                        await tx.movimentacaoEstoque.create({
-                            data: {
-                                userId,
-                                produtoId: item.produtoId,
-                                quantidade: item.quantidade,
-                                tipo: 'saida',
-                                origem: 'venda',
-                                observacoes: `Venda #${venda.id.slice(0, 8)}`,
-                                data: new Date(vendaData.data_venda)
-                            }
-                        })
+        const result = await prisma.$transaction(async (tx) => {
+            const venda = await tx.venda.create({
+                data: {
+                    userId,
+                    cliente_nome: vendaData.cliente_nome,
+                    clienteId: vendaData.clienteId,
+                    data_venda: new Date(vendaData.data_venda),
+                    valor_total: vendaData.valor_total,
+                    observacoes: vendaData.observacoes,
+                    itens: {
+                        create: itens.map(item => ({
+                            produtoId: item.produtoId || null,
+                            nome_produto: item.nome_produto,
+                            quantidade: item.quantidade,
+                            preco_unitario: item.preco_unitario,
+                            subtotal: item.subtotal
+                        }))
                     }
-                }
-
-                return venda
+                },
+                include: { itens: true }
             })
 
-            return result
-        } catch (error: any) {
-            return reply.status(400).send({ message: error.message || 'Erro ao criar venda' })
-        }
+            // Atualizar estoque se tiver produtoId
+            for (const item of itens) {
+                if (item.produtoId) {
+                    const produtoInfo = await tx.produto.findUnique({ where: { id: item.produtoId } })
+                    if (!produtoInfo) throw { statusCode: 404, message: `Produto não encontrado`, code: 'NOT_FOUND' }
+                    
+                    if (produtoInfo.controla_estoque && produtoInfo.estoque_atual < item.quantidade) {
+                        throw { 
+                            statusCode: 400, 
+                            message: `Estoque insuficiente para o produto "${produtoInfo.nome}". Disponível: ${produtoInfo.estoque_atual}`,
+                            code: 'BUSINESS_RULE_ERROR'
+                        }
+                    }
+
+                    await tx.produto.update({
+                        where: { id: item.produtoId },
+                        data: { estoque_atual: { decrement: item.quantidade } }
+                    })
+
+                    // Registrar movimentação de saída
+                    await tx.movimentacaoEstoque.create({
+                        data: {
+                            userId,
+                            produtoId: item.produtoId,
+                            quantidade: item.quantidade,
+                            tipo: 'saida',
+                            origem: 'venda',
+                            observacoes: `Venda #${venda.id.slice(0, 8)}`,
+                            data: new Date(vendaData.data_venda)
+                        }
+                    })
+                }
+            }
+
+            return venda
+        })
+
+        return result
     })
 
     // Detalhe Venda

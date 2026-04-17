@@ -1,4 +1,5 @@
 import React from "react";
+import { toast } from 'sonner';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Globe, Smartphone } from "lucide-react";
@@ -26,7 +27,7 @@ export default function BannerAcessoWeb() {
               <Button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.origin);
-                  alert('✅ Link copiado!');
+                  toast.success('Link copiado!', { id: 'Link copiado!' })
                 }}
                 variant="secondary"
                 size="sm"

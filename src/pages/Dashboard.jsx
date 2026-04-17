@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,26 +88,19 @@ export default function Dashboard() {
     enabled: !!user?.email && !loading,
   });
 
+  const { data: dashboardStats } = useQuery({
+    queryKey: ['dashboard-stats', user?.email],
+    queryFn: async () => {
+      return await httpClient('/dashboard/stats');
+    },
+    enabled: !!user?.email && !loading,
+  });
+
   const { data: vendasRevenda = [] } = useQuery({
     queryKey: ['vendas-revenda-dashboard', user?.email],
     queryFn: async () => {
-      return await base44.entities.VendaRevenda.filter({ created_by: user.email }, '-data_primeira_parcela');
-    },
-    enabled: !!user?.email && !loading,
-  });
-
-  const { data: produtos = [] } = useQuery({
-    queryKey: ['produtos-dashboard', user?.email],
-    queryFn: async () => {
-      return await base44.entities.Produto.filter({ created_by: user.email }, '-created_date');
-    },
-    enabled: !!user?.email && !loading,
-  });
-
-  const { data: ingredientes = [] } = useQuery({
-    queryKey: ['ingredientes-dashboard', user?.email],
-    queryFn: async () => {
-      return await base44.entities.Ingrediente.filter({ created_by: user.email }, 'nome');
+      // Limite para Últimas Transações e ResumoLucro
+      return await base44.entities.VendaRevenda.filter({ created_by: user.email, limit: 10 }, '-data_primeira_parcela');
     },
     enabled: !!user?.email && !loading,
   });
@@ -118,32 +112,9 @@ export default function Dashboard() {
   const vendasMes = vendas;
   const gastosMes = gastos;
 
-  // Calcular comissões de revenda (apenas parcelas pagas)
-  const comissoesDoMes = vendasRevenda.reduce((total, venda) => {
-    if (venda.status === 'cancelada' || !venda.numero_parcelas || venda.numero_parcelas === 0) return total;
-    
-    const comissaoPorParcela = venda.valor_comissao_total / venda.numero_parcelas;
-    
-    // Verificar quais parcelas foram pagas este mês
-    for (let i = 0; i < venda.parcelas_pagas; i++) {
-      const dataParcela = addMonths(new Date(venda.data_primeira_parcela), i);
-      if (dataParcela >= inicioMesObj && dataParcela <= fimMesObj) {
-        total += comissaoPorParcela;
-      }
-    }
-    return total;
-  }, 0);
-
-  const comissoesAReceber = vendasRevenda.reduce((total, venda) => {
-    if (venda.status === 'cancelada' || venda.status === 'paga') return total;
-    
-    // Check for division by zero
-    if (!venda.numero_parcelas || venda.numero_parcelas === 0) return total;
-
-    const parcelasRestantes = venda.numero_parcelas - venda.parcelas_pagas;
-    const comissaoPorParcela = venda.valor_comissao_total / venda.numero_parcelas;
-    return total + (parcelasRestantes * comissaoPorParcela);
-  }, 0);
+  // Usa o stats delegado ao banco para O(1) fetch ao em vez de map client-side
+  const comissoesDoMes = dashboardStats?.comissoes?.comissoesDoMes || 0;
+  const comissoesAReceber = dashboardStats?.comissoes?.comissoesAReceber || 0;
 
   const totalComprasMes = comprasMes.reduce((sum, c) => sum + c.valor_total, 0);
   const totalVendasMes = vendasMes.reduce((sum, v) => sum + v.valor_total, 0);
@@ -279,7 +250,7 @@ export default function Dashboard() {
         </div>
 
         {/* Painel de Estoque */}
-        <PainelEstoque produtos={produtos} ingredientes={ingredientes} />
+        <PainelEstoque stats={dashboardStats?.estoque} />
 
         {/* Cards de Gastos Específicos */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 mt-6">

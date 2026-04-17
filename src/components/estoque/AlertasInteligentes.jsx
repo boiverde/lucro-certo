@@ -229,6 +229,7 @@ export default function AlertasInteligentes() {
     if (user && !isLoading && alertas.length === 0) {
       gerarAlertas();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isLoading]);
 
   const handleMarcarResolvido = (alerta, acao) => {

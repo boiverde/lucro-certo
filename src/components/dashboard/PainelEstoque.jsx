@@ -6,25 +6,13 @@ import { AlertTriangle, Package, TrendingDown, ExternalLink, AlertCircle } from 
 import { Link } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 
-export default function PainelEstoque({ produtos = [], ingredientes = [] }) {
-  // Produtos com estoque baixo
-  const produtosBaixos = produtos.filter(
-    p => p.ativo && p.controla_estoque && p.estoque_atual <= p.estoque_minimo && p.estoque_minimo > 0
-  );
+export default function PainelEstoque({ stats }) {
+  if (!stats) return null;
 
-  // Produtos zerados
-  const produtosZerados = produtos.filter(
-    p => p.ativo && p.controla_estoque && p.estoque_atual === 0
-  );
-
-  // Ingredientes com estoque baixo
-  const ingredientesBaixos = ingredientes.filter(
-    i => i.ativo && i.estoque_atual <= i.estoque_minimo && i.estoque_minimo > 0
-  );
-
+  const { produtosBaixos = [], produtosZerados = [], ingredientesBaixos = [], totalProdutos = 0, totalIngredientes = 0 } = stats;
   const totalAlertas = produtosBaixos.length + produtosZerados.length + ingredientesBaixos.length;
 
-  if (totalAlertas === 0 && produtos.length === 0 && ingredientes.length === 0) {
+  if (totalAlertas === 0 && totalProdutos === 0 && totalIngredientes === 0) {
     return null;
   }
 
@@ -128,18 +116,18 @@ export default function PainelEstoque({ produtos = [], ingredientes = [] }) {
           <div className="bg-blue-50 rounded-lg p-3">
             <p className="text-xs text-blue-600 font-medium mb-1">Produtos Ativos</p>
             <p className="text-2xl font-bold text-blue-900">
-              {produtos.filter(p => p.ativo).length}
+              {totalProdutos}
             </p>
           </div>
           <div className="bg-purple-50 rounded-lg p-3">
             <p className="text-xs text-purple-600 font-medium mb-1">Ingredientes</p>
             <p className="text-2xl font-bold text-purple-900">
-              {ingredientes.filter(i => i.ativo).length}
+              {totalIngredientes}
             </p>
           </div>
         </div>
 
-        {totalAlertas === 0 && (produtos.length > 0 || ingredientes.length > 0) && (
+        {totalAlertas === 0 && (totalProdutos > 0 || totalIngredientes > 0) && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-center gap-2">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <p className="text-sm text-green-800 font-medium">

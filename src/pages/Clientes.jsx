@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Users } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,12 +11,14 @@ import { Badge } from "@/components/ui/badge";
 import FormCliente from "../components/clientes/FormCliente";
 import ListaClientes from "../components/clientes/ListaClientes";
 import HistoricoCliente from "../components/clientes/HistoricoCliente";
+import Pagination from "@/components/ui/pagination";
 
 export default function ClientesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
   const [clienteSelecionado, setClienteSelecionado] = useState(null);
   const [user, setUser] = useState(null);
+  const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
 
@@ -28,17 +30,22 @@ export default function ClientesPage() {
     loadUser();
   }, []);
 
-  const { data: clientes = [], isLoading: loadingClientes } = useQuery({
-    queryKey: ['clientes'],
+  const { data: clientesData = { data: [], meta: null }, isLoading: loadingClientes } = useQuery({
+    queryKey: ['clientes', page],
     queryFn: async () => {
-      const result = await base44.entities.Cliente.filter(
+      const result = await base44.entities.Cliente.filterPaginated(
         { created_by: user?.email },
-        '-created_date'
+        '-created_date',
+        page,
+        50
       );
       return result;
     },
     enabled: !!user,
+    placeholderData: keepPreviousData,
   });
+
+  const clientes = clientesData.data;
 
   const { data: vendasRevenda = [] } = useQuery({
     queryKey: ['vendas-revenda-clientes'],
@@ -226,6 +233,11 @@ export default function ClientesPage() {
               onEditar={handleEditar}
               onVerHistorico={handleVerHistorico}
               onDeletar={handleDeletar}
+            />
+
+            <Pagination 
+              meta={clientesData.meta} 
+              onPageChange={(p) => setPage(p)} 
             />
           </TabsContent>
 
