@@ -29,6 +29,8 @@ import PainelEstoque from "../components/dashboard/PainelEstoque";
 import UsageTracker from "../components/dashboard/UsageTracker";
 import LucratividadeBanner from "../components/dashboard/LucratividadeBanner";
 import RenewalNotice from "../components/dashboard/RenewalNotice";
+import { useUpgrade } from "@/context/UpgradeContext";
+import { CreditCard, ArrowRight } from "lucide-react";
 
 const hoje = new Date();
 const inicioMesObj = startOfMonth(hoje);
@@ -39,6 +41,7 @@ const fimMesStr = format(fimMesObj, "yyyy-MM-dd");
 export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { pendingPix, openUpgrade } = useUpgrade();
 
   useEffect(() => {
     const loadUser = async () => {
@@ -156,6 +159,27 @@ export default function Dashboard() {
 
         <WelcomeMessage user={user} hasData={hasData} />
         <RenewalNotice user={user} stats={dashboardStats} />
+        
+        {pendingPix && new Date(pendingPix.expiresAt) > new Date() && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top duration-500">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-900">Você tem um pagamento pendente</p>
+                <p className="text-[10px] text-amber-700 font-medium">Finalize sua assinatura PRO para liberar todos os recursos.</p>
+              </div>
+            </div>
+            <Button 
+              onClick={() => openUpgrade("Retome o pagamento da sua assinatura PRO.")}
+              className="h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl gap-2 shadow-lg shadow-amber-600/20"
+            >
+              Concluir Pagamento <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+
         <LucratividadeBanner stats={dashboardStats} />
         <UsageTracker usage={dashboardStats?.usage} />
 
