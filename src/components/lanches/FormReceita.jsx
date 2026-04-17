@@ -10,6 +10,8 @@ import { X, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { base44 } from "@/api/base44Client";
 import CalculadoraCustoTotal, { useCustoTotal } from "../receitas/CalculadoraCustoTotal";
+import PricingAssistant from "../configuracoes/PricingAssistant";
+import { usePlan } from "@/api/usePlan";
 
 const capitalizar = (texto) => {
   return texto
@@ -38,6 +40,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
   const [usarMarkup, setUsarMarkup] = useState(false);
   const [markup, setMarkup] = useState(0);
   const [configuracoes, setConfiguracoes] = useState(null);
+  const { plan } = usePlan();
 
   useEffect(() => {
     const carregarConfiguracoes = async () => {
@@ -92,22 +95,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
     );
     const custoTotal = custoTotalCalc.custoTotal;
 
-  useEffect(() => {
-    if (custoTotal > 0) {
-      let precoSugerido;
-      if (usarMarkup && markup > 0) {
-        // Usar markup
-        precoSugerido = custoTotal * markup;
-      } else if (dados.margem_lucro) {
-        // Usar margem
-        const margem = parseFloat(dados.margem_lucro) || 0;
-        precoSugerido = custoTotal * (1 + margem / 100);
-      }
-      if (precoSugerido && precoSugerido.toFixed(2) !== String(dados.preco_venda_sugerido)) {
-        setDados(prev => ({...prev, preco_venda_sugerido: precoSugerido.toFixed(2)}));
-      }
-    }
-  }, [custoTotal, dados.margem_lucro, dados.preco_venda_sugerido, usarMarkup, markup]);
+  // Removido useEffect que setava preço automaticamente sem permissão do usuário
 
   const adicionarIngrediente = () => {
     if (!ingredienteSelecionado || !quantidade) return;
@@ -310,57 +298,26 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
               />
             </div>
 
-            {markup > 0 && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-blue-900">Usar Markup Configurado?</h4>
-                    <p className="text-sm text-blue-700">Seu markup atual: {markup.toFixed(2)}</p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={usarMarkup}
-                    onChange={(e) => setUsarMarkup(e.target.checked)}
-                    className="w-5 h-5"
-                  />
-                </div>
-              </div>
+            {custoTotal > 0 && (
+              <PricingAssistant 
+                cost={custoTotal}
+                configs={configuracoes}
+                isPro={plan === 'pro'}
+                onApply={(val) => setDados({...dados, preco_venda_sugerido: val})}
+              />
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {!usarMarkup && (
-                <div>
-                  <Label>Margem de Lucro (%) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={dados.margem_lucro}
-                    onChange={(e) => setDados({...dados, margem_lucro: e.target.value})}
-                    placeholder={margemPadrao.toString()}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Padrão: {margemPadrao}%</p>
-                </div>
-              )}
-
-              <div className={!usarMarkup ? "" : "md:col-span-2"}>
-                <Label>Preço de Venda Sugerido</Label>
+              <div className="md:col-span-2">
+                <Label>Preço de Venda Final</Label>
                 <Input
                   type="number"
                   step="0.01"
                   value={dados.preco_venda_sugerido}
                   onChange={(e) => setDados({...dados, preco_venda_sugerido: e.target.value})}
                   placeholder="0.00"
+                  className="h-12 text-lg font-bold text-blue-900"
                 />
-                {custoTotal > 0 && (
-                  <p className="text-xs text-green-600 mt-1">
-                    {usarMarkup 
-                      ? `Markup ${markup.toFixed(2)}: R$ ${(custoTotal * markup).toFixed(2)}`
-                      : dados.margem_lucro && `Margem ${dados.margem_lucro}%: R$ ${(custoTotal * (1 + parseFloat(dados.margem_lucro) / 100)).toFixed(2)}`
-                    }
-                  </p>
-                )}
               </div>
-            </div>
 
             <div>
               <Label>Observações</Label>

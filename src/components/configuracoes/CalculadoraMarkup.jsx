@@ -15,14 +15,19 @@ export default function CalculadoraMarkup({
   // Custo fixo em %
   const custoFixoPct = (!faturamento || faturamento === 0) ? 0 : (custoFixo / faturamento) * 100;
   
-  // Custos totais = Custo Fixo% + Impostos% + Taxas%
-  const custosVariaveisTotal = parseFloat(taxaImpostos || 0) + parseFloat(taxaCartao || 0);
-  const custosTotais = custoFixoPct + custosVariaveisTotal;
+  // Taxas e Margem em decimal (ex: 0.15)
+  const taxaImpostoDec = parseFloat(taxaImpostos || 0) / 100;
+  const taxaCartaoDec = parseFloat(taxaCartao || 0) / 100;
+  const custoFixoDec = custoFixoPct / 100;
+  const margemDec = parseFloat(margemLucro || 0) / 100;
   
-  // Markup = 100 / (100 - Custos Totais% - Margem Lucro%)
-  const margem = parseFloat(margemLucro || 0);
-  const divisor = 100 - custosTotais - margem;
-  const markup = (!faturamento || faturamento === 0 || divisor <= 0) ? 0 : (100 / divisor);
+  // Divisor = 1 - (Custo Fixo% + Impostos% + Taxas% + Margem%)
+  const custosTotaisMargem = custoFixoDec + taxaImpostoDec + taxaCartaoDec + margemDec;
+  const divisor = 1 - custosTotaisMargem;
+  
+  // Validação: Se a soma das taxas e lucro for >= 100%, o cálculo é impossível (prejuízo garantido)
+  const markup = (divisor <= 0) ? 0 : (1 / divisor);
+  const custosTotaisPct = (custoFixoDec + taxaImpostoDec + taxaCartaoDec) * 100;
 
   const custoFixoPercent = custoFixoPct;
 
@@ -59,7 +64,7 @@ export default function CalculadoraMarkup({
           <div className="pt-3 border-t border-gray-200">
             <div className="flex justify-between">
               <span className="font-medium">Custos Totais:</span>
-              <span className="font-bold text-orange-600">{custosTotais.toFixed(2)}%</span>
+              <span className="font-bold text-orange-600">{custosTotaisPct.toFixed(2)}%</span>
             </div>
           </div>
         </div>
@@ -104,10 +109,10 @@ export default function CalculadoraMarkup({
         <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
           <p className="font-semibold mb-1">Fórmula do Markup:</p>
           <p className="font-mono">
-            Markup = 100 ÷ (100 - {custosTotais.toFixed(1)}% - {margemLucro}%)
+            Markup = 1 ÷ (1 - {custosTotaisMargem.toFixed(2)})
           </p>
           <p className="font-mono mt-1">
-            Markup = 100 ÷ {(100 - custosTotais - parseFloat(margemLucro || 0)).toFixed(1)}
+            Markup = 1 ÷ {divisor.toFixed(2)}
           </p>
         </div>
       </CardContent>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,26 @@ import { motion } from "framer-motion";
 import { Save, X, Package, Scan } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import BarcodeScanner from "../mobile/BarcodeScanner";
+import PricingAssistant from "../configuracoes/PricingAssistant";
+import { usePlan } from "@/api/usePlan";
+import { base44 } from "@/api/base44Client";
 
 export default function FormProduto({ produto, onSubmit, onCancel }) {
+  const [configuracoes, setConfiguracoes] = useState(null);
+  const { plan } = usePlan();
+
+  useEffect(() => {
+    const loadConfigs = async () => {
+      try {
+        const user = await base44.auth.me();
+        setConfiguracoes(user);
+      } catch (e) {
+        console.error('Erro ao carregar configurações');
+      }
+    };
+    loadConfigs();
+  }, []);
+
   const [dados, setDados] = useState(produto || {
     nome: "",
     codigo_barras: "",
@@ -20,7 +38,9 @@ export default function FormProduto({ produto, onSubmit, onCancel }) {
     notificar_estoque_baixo: true,
     controla_estoque: true,
     ativo: true,
-    observacoes: ""
+    observacoes: "",
+    preco: 0,
+    custo: 0
   });
 
   const [showScanner, setShowScanner] = useState(false);
@@ -30,7 +50,9 @@ export default function FormProduto({ produto, onSubmit, onCancel }) {
     onSubmit({
       ...dados,
       estoque_atual: parseFloat(dados.estoque_atual) || 0,
-      estoque_minimo: parseFloat(dados.estoque_minimo) || 0
+      estoque_minimo: parseFloat(dados.estoque_minimo) || 0,
+      preco: parseFloat(dados.preco) || 0,
+      custo: parseFloat(dados.custo) || 0
     });
   };
 
@@ -127,6 +149,41 @@ export default function FormProduto({ produto, onSubmit, onCancel }) {
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t pt-4">
+                  <div>
+                    <Label htmlFor="custo" className="text-base">Custo de Aquisição (R$)</Label>
+                    <Input
+                      id="custo"
+                      type="number"
+                      step="0.01"
+                      value={dados.custo}
+                      onChange={(e) => setDados({...dados, custo: e.target.value})}
+                      placeholder="0.00"
+                      className="h-12 text-base"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="preco" className="text-base">Preço de Venda (R$)</Label>
+                    <Input
+                      id="preco"
+                      type="number"
+                      step="0.01"
+                      value={dados.preco}
+                      onChange={(e) => setDados({...dados, preco: e.target.value})}
+                      placeholder="0.00"
+                      className="h-12 text-base font-bold text-blue-700"
+                    />
+                  </div>
+                </div>
+
+                <PricingAssistant 
+                  cost={parseFloat(dados.custo) || 0}
+                  configs={configuracoes}
+                  isPro={plan === 'pro'}
+                  onApply={(val) => setDados({...dados, preco: val})}
+                />
 
                 {!produto && (
                   <div>

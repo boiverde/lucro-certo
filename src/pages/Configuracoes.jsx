@@ -83,7 +83,7 @@ export default function ConfiguracoesPage() {
       if (faturamentoVal > 0) {
         const custoFixoPct = (custoFixoVal / faturamentoVal) * 100;
         const custosTotais = custoFixoPct + impostosVal + cartaoVal;
-        finalMarkup = 100 / (100 - custosTotais - margemVal);
+        finalMarkup = (100 - custosTotais - margemVal) > 0 ? 100 / (100 - custosTotais - margemVal) : 0;
       }
 
       await base44.auth.updateMe({
