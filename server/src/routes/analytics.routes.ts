@@ -209,47 +209,70 @@ export async function analyticsRoutes(app: FastifyInstance) {
         }
     })
 
-    // Endpoint para decidir qual variante servir para cada segmento
+    // Endpoint para decidir qual variante servir para cada segmento (com Guardrails)
     app.get('/active-variants', async (request) => {
-        // Lógica de decisão automática:
-        // 1. Coletar lift por segmento
-        // 2. Se validade (7 dias) e Lift > 2%, retornar vencedora
-        // 3. Caso contrário, 50/50 ramdom (exploração)
+        const now = new Date()
+        const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
+        const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000))
 
-        const variantData = await prisma.analyticsEvent.findMany({
-            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
+        // 1. Coletar dados da janela móvel (14 dias)
+        const windowData = await prisma.analyticsEvent.findMany({
+            where: { 
+                event: { in: ['upgrade_view', 'pix_paid'] },
+                timestamp: { gte: fourteenDaysAgo }
+            },
             select: { event: true, metadata: true, timestamp: true }
         })
 
-        const firstEvent = variantData[0]?.timestamp
-        const days = firstEvent ? Math.ceil((Date.now() - firstEvent.getTime()) / (1000 * 60 * 60 * 24)) : 0
+        // 2. Coletar dados recentes para monitoramento de Rollback (3 dias)
+        const recentData = windowData.filter(e => e.timestamp >= threeDaysAgo)
         
         const segments = ['high', 'medium', 'low']
         const decisions: any = {}
 
         segments.forEach(seg => {
+            // Métricas da Janela (14d)
             const vA = { views: 0, revenue: 0 }
             const vB = { views: 0, revenue: 0 }
+            
+            // Métricas Recentes (3d) para detecção de crash
+            const rA = { views: 0, revenue: 0 }
+            const rB = { views: 0, revenue: 0 }
 
-            variantData.forEach(e => {
+            windowData.forEach(e => {
                 const meta = e.metadata as any
                 if (meta.user_segment === seg) {
                     const target = meta.ab_variant === 'A' ? vA : vB
                     if (e.event === 'upgrade_view') target.views++
                     if (e.event === 'pix_paid') target.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
+
+                    if (e.timestamp >= threeDaysAgo) {
+                        const rTarget = meta.ab_variant === 'A' ? rA : rB
+                        if (e.event === 'upgrade_view') rTarget.views++
+                        if (e.event === 'pix_paid') rTarget.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
+                    }
                 }
             })
 
-            const rpvA = vA.views > 10 ? vA.revenue / vA.views : 0
-            const rpvB = vB.views > 10 ? vB.revenue / vB.views : 0
+            const rpvA = vA.views > 20 ? vA.revenue / vA.views : 0
+            const rpvB = vB.views > 20 ? vB.revenue / vB.views : 0
+            
+            const recentRpvB = rB.views > 10 ? rB.revenue / rB.views : rpvB
 
-            // Se B é pelo menos 5% melhor que A após 7 dias
-            if (days >= 7 && rpvB > (rpvA * 1.05)) {
-                decisions[seg] = 'B'
-            } else if (days >= 7 && rpvA > (rpvB * 1.05)) {
-                decisions[seg] = 'A'
+            // GUARDRAIL 1: ROLLBACK AUTOMÁTICO
+            // Se o RPV recente de B caiu > 15% em relação ao RPV histórico de A
+            if (rpvA > 0 && recentRpvB < (rpvA * 0.85)) {
+                decisions[seg] = { variant: 'A', mode: 'rollback' }
+                return
+            }
+
+            // GUARDRAIL 2: THRESHOLD DE PROMOÇÃO (LIFT > 8%)
+            if (rpvB > (rpvA * 1.08)) {
+                decisions[seg] = { variant: 'B', mode: 'winner' }
+            } else if (rpvA > (rpvB * 1.08)) {
+                decisions[seg] = { variant: 'A', mode: 'winner' }
             } else {
-                decisions[seg] = 'RANDOM'
+                decisions[seg] = { variant: 'RANDOM', mode: 'exploration' }
             }
         })
 

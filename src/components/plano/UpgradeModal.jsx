@@ -17,6 +17,7 @@ export default function UpgradeModal() {
     const [step, setStep] = useState('plan'); // plan, cpf, loading, qrcode, confirmed
     const [selectedPlan, setSelectedPlan] = useState(null); 
     const [abVariant, setAbVariant] = useState(null); 
+    const [abMode, setAbMode] = useState('loading'); // holdout, winner, exploration, rollback
     const [cpf, setCpf] = useState('');
     const [pix, setPix] = useState(null);
     const [copied, setCopied] = useState(false);
@@ -37,7 +38,7 @@ export default function UpgradeModal() {
     const userSegment = lucroPotencialMensal > 1000 ? 'high' : (lucroPotencialMensal > 300 ? 'medium' : 'low');
 
     const trackEvent = (event, metadata = {}) => {
-        if (!abVariant) return; // Esperar decidir a variante
+        if (!abVariant) return; 
         const timeInModal = startTimeRef.current ? Math.floor((Date.now() - startTimeRef.current) / 1000) : 0;
         fetch(`${import.meta.env.VITE_API_URL}/analytics/event`, {
             method: 'POST',
@@ -48,6 +49,7 @@ export default function UpgradeModal() {
                 metadata: { 
                     ...metadata, 
                     ab_variant: abVariant, 
+                    ab_mode: abMode,
                     user_segment: userSegment,
                     time_in_modal: timeInModal,
                     close_attempts: closeAttemptsRef.current
@@ -62,17 +64,29 @@ export default function UpgradeModal() {
                 startTimeRef.current = Date.now();
                 closeAttemptsRef.current = 0;
 
-                // Decisão Automática de Variante (Backend Decision Engine)
                 try {
                     const res = await fetch(`${import.meta.env.VITE_API_URL}/analytics/active-variants`, {
                         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                     });
                     const decisions = await res.json();
-                    const activeVariant = decisions[userSegment] === 'RANDOM' 
-                        ? (Math.random() > 0.5 ? 'A' : 'B') 
-                        : decisions[userSegment];
                     
-                    setAbVariant(activeVariant);
+                    // GUARDRAIL 3: HOLDOUT GROUP (10% fixo no baseline para referência)
+                    const isHoldout = Math.random() < 0.10;
+                    
+                    if (isHoldout) {
+                        setAbVariant('A');
+                        setAbMode('holdout');
+                    } else {
+                        // GUARDRAIL 4: EPSILON-GREEDY (10% de exploração mesmo com vencedor)
+                        const epsilonExploration = Math.random() < 0.10;
+                        if (epsilonExploration || decisions[userSegment].variant === 'RANDOM') {
+                            setAbVariant(Math.random() > 0.5 ? 'A' : 'B');
+                            setAbMode('exploration');
+                        } else {
+                            setAbVariant(decisions[userSegment].variant);
+                            setAbMode(decisions[userSegment].mode);
+                        }
+                    }
 
                     if (pendingPix && new Date(pendingPix.expiresAt) > new Date()) {
                         setPix(pendingPix);
@@ -80,27 +94,23 @@ export default function UpgradeModal() {
                         setPollingActive(true);
                     } else {
                         setStep('plan');
-                        // Aplicação do Default por Segmento corrigido pela variante
-                        // Se for variante A ou B, aqui mantemos a lógica anterior mas guiada pelo backend
+                        // No Holdout ou Baseline, preservamos a lógica de entrada
                         if (userSegment === 'high' || userSegment === 'medium') {
-                            setSelectedPlan(activeVariant === 'A' ? 'pro_yearly' : 'pro_yearly'); 
+                            setSelectedPlan('pro_yearly'); 
                         } else {
-                            setSelectedPlan(activeVariant === 'A' ? 'pro_monthly' : 'pro_monthly');
+                            setSelectedPlan('pro_monthly');
                         }
-                        setPix(null);
-                        setPollingActive(false);
                     }
                 } catch (e) {
                     setAbVariant('A');
+                    setAbMode('fallback');
                     setStep('plan');
                 }
             };
-
             initModal();
         }
     }, [isOpen, userSegment, pendingPix]);
 
-    // Rastrear view apenas após decidir variante
     useEffect(() => {
         if (isOpen && abVariant) {
             trackEvent('upgrade_view');
@@ -225,12 +235,12 @@ export default function UpgradeModal() {
                             {userSegment === 'high' ? (
                                 <>
                                     <Target className="w-14 h-14 text-amber-500 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
-                                    <h2 className="text-2xl font-black italic">AUMENTE SEU RETORNO 📈</h2>
+                                    <h2 className="text-2xl font-black italic">PRO COM ROI REAL 📈</h2>
                                 </>
                             ) : (
                                 <>
                                     <Shield className="w-14 h-14 text-indigo-500 mx-auto mb-4" />
-                                    <h2 className="text-2xl font-black italic">PRO COM SEGURANÇA 🛡️</h2>
+                                    <h2 className="text-2xl font-black italic">SEGURANÇA PRO 🛡️</h2>
                                 </>
                             )}
                         </div>
@@ -243,7 +253,7 @@ export default function UpgradeModal() {
                                         className={`p-6 rounded-3xl border-2 transition-all cursor-pointer relative ${selectedPlan === 'pro_yearly' ? 'border-amber-500 bg-amber-50/50 shadow-xl' : 'border-slate-100 hover:border-slate-200'}`}
                                     >
                                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-tighter shadow-lg">
-                                            Melhor Escolha
+                                            Planos Recomendados
                                         </div>
                                         <div className="flex justify-between items-start mb-2">
                                             <p className="font-black text-slate-900 text-xl leading-none italic">Anual 🏆</p>
@@ -269,11 +279,11 @@ export default function UpgradeModal() {
                                         </div>
                                     </div>
 
-                                    <Button onClick={() => handleCreatePix()} className="w-full h-16 bg-slate-950 text-white font-black text-xl rounded-3xl shadow-2xl uppercase italic">
+                                    <Button onClick={() => handleCreatePix()} className="w-full h-16 bg-slate-950 text-white font-black text-xl rounded-2xl shadow-2xl">
                                         Continuar
                                     </Button>
                                     <p className="text-[9px] text-slate-400 font-black uppercase text-center tracking-widest flex items-center justify-center gap-1">
-                                        <ShieldCheck className="w-3.5 h-3.5" /> Ativação em segundos via Pix
+                                        🛡️ Proteção Lucro Certo
                                     </p>
                                 </div>
                             ) : step === 'cpf' || step === 'loading' ? (
