@@ -180,6 +180,7 @@ export default function FormProduto({ produto, onSubmit, onCancel }) {
 
                 <PricingAssistant 
                   cost={parseFloat(dados.custo) || 0}
+                  currentPrice={parseFloat(dados.preco) || 0}
                   configs={configuracoes}
                   isPro={plan === 'pro'}
                   onApply={(val) => setDados({...dados, preco: val})}

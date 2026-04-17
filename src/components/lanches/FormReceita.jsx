@@ -301,6 +301,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
             {custoTotal > 0 && (
               <PricingAssistant 
                 cost={custoTotal}
+                currentPrice={parseFloat(dados.preco_venda_sugerido) || 0}
                 configs={configuracoes}
                 isPro={plan === 'pro'}
                 onApply={(val) => setDados({...dados, preco_venda_sugerido: val})}
