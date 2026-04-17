@@ -109,18 +109,35 @@ export async function analyticsRoutes(app: FastifyInstance) {
             total_payments: stats.paid
         }
 
-        // Conversão por Segmento de Usuário
-        const segmentStats = await prisma.analyticsEvent.groupBy({
-            where: { event: 'upgrade_view' },
-            by: ['metadata'],
-            _count: { id: true }
+        // Métricas Segmentadas (RPV e Conversão por Perfil)
+        const segmentEvents = await prisma.analyticsEvent.findMany({
+            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
+            select: { event: true, metadata: true }
         })
 
-        const segments = {
-            high: segmentStats.find(s => (s.metadata as any)?.user_segment === 'high_potential')?._count.id || 0,
-            medium: segmentStats.find(s => (s.metadata as any)?.user_segment === 'medium_potential')?._count.id || 0,
-            low: segmentStats.find(s => (s.metadata as any)?.user_segment === 'low_potential')?._count.id || 0
+        const segmentStats: any = {
+            high: { views: 0, sales: 0, revenue: 0 },
+            medium: { views: 0, sales: 0, revenue: 0 },
+            low: { views: 0, sales: 0, revenue: 0 }
         }
+
+        segmentEvents.forEach(e => {
+            const seg = (e.metadata as any)?.user_segment as string
+            if (seg && segmentStats[seg]) {
+                if (e.event === 'upgrade_view') segmentStats[seg].views++
+                if (e.event === 'pix_paid') {
+                    segmentStats[seg].sales++
+                    const planId = (e.metadata as any)?.planId
+                    segmentStats[seg].revenue += planId === 'pro_yearly' ? 249 : 29.99
+                }
+            }
+        })
+
+        const segmentedResults = Object.keys(segmentStats).map(key => ({
+            segment: key,
+            rpv: segmentStats[key].views > 0 ? (segmentStats[key].revenue / segmentStats[key].views).toFixed(2) : 0,
+            conversion: segmentStats[key].views > 0 ? (segmentStats[key].sales / segmentStats[key].views * 100).toFixed(1) : 0
+        }))
 
         return { 
             stats, 
@@ -132,7 +149,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
             annualRate,
             abResults,
             ab_validity,
-            segments
+            segmentedResults
         }
     })
 }

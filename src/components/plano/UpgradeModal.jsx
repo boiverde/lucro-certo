@@ -3,7 +3,7 @@ import { useUpgrade } from '@/context/UpgradeContext';
 import { 
     X, QrCode, Loader2, Check, Copy, Clock, 
     Crown, Rocket, ShieldCheck, TrendingUp, AlertCircle, Calendar,
-    ArrowRight, Star, Zap, Info
+    ArrowRight, Star, Zap, Info, Shield, Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 export default function UpgradeModal() {
     const { isOpen, closeUpgrade, reason, pendingPix, savePendingPix } = useUpgrade();
     const [step, setStep] = useState('plan'); // plan, cpf, loading, qrcode, confirmed
-    const [selectedPlan, setSelectedPlan] = useState('pro_yearly'); 
+    const [selectedPlan, setSelectedPlan] = useState(null); 
     const [abVariant, setAbVariant] = useState('A'); 
     const [cpf, setCpf] = useState('');
     const [pix, setPix] = useState(null);
@@ -31,19 +31,15 @@ export default function UpgradeModal() {
 
     const lucroPotencialMensal = dashboardStats?.insights?.lucroPotencial || 0;
     
-    // Segmentação de Perfil
-    const userSegment = lucroPotencialMensal > 1000 ? 'high_potential' : (lucroPotencialMensal > 300 ? 'medium_potential' : 'low_potential');
+    // Segmentação Dinâmica por Perfil de Valor
+    const userSegment = lucroPotencialMensal > 1000 ? 'high' : (lucroPotencialMensal > 300 ? 'medium' : 'low');
 
-    // Cálculo do Payback Conservador (Range 60% - 100%)
+    // Payback Conservador
     const getPaybackRange = () => {
         if (lucroPotencialMensal <= 0) return null;
         const dailyProfitMax = lucroPotencialMensal / 30;
-        const dailyProfitMin = dailyProfitMax * 0.6; // Fator de ajuste 0.6
-
-        const daysStart = Math.ceil(249 / dailyProfitMax);
-        const daysEnd = Math.ceil(249 / dailyProfitMin);
-
-        return { start: daysStart, end: daysEnd };
+        const dailyProfitMin = dailyProfitMax * 0.6;
+        return { start: Math.ceil(249 / dailyProfitMax), end: Math.ceil(249 / dailyProfitMin) };
     };
 
     const paybackRange = getPaybackRange();
@@ -59,27 +55,27 @@ export default function UpgradeModal() {
                 setPollingActive(true);
             } else {
                 setStep('plan');
-                setSelectedPlan(variant === 'A' ? 'pro_yearly' : null);
+                // PERSONALIZAÇÃO: Escolha do plano default por segmento
+                if (userSegment === 'high' || userSegment === 'medium') {
+                    setSelectedPlan('pro_yearly');
+                } else {
+                    setSelectedPlan('pro_monthly'); // Baixo potencial começa no mensal
+                }
                 setPix(null);
                 setPollingActive(false);
             }
             
-            // Analytics: Visualização com Variante, Segmento e ROI
             fetch(`${import.meta.env.VITE_API_URL}/analytics/event`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
                 body: JSON.stringify({ 
                     event: 'upgrade_view', 
                     origin: reason || 'direct',
-                    metadata: { 
-                        ab_variant: variant,
-                        user_segment: userSegment,
-                        lucro_potencial: lucroPotencialMensal
-                    }
+                    metadata: { ab_variant: variant, user_segment: userSegment }
                 })
             }).catch(e => console.error('Analytics error', e));
         }
-    }, [isOpen, pendingPix, reason, userSegment, lucroPotencialMensal]);
+    }, [isOpen, pendingPix, reason, userSegment]);
 
     // Lógica do Contador Regressivo
     useEffect(() => {
@@ -140,18 +136,12 @@ export default function UpgradeModal() {
 
     const handleCreatePix = async (planToSet = selectedPlan) => {
         if (!planToSet) {
-            toast.info("Por favor, selecione um plano");
+            toast.info("Selecione um plano");
             return;
         }
 
         if (step === 'plan') {
-            setSelectedPlan(planToSet);
             setStep('cpf');
-            return;
-        }
-
-        if (cpf.length < 11) {
-            toast.error("Informe um CPF válido");
             return;
         }
 
@@ -196,126 +186,145 @@ export default function UpgradeModal() {
         navigator.clipboard.writeText(pix.qrCodeText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-        toast.info("Código PIX copiado!");
+        toast.info("Copiado!");
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-300 border border-white/20">
-                <button onClick={closeUpgrade} className="absolute top-4 right-4 p-2 bg-slate-100/50 hover:bg-slate-200 rounded-full transition-colors z-20">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-500">
+            <div className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden shadow-2xl relative border border-white/20">
+                <button onClick={closeUpgrade} className="absolute top-6 right-6 p-2 bg-slate-100 hover:bg-slate-200 rounded-full transition-colors z-20">
                     <X className="w-5 h-5 text-slate-500" />
                 </button>
 
                 {step === 'confirmed' ? (
-                    <div className="p-8 text-center flex flex-col items-center">
-                        <div className="w-20 h-20 bg-emerald-100 rounded-full mb-4 flex items-center justify-center">
-                            <Check className="w-10 h-10 text-emerald-600 animate-bounce" />
+                    <div className="p-12 text-center flex flex-col items-center">
+                        <div className="w-24 h-24 bg-emerald-100 rounded-full mb-6 flex items-center justify-center">
+                            <Check className="w-12 h-12 text-emerald-600 animate-bounce" />
                         </div>
-                        <h2 className="text-2xl font-black text-slate-900 mb-2">GERAL ATUALIZADO!</h2>
-                        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mt-4" />
+                        <h2 className="text-3xl font-black text-slate-900 mb-2 italic">LIBERADO!</h2>
+                        <p className="text-slate-500 font-medium">Prepare-se para escalar...</p>
                     </div>
                 ) : (
                     <>
-                        <div className="bg-slate-950 p-6 pt-10 text-white relative overflow-hidden text-center">
-                            <Star className="absolute -top-4 -left-4 w-24 h-24 text-amber-500/10 rotate-12" />
-                            <Crown className="w-12 h-12 text-amber-500 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
-                            <h2 className="text-2xl font-black tracking-tighter text-white">Domine Lucro Certo 💎</h2>
-                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em] mt-1">Escalabilidade Ilimitada</p>
+                        {/* HEADER PERSONALIZADO POR SEGMENTO */}
+                        <div className="bg-slate-950 p-6 pt-12 text-white relative overflow-hidden text-center">
+                            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-500 via-indigo-500 to-purple-500"></div>
+                            
+                            {userSegment === 'high' ? (
+                                <>
+                                    <Target className="w-14 h-14 text-amber-500 mx-auto mb-4 animate-pulse drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
+                                    <h2 className="text-2xl font-black italic tracking-tighter">ROI IMEDIATO GARANTIDO 🚀</h2>
+                                    <p className="text-amber-500/80 text-[10px] font-black uppercase mt-2">Você está deixando dinheiro na mesa.</p>
+                                </>
+                            ) : userSegment === 'medium' ? (
+                                <>
+                                    <Crown className="w-14 h-14 text-amber-500 mx-auto mb-4" />
+                                    <h2 className="text-2xl font-black italic tracking-tighter">LUCRE COMO UM PRO 💎</h2>
+                                    <p className="text-slate-400 text-[10px] uppercase font-bold mt-2 tracking-[0.2em]">Sua empresa em outro nível.</p>
+                                </>
+                            ) : (
+                                <>
+                                    <Shield className="w-14 h-14 text-indigo-500 mx-auto mb-4" />
+                                    <h2 className="text-2xl font-black italic tracking-tighter">LIBERDADE SEM RISCOS 🛡️</h2>
+                                    <p className="text-slate-400 text-[10px] uppercase font-bold mt-2">Teste toda a potência do Lucro Certo.</p>
+                                </>
+                            )}
                         </div>
 
-                        <div className="p-8">
+                        <div className="p-10">
                             {step === 'plan' ? (
                                 <div className="space-y-4">
-                                    <p className="text-sm text-slate-500 font-bold uppercase tracking-tight text-center">Planos Recomendados</p>
-                                    
                                     {/* PLANO ANUAL */}
                                     <div 
                                         onClick={() => setSelectedPlan('pro_yearly')}
-                                        className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative ${selectedPlan === 'pro_yearly' ? 'border-amber-500 bg-amber-50/50 shadow-lg shadow-amber-500/10' : 'border-slate-100 hover:border-slate-200'}`}
+                                        className={`p-6 rounded-3xl border-2 transition-all cursor-pointer relative ${selectedPlan === 'pro_yearly' ? 'border-amber-500 bg-amber-50/50 shadow-xl' : 'border-slate-100 hover:border-slate-200'}`}
                                     >
-                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-tighter shadow-md">
+                                        <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-tighter shadow-lg">
                                             Melhor Custo-Benefício
                                         </div>
-                                        <div className="flex justify-between items-start mb-1">
-                                            <p className="font-black text-slate-900 text-lg leading-none">Plano Anual 🏆</p>
-                                            <div className="text-right">
-                                                <p className="text-2xl font-black text-slate-900 leading-none">R$ 249</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Ano</p>
-                                            </div>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <p className="font-black text-slate-900 text-xl leading-none italic">PRO Anual 🏆</p>
+                                            <p className="text-2xl font-black text-slate-900">R$ 249</p>
                                         </div>
                                         
+                                        {/* PAYBACK PERSONALIZADO */}
                                         {paybackRange && (
-                                            <div className="mt-3 bg-emerald-100 p-3 rounded-2xl animate-in slide-in-from-left duration-500">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <Zap className="w-4 h-4 text-emerald-600 fill-emerald-600" />
-                                                    <p className="text-[11px] text-emerald-900 font-black uppercase">
+                                            <div className="mt-4 bg-white/60 p-3 rounded-2xl border border-emerald-100 flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <Zap className="w-5 h-5 text-emerald-600 fill-emerald-600 animate-pulse" />
+                                                    <p className="text-[11px] text-emerald-900 font-black uppercase italic">
                                                         Retorno em {paybackRange.start}–{paybackRange.end} dias
                                                     </p>
                                                 </div>
-                                                <div className="flex items-center gap-1 text-[8px] text-emerald-700/70 font-bold uppercase leading-tight">
-                                                    <Info className="w-3 h-3" /> estimativa baseada no seu uso real
-                                                </div>
                                             </div>
+                                        )}
+                                        
+                                        {userSegment === 'high' && (
+                                            <p className="mt-2 text-[9px] text-amber-700 font-black uppercase tracking-tighter leading-tight">
+                                                *Você recupera o valor do ano investindo menos de 1 mês de lucro potencial.
+                                            </p>
                                         )}
                                     </div>
 
+                                    {/* PLANO MENSAL */}
                                     <div 
                                         onClick={() => setSelectedPlan('pro_monthly')}
-                                        className={`p-4 rounded-3xl border-2 transition-all cursor-pointer ${selectedPlan === 'pro_monthly' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-200'}`}
+                                        className={`p-5 rounded-3xl border-2 transition-all cursor-pointer ${selectedPlan === 'pro_monthly' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-200'}`}
                                     >
                                         <div className="flex justify-between items-center">
-                                            <div>
-                                                <p className="font-black text-slate-700">Plano Mensal</p>
-                                            </div>
+                                            <p className="font-black text-slate-700 italic">PRO Mensal</p>
                                             <p className="text-lg font-black text-slate-800">R$ 29,99</p>
                                         </div>
+                                        {userSegment === 'low' && (
+                                            <p className="text-[9px] text-indigo-500 font-black uppercase mt-1">Ótimo para começar sem compromisso</p>
+                                        )}
                                     </div>
 
                                     <Button 
                                         onClick={() => handleCreatePix()}
-                                        className={`w-full h-14 font-black text-lg rounded-2xl transition-all shadow-xl active:scale-95 flex gap-2 items-center justify-center ${selectedPlan === 'pro_yearly' ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-amber-500/20' : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/20'}`}
+                                        className={`w-full h-16 font-black text-xl rounded-3xl transition-all shadow-2xl active:scale-95 flex gap-2 items-center justify-center uppercase italic ${selectedPlan === 'pro_yearly' ? 'bg-amber-500 hover:bg-amber-600 text-slate-950' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
                                     >
-                                        {selectedPlan === 'pro_yearly' ? "Garantir Plano Anual!" : "Continuar com Mensal"}
-                                        <ArrowRight className="w-5 h-5" />
+                                        {userSegment === 'high' ? "Resgatar Meu Lucro Agora!" : "Liberar Acesso PRO"}
+                                        <ArrowRight className="w-6 h-6" />
                                     </Button>
                                 </div>
                             ) : step === 'cpf' || step === 'loading' ? (
                                 <div className="space-y-6">
                                     <div className="grid grid-cols-1 gap-1">
                                         <div className="flex justify-between items-end mb-1">
-                                            <Label className="text-slate-400 text-[10px] font-black uppercase">Identificação (CPF)</Label>
-                                            <button onClick={() => setStep('plan')} className="text-indigo-600 text-[9px] font-black uppercase hover:underline">Voltar</button>
+                                            <Label className="text-slate-400 text-[10px] font-black uppercase italic tracking-widest">Identificação (CPF)</Label>
+                                            <button onClick={() => setStep('plan')} className="text-indigo-600 text-[10px] font-black uppercase underline">Voltar</button>
                                         </div>
                                         <Input 
                                             placeholder="000.000.000-00"
                                             value={cpf}
                                             onChange={(e) => setCpf(e.target.value)}
-                                            className="h-14 rounded-2xl text-xl font-black border-slate-200"
+                                            className="h-16 rounded-[1.5rem] text-2xl font-black border-slate-200 focus:ring-amber-500 text-center"
                                             disabled={step === 'loading'}
                                         />
                                     </div>
-                                    <Button onClick={handleCreatePix} disabled={step === 'loading'} className="w-full h-14 bg-indigo-600 text-white font-black text-lg rounded-2xl">
+                                    <Button onClick={handleCreatePix} disabled={step === 'loading'} className="w-full h-16 bg-slate-900 text-white font-black text-lg rounded-3xl shadow-xl">
                                         {step === 'loading' ? <Loader2 className="w-6 h-6 animate-spin" /> : "GERAR CÓDIGO PIX"}
                                     </Button>
                                 </div>
                             ) : (
-                                <div className="space-y-6 text-center">
-                                    <div className="bg-slate-50 p-3 rounded-[2rem] inline-block shadow-inner">
-                                        <img src={pix.qrCodeBase64} alt="PIX" className="w-44 h-44 mix-blend-multiply" />
+                                <div className="space-y-8 text-center pb-4">
+                                    <div className="bg-slate-50 p-4 rounded-[3rem] inline-block shadow-inner ring-12 ring-slate-100/50">
+                                        <img src={pix.qrCodeBase64} alt="PIX" className="w-48 h-48 mix-blend-multiply" />
                                     </div>
-                                    <div className="flex items-center justify-center gap-4 py-2 text-center">
-                                        <div>
-                                            <p className="text-[9px] text-slate-400 uppercase font-black">Total</p>
-                                            <p className="text-2xl font-black text-slate-900">R$ {selectedPlan === 'pro_yearly' ? '249' : '29,99'}</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-slate-50 p-4 rounded-3xl">
+                                            <p className="text-[10px] text-slate-400 uppercase font-black">Total</p>
+                                            <p className="text-xl font-black text-slate-900">R$ {selectedPlan === 'pro_yearly' ? '249' : '29,99'}</p>
                                         </div>
-                                        <div className="h-10 w-px bg-slate-100" />
-                                        <div>
-                                            <p className="text-[9px] text-slate-400 uppercase font-black">Expira em</p>
-                                            <p className="text-lg font-black text-indigo-600">{countdown}</p>
+                                        <div className="bg-indigo-50 p-4 rounded-3xl">
+                                            <p className="text-[10px] text-indigo-400 uppercase font-black">Expira em</p>
+                                            <p className="text-xl font-black text-indigo-600">{countdown}</p>
                                         </div>
                                     </div>
-                                    <Button onClick={handleCopy} variant="outline" className="w-full h-14 rounded-2xl font-black text-sm mb-4">
-                                        {copied ? "SÓ COLAR NO BANCO!" : "COPIAR CÓDIGO PIX"}
+                                    <Button onClick={handleCopy} variant="outline" className="w-full h-16 rounded-3xl border-2 border-slate-200 font-black text-base flex items-center justify-center gap-3 active:scale-95 transition-all">
+                                        {copied ? <Check className="w-6 h-6 text-emerald-500" /> : <Copy className="w-6 h-6" />}
+                                        {copied ? "COPIADO!" : "COPIAR CÓDIGO PIX"}
                                     </Button>
                                 </div>
                             )}
