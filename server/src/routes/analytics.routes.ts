@@ -209,13 +209,13 @@ export async function analyticsRoutes(app: FastifyInstance) {
         }
     })
 
-    // Endpoint para decidir qual variante servir para cada segmento (Métrica EV_7d)
+    // Endpoint para decidir qual variante servir (Métrica de Valor de Médio Prazo)
     app.get('/active-variants', async (request) => {
         const now = new Date()
-        const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
+        const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
 
         const allEvents = await prisma.analyticsEvent.findMany({
-            where: { timestamp: { gte: fourteenDaysAgo } },
+            where: { timestamp: { gte: thirtyDaysAgo } },
             select: { event: true, metadata: true, timestamp: true, userId: true },
             orderBy: { timestamp: 'asc' }
         })
@@ -224,7 +224,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         const decisions: any = {}
 
         segments.forEach(seg => {
-            const userData: any = {} // userId -> { variant: string, firstSeen: Date, revenue7d: number, qualified: boolean }
+            const userData: any = {} // userId -> stats
 
             allEvents.forEach(e => {
                 const meta = e.metadata as any
@@ -233,58 +233,77 @@ export async function analyticsRoutes(app: FastifyInstance) {
                         userData[e.userId] = { 
                             variant: meta.ab_variant, 
                             firstSeen: e.timestamp, 
-                            revenue7d: 0, 
-                            qualified: false 
+                            rev7d: 0, 
+                            rev30d: 0, 
+                            actions: 0, 
+                            frequency: new Set(),
+                            planType: null
                         }
                     }
 
                     if (userData[e.userId]) {
-                        const user = userData[e.userId]
-                        const daysSinceFirstSeen = (e.timestamp.getTime() - user.firstSeen.getTime()) / (1000 * 60 * 60 * 24)
-
-                        // Coleta de Receita em 7 dias
-                        if (e.event === 'pix_paid' && daysSinceFirstSeen <= 7) {
-                            user.revenue7d += meta.planId === 'pro_yearly' ? 249 : 29.99
+                        const u = userData[e.userId]
+                        const days = (e.timestamp.getTime() - u.firstSeen.getTime()) / (1000 * 60 * 60 * 24)
+                        
+                        // Faturamento por Horizonte
+                        if (e.event === 'pix_paid') {
+                            const val = meta.planId === 'pro_yearly' ? 249 : 29.99
+                            if (days <= 7) u.rev7d += val
+                            if (days <= 30) u.rev30d += val
+                            u.planType = meta.planId
                         }
 
-                        // Retenção Qualificada (Ação relevante além de ver o modal)
-                        const relevantEvents = ['venda_create', 'produto_create', 'config_update']
-                        if (relevantEvents.includes(e.event) && daysSinceFirstSeen <= 7) {
-                            user.qualified = true
-                        }
+                        // Engagement Score (Produtos, Vendas, Frequência)
+                        if (['produto_create', 'venda_create'].includes(e.event)) u.actions++
+                        u.frequency.add(e.timestamp.toISOString().split('T')[0])
                     }
                 }
             })
 
             // Agregação por Variante
-            const vMetrics: any = { A: { users: 0, totalEV: 0, qualifiedCount: 0 }, B: { users: 0, totalEV: 0, qualifiedCount: 0 } }
+            const vMetrics: any = { A: { users: 0, ev7d: 0, ev30d: 0, qRet: 0, planSplit: { m: 0, y: 0 } }, B: { users: 0, ev7d: 0, ev30d: 0, qRet: 0, planSplit: { m: 0, y: 0 } } }
             
             Object.values(userData).forEach((u: any) => {
                 const target = vMetrics[u.variant]
                 if (target) {
                     target.users++
-                    target.totalEV += u.revenue7d
-                    if (u.qualified) target.qualifiedCount++
+                    target.ev7d += u.rev7d
+                    target.ev30d += u.rev30d
+                    
+                    // Definição de Usuário Qualificado (Engagement Score)
+                    // Pelo menos 2 dias de uso OU 5+ ações relevantes
+                    if (u.frequency.size >= 2 || u.actions >= 5) target.qRet++
+
+                    if (u.planType === 'pro_yearly') target.planSplit.y++
+                    else if (u.planType === 'pro_monthly') target.planSplit.m++
                 }
             })
 
-            // EV_7d = Receita Total na Janela / Total de Usuários
-            const evA = vMetrics.A.users > 10 ? vMetrics.A.totalEV / vMetrics.A.users : 0
-            const evB = vMetrics.B.users > 10 ? vMetrics.B.totalEV / vMetrics.B.users : 0
-            
-            // Retenção Qualificada %
-            const qRetA = vMetrics.A.users > 0 ? vMetrics.A.qualifiedCount / vMetrics.A.users : 0
-            const qRetB = vMetrics.B.users > 0 ? vMetrics.B.qualifiedCount / vMetrics.B.users : 0
+            const getFinalMetrics = (v: any) => {
+                const count = v.users > 0 ? v.users : 1
+                return {
+                    ev7d: v.ev7d / count,
+                    ev30d: v.ev30d / count, // EV_30d Real/Projetado
+                    qRate: v.qRet / count,
+                    annualMix: v.planSplit.y / (v.planSplit.y + v.planSplit.m || 1)
+                }
+            }
+
+            const mA = getFinalMetrics(vMetrics.A)
+            const mB = getFinalMetrics(vMetrics.B)
+
+            // NOVA FUNÇÃO DE DECISÃO: SCORE = EV_7d * Retenção Qualificada
+            // Isso previne variantes que vendem bem mas entregam usuários inativos
+            const scoreA = mA.ev7d * mA.qRate
+            const scoreB = mB.ev7d * mB.qRate
 
             const totalSamples = vMetrics.A.users + vMetrics.B.users
             const epsilon = Math.max(0.05, Math.min(0.5, 2 / Math.sqrt(totalSamples || 1)))
 
-            // DECISÃO POR EV_7d (A métrica mais pura de valor de negócio)
-            // Shield de 8% de Lift necessário para promoção
-            if (evB > (evA * 1.08)) {
-                decisions[seg] = { variant: 'B', mode: 'winner', epsilon, metrics: { ev7d: evB, qRet: qRetB } }
-            } else if (evA > (evB * 1.08)) {
-                decisions[seg] = { variant: 'A', mode: 'winner', epsilon, metrics: { ev7d: evA, qRet: qRetA } }
+            if (scoreB > (scoreA * 1.10)) {
+                decisions[seg] = { variant: 'B', mode: 'winner', epsilon, metrics: { score: scoreB, ev30d: mB.ev30d, annualMix: mB.annualMix } }
+            } else if (scoreA > (scoreB * 1.10)) {
+                decisions[seg] = { variant: 'A', mode: 'winner', epsilon, metrics: { score: scoreA, ev30d: mA.ev30d, annualMix: mA.annualMix } }
             } else {
                 decisions[seg] = { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 }
             }
