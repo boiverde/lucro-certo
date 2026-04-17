@@ -144,7 +144,7 @@ export default function Plano() {
                         </div>
                         
                         <h1 className="text-3xl font-black text-white tracking-tight">Assinatura PRO</h1>
-                        <p className="text-slate-400 mt-1">Status: <span className="text-emerald-400 font-bold uppercase text-xs">Ativo e Vitalício</span></p>
+                        <p className="text-slate-400 mt-1">Status: <span className="text-emerald-400 font-bold uppercase text-xs">Ativo por 30 dias</span></p>
                         
                         {/* Indicador de dias */}
                         <div className="mt-8 grid grid-cols-1 w-full gap-4">
