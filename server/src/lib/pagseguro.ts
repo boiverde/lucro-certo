@@ -11,8 +11,8 @@ export const pagseguroClient = axios.create({
         token: PAGSEGURO_TOKEN,
     },
     headers: {
-        'Content-Type': 'application/json;charset=ISO-8859-1',
-        'Accept': 'application/json;charset=ISO-8859-1'
+        'Content-Type': 'application/json;charset=ISO-8859-1'
+        // Removido Accept global json para não engessar
     }
 });
 
@@ -53,7 +53,7 @@ export async function createCheckoutRequest(data: {
         const response = await pagseguroClient.post('/v2/checkout', params.toString(), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=ISO-8859-1',
-                'Accept': 'application/xml'
+                'Accept': 'application/xml;charset=ISO-8859-1'
             }
         });
         
