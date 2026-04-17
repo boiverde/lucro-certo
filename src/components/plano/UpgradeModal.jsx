@@ -52,7 +52,8 @@ export default function UpgradeModal() {
                     ab_mode: abMode,
                     user_segment: userSegment,
                     time_in_modal: timeInModal,
-                    close_attempts: closeAttemptsRef.current
+                    close_attempts: closeAttemptsRef.current,
+                    rpu_based: true // Flag de nova métrica robusta
                 }
             })
         }).catch(e => console.error('Analytics error', e));
@@ -70,16 +71,18 @@ export default function UpgradeModal() {
                     });
                     const decisions = await res.json();
                     
-                    // GUARDRAIL 3: HOLDOUT GROUP (10% fixo no baseline para referência)
+                    // GUARDRAIL: HOLDOUT (10% de base)
                     const isHoldout = Math.random() < 0.10;
                     
                     if (isHoldout) {
                         setAbVariant('A');
                         setAbMode('holdout');
                     } else {
-                        // GUARDRAIL 4: EPSILON-GREEDY (10% de exploração mesmo com vencedor)
-                        const epsilonExploration = Math.random() < 0.10;
-                        if (epsilonExploration || decisions[userSegment].variant === 'RANDOM') {
+                        // GUARDRAIL: EXPLORAÇÃO ADAPTATIVA (EPSILON DINÂMICO)
+                        const epsilon = decisions[userSegment].epsilon || 0.15;
+                        const isExploration = Math.random() < epsilon;
+
+                        if (isExploration || decisions[userSegment].variant === 'RANDOM') {
                             setAbVariant(Math.random() > 0.5 ? 'A' : 'B');
                             setAbMode('exploration');
                         } else {
@@ -94,7 +97,6 @@ export default function UpgradeModal() {
                         setPollingActive(true);
                     } else {
                         setStep('plan');
-                        // No Holdout ou Baseline, preservamos a lógica de entrada
                         if (userSegment === 'high' || userSegment === 'medium') {
                             setSelectedPlan('pro_yearly'); 
                         } else {
@@ -235,12 +237,12 @@ export default function UpgradeModal() {
                             {userSegment === 'high' ? (
                                 <>
                                     <Target className="w-14 h-14 text-amber-500 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
-                                    <h2 className="text-2xl font-black italic">PRO COM ROI REAL 📈</h2>
+                                    <h2 className="text-2xl font-black italic">IMPULSIONE SEU ROI 📈</h2>
                                 </>
                             ) : (
                                 <>
                                     <Shield className="w-14 h-14 text-indigo-500 mx-auto mb-4" />
-                                    <h2 className="text-2xl font-black italic">SEGURANÇA PRO 🛡️</h2>
+                                    <h2 className="text-2xl font-black italic">PRO COM SEGURANÇA 🛡️</h2>
                                 </>
                             )}
                         </div>
@@ -253,7 +255,7 @@ export default function UpgradeModal() {
                                         className={`p-6 rounded-3xl border-2 transition-all cursor-pointer relative ${selectedPlan === 'pro_yearly' ? 'border-amber-500 bg-amber-50/50 shadow-xl' : 'border-slate-100 hover:border-slate-200'}`}
                                     >
                                         <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-tighter shadow-lg">
-                                            Planos Recomendados
+                                            Recomendado para você
                                         </div>
                                         <div className="flex justify-between items-start mb-2">
                                             <p className="font-black text-slate-900 text-xl leading-none italic">Anual 🏆</p>
@@ -283,7 +285,7 @@ export default function UpgradeModal() {
                                         Continuar
                                     </Button>
                                     <p className="text-[9px] text-slate-400 font-black uppercase text-center tracking-widest flex items-center justify-center gap-1">
-                                        🛡️ Proteção Lucro Certo
+                                        🛡️ Pagamento Seguro Pix
                                     </p>
                                 </div>
                             ) : step === 'cpf' || step === 'loading' ? (
@@ -298,7 +300,7 @@ export default function UpgradeModal() {
                                     <img src={pix.qrCodeBase64} alt="PIX" className="w-48 h-48 mx-auto mix-blend-multiply bg-slate-50 p-4 rounded-3xl" />
                                     <Button onClick={() => { navigator.clipboard.writeText(pix.qrCodeText); setCopied(true); setTimeout(() => setCopied(false), 2000); }} variant="outline" className="w-full h-16 rounded-3xl font-black">{copied ? "COPIADO!" : "COPIAR CÓDIGO PIX"}</Button>
                                     <div className="text-[10px] text-slate-400 font-bold uppercase flex items-center justify-center gap-2">
-                                        <Clock className="w-4 h-4" /> Aguardando pagamento ({countdown})
+                                        <Clock className="w-4 h-4" /> Aguardando Pix ({countdown})
                                     </div>
                                 </div>
                             )}

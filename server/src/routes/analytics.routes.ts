@@ -209,70 +209,78 @@ export async function analyticsRoutes(app: FastifyInstance) {
         }
     })
 
-    // Endpoint para decidir qual variante servir para cada segmento (com Guardrails)
+    // Endpoint para decidir qual variante servir para cada segmento (Decisão Robusta)
     app.get('/active-variants', async (request) => {
         const now = new Date()
         const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
-        const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000))
 
-        // 1. Coletar dados da janela móvel (14 dias)
         const windowData = await prisma.analyticsEvent.findMany({
             where: { 
                 event: { in: ['upgrade_view', 'pix_paid'] },
                 timestamp: { gte: fourteenDaysAgo }
             },
-            select: { event: true, metadata: true, timestamp: true }
+            select: { event: true, metadata: true, timestamp: true, userId: true }
         })
 
-        // 2. Coletar dados recentes para monitoramento de Rollback (3 dias)
-        const recentData = windowData.filter(e => e.timestamp >= threeDaysAgo)
-        
         const segments = ['high', 'medium', 'low']
         const decisions: any = {}
 
         segments.forEach(seg => {
-            // Métricas da Janela (14d)
-            const vA = { views: 0, revenue: 0 }
-            const vB = { views: 0, revenue: 0 }
+            const vA = { users: new Set(), revenue: 0 }
+            const vB = { users: new Set(), revenue: 0 }
             
-            // Métricas Recentes (3d) para detecção de crash
-            const rA = { views: 0, revenue: 0 }
-            const rB = { views: 0, revenue: 0 }
+            // Dados diários para Média Móvel (Rollback)
+            const dailyStats: any = {}
 
             windowData.forEach(e => {
                 const meta = e.metadata as any
                 if (meta.user_segment === seg) {
                     const target = meta.ab_variant === 'A' ? vA : vB
-                    if (e.event === 'upgrade_view') target.views++
+                    if (e.event === 'upgrade_view') target.users.add(e.userId)
                     if (e.event === 'pix_paid') target.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
 
-                    if (e.timestamp >= threeDaysAgo) {
-                        const rTarget = meta.ab_variant === 'A' ? rA : rB
-                        if (e.event === 'upgrade_view') rTarget.views++
-                        if (e.event === 'pix_paid') rTarget.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
-                    }
+                    // Agregação diária
+                    const day = e.timestamp.toISOString().split('T')[0]
+                    if (!dailyStats[day]) dailyStats[day] = { A: { u: 0, r: 0 }, B: { u: 0, r: 0 } }
+                    const dTarget = meta.ab_variant === 'A' ? dailyStats[day].A : dailyStats[day].B
+                    if (e.event === 'upgrade_view') dTarget.u++ // Usando views aqui para sensibilidade diária
+                    if (e.event === 'pix_paid') dTarget.r += meta.planId === 'pro_yearly' ? 249 : 29.99
                 }
             })
 
-            const rpvA = vA.views > 20 ? vA.revenue / vA.views : 0
-            const rpvB = vB.views > 20 ? vB.revenue / vB.views : 0
+            // RPU (Revenue Per Unit/User)
+            const rpuA = vA.users.size > 10 ? vA.revenue / vA.users.size : 0
+            const rpuB = vB.users.size > 10 ? vB.revenue / vB.users.size : 0
             
-            const recentRpvB = rB.views > 10 ? rB.revenue / rB.views : rpvB
+            const totalSamples = vA.users.size + vB.users.size
 
-            // GUARDRAIL 1: ROLLBACK AUTOMÁTICO
-            // Se o RPV recente de B caiu > 15% em relação ao RPV histórico de A
-            if (rpvA > 0 && recentRpvB < (rpvA * 0.85)) {
-                decisions[seg] = { variant: 'A', mode: 'rollback' }
+            // EXPLORAÇÃO ADAPTATIVA (Epsilon Dinâmico)
+            // Quanto mais dados, menor o epsilon (exploração). Mínimo 5%, Máximo 50%.
+            const epsilon = Math.max(0.05, Math.min(0.5, 2 / Math.sqrt(totalSamples || 1)))
+
+            // MONITORAÇÃO DE ROLLBACK (Média Móvel 3 dias)
+            const daysArr = Object.keys(dailyStats).sort().reverse()
+            let rollbackTriggered = false
+            if (daysArr.length >= 3) {
+                const recentPerformance = daysArr.slice(0, 3).every(d => {
+                    const rpvB = dailyStats[d].B.u > 0 ? dailyStats[d].B.r / dailyStats[d].B.u : 0
+                    return rpuA > 0 && rpvB < (rpuA * 0.80) // Queda de 20% por 3 dias seguidos
+                })
+                if (recentPerformance) rollbackTriggered = true
+            }
+
+            if (rollbackTriggered) {
+                decisions[seg] = { variant: 'A', mode: 'rollback', epsilon: 0.2 }
                 return
             }
 
-            // GUARDRAIL 2: THRESHOLD DE PROMOÇÃO (LIFT > 8%)
-            if (rpvB > (rpvA * 1.08)) {
-                decisions[seg] = { variant: 'B', mode: 'winner' }
-            } else if (rpvA > (rpvB * 1.08)) {
-                decisions[seg] = { variant: 'A', mode: 'winner' }
+            // DECISÃO POR LIFT DE RPU (Threshold 10%)
+            if (rpuB > (rpuA * 1.10)) {
+                decisions[seg] = { variant: 'B', mode: 'winner', epsilon }
+            } else if (rpuA > (rpuB * 1.10)) {
+                decisions[seg] = { variant: 'A', mode: 'winner', epsilon }
             } else {
-                decisions[seg] = { variant: 'RANDOM', mode: 'exploration' }
+                decisions[seg] = { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 }
             }
         })
 
