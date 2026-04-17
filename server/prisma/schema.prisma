@@ -19,6 +19,7 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relacionamentos
+  analyticsEvents    AnalyticsEvent[]
   clientes           Cliente[]
   produtos           Produto[]
   vendas             Venda[]
@@ -495,4 +496,16 @@ model Diaria {
   user              User     @relation(fields: [userId], references: [id])
 
   @@map("diarias")
+}
+
+model AnalyticsEvent {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  event     String
+  origin    String?
+  timestamp DateTime @default(now())
+  metadata  Json?
+
+  @@map(" analytics_events\)
 }

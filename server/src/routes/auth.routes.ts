@@ -127,15 +127,45 @@ export async function authRoutes(app: FastifyInstance) {
     app.withTypeProvider<ZodTypeProvider>().get('/me', {
         onRequest: [app.authenticate]
     }, async (request) => {
-        const user = await prisma.user.findUnique({
-            where: { id: request.user.sub },
+        const userId = request.user.sub
+        let user = await prisma.user.findUnique({
+            where: { id: userId },
             select: {
                 id: true,
                 name: true,
                 email: true,
+                plan: true,
+                planExpiresAt: true,
                 createdAt: true,
+                taxa_impostos: true,
+                taxa_cartao: true,
+                custo_fixo_por_unidade: true,
+                margem_lucro_padrao: true
             }
         })
+
+        if (!user) return null
+
+        // Verificar expiração do plano
+        if (user.plan === 'pro' && user.planExpiresAt && user.planExpiresAt < new Date()) {
+            // Plano expirou!
+            user = await prisma.user.update({
+                where: { id: userId },
+                data: { plan: 'free' },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    plan: true,
+                    planExpiresAt: true,
+                    createdAt: true,
+                    taxa_impostos: true,
+                    taxa_cartao: true,
+                    custo_fixo_por_unidade: true,
+                    margem_lucro_padrao: true
+                }
+            })
+        }
 
         return user
     })

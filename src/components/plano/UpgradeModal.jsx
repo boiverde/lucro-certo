@@ -7,7 +7,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
 export default function UpgradeModal() {
@@ -19,12 +18,22 @@ export default function UpgradeModal() {
     const [pollingActive, setPollingActive] = useState(false);
 
     useEffect(() => {
-        if (!isOpen) {
+        if (isOpen) {
             setStep('cpf');
             setPix(null);
             setPollingActive(false);
+            
+            // Analytics: Visualização do Modal
+            fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/analytics/event`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({ event: 'upgrade_view', origin: reason || 'direct' })
+            }).catch(e => console.error('Analytics error', e));
         }
-    }, [isOpen]);
+    }, [isOpen, reason]);
 
     // Lógica de Polling do Pagamento
     useEffect(() => {
@@ -32,14 +41,27 @@ export default function UpgradeModal() {
         if (pollingActive && pix?.orderId) {
             timer = setInterval(async () => {
                 try {
-                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/payments/status/${pix.orderId}`);
+                    const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/payments/pix/status/${pix.orderId}`, {
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                    });
                     const data = await response.json();
-                    if (data.status === 'PAID' || data.status === 'confirmed') {
+                    if (data.status === 'PAID') {
                         setStep('confirmed');
                         setPollingActive(false);
                         toast.success("Pagamento confirmado! Plano PRO ativado.");
+                        
+                        // Analytics: Pagamento Confirmado
+                        fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/analytics/event`, {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            },
+                            body: JSON.stringify({ event: 'pix_paid', origin: reason || 'direct', metadata: { orderId: pix.orderId } })
+                        }).catch(e => console.error('Analytics error', e));
+
                         setTimeout(() => {
-                            window.location.reload(); // Recarregar para aplicar plano
+                            window.location.reload(); 
                         }, 3000);
                     }
                 } catch (e) {
@@ -48,7 +70,7 @@ export default function UpgradeModal() {
             }, 5000);
         }
         return () => clearInterval(timer);
-    }, [pollingActive, pix]);
+    }, [pollingActive, pix, reason]);
 
     if (!isOpen) return null;
 
@@ -57,17 +79,27 @@ export default function UpgradeModal() {
             toast.error("Informe um CPF válido");
             return;
         }
+
+        // Analytics: Clique para gerar PIX
+        fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/analytics/event`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ event: 'upgrade_click', origin: reason || 'direct', metadata: { has_cpf: true } })
+        }).catch(e => console.error('Analytics error', e));
+
         setStep('loading');
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/payments/checkout-pix`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/payments/pix`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
                 body: JSON.stringify({ 
-                    cpf: cpf.replace(/\D/g, ''),
-                    planId: 'pro_mensal'
+                    cpf: cpf.replace(/\D/g, '')
                 })
             });
             const data = await res.json();
@@ -75,6 +107,16 @@ export default function UpgradeModal() {
                 setPix(data);
                 setStep('qrcode');
                 setPollingActive(true);
+
+                // Analytics: PIX Gerado com sucesso
+                fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/analytics/event`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ event: 'pix_created', origin: reason || 'direct', metadata: { orderId: data.orderId } })
+                }).catch(e => console.error('Analytics error', e));
             } else {
                 toast.error(data.message || "Erro ao gerar PIX");
                 setStep('cpf');
@@ -86,6 +128,7 @@ export default function UpgradeModal() {
     };
 
     const handleCopy = () => {
+        if (!pix?.qrCodeText) return;
         navigator.clipboard.writeText(pix.qrCodeText);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
@@ -102,7 +145,6 @@ export default function UpgradeModal() {
                     <X className="w-5 h-5 text-slate-500" />
                 </button>
 
-                {/* Step Confirmed */}
                 {step === 'confirmed' ? (
                     <div className="p-8 text-center flex flex-col items-center">
                         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
@@ -117,7 +159,6 @@ export default function UpgradeModal() {
                     </div>
                 ) : (
                     <>
-                        {/* Header Premium */}
                         <div className="bg-slate-900 p-6 pt-10 text-white relative overflow-hidden text-center">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-indigo-500 to-purple-500"></div>
                             <Crown className="w-12 h-12 text-amber-500 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
