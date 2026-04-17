@@ -209,16 +209,14 @@ export async function analyticsRoutes(app: FastifyInstance) {
         }
     })
 
-    // Endpoint para decidir qual variante servir para cada segmento (Decisão Robusta)
+    // Endpoint para decidir qual variante servir para cada segmento (Foco em LTV)
     app.get('/active-variants', async (request) => {
         const now = new Date()
         const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
+        const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
 
         const windowData = await prisma.analyticsEvent.findMany({
-            where: { 
-                event: { in: ['upgrade_view', 'pix_paid'] },
-                timestamp: { gte: fourteenDaysAgo }
-            },
+            where: { timestamp: { gte: fourteenDaysAgo } },
             select: { event: true, metadata: true, timestamp: true, userId: true }
         })
 
@@ -226,59 +224,47 @@ export async function analyticsRoutes(app: FastifyInstance) {
         const decisions: any = {}
 
         segments.forEach(seg => {
-            const vA = { users: new Set(), revenue: 0 }
-            const vB = { users: new Set(), revenue: 0 }
+            const vA = { users: new Set<string>(), activeUsers: new Set<string>(), revenue: 0 }
+            const vB = { users: new Set<string>(), activeUsers: new Set<string>(), revenue: 0 }
             
-            // Dados diários para Média Móvel (Rollback)
-            const dailyStats: any = {}
-
             windowData.forEach(e => {
                 const meta = e.metadata as any
                 if (meta.user_segment === seg) {
                     const target = meta.ab_variant === 'A' ? vA : vB
+                    
+                    // Contagem de usuários únicos na variante
                     if (e.event === 'upgrade_view') target.users.add(e.userId)
+                    
+                    // Contagem de receita
                     if (e.event === 'pix_paid') target.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
-
-                    // Agregação diária
-                    const day = e.timestamp.toISOString().split('T')[0]
-                    if (!dailyStats[day]) dailyStats[day] = { A: { u: 0, r: 0 }, B: { u: 0, r: 0 } }
-                    const dTarget = meta.ab_variant === 'A' ? dailyStats[day].A : dailyStats[day].B
-                    if (e.event === 'upgrade_view') dTarget.u++ // Usando views aqui para sensibilidade diária
-                    if (e.event === 'pix_paid') dTarget.r += meta.planId === 'pro_yearly' ? 249 : 29.99
+                    
+                    // Monitoramento de Retenção (Atividade nos últimos 7 dias)
+                    if (e.timestamp >= sevenDaysAgo) {
+                        target.activeUsers.add(e.userId)
+                    }
                 }
             })
 
-            // RPU (Revenue Per Unit/User)
+            // Cálculo de Retenção de 7 dias
+            const retA = vA.users.size > 0 ? vA.activeUsers.size / vA.users.size : 0
+            const retB = vB.users.size > 0 ? vB.activeUsers.size / vB.users.size : 0
+
+            // RPU Base
             const rpuA = vA.users.size > 10 ? vA.revenue / vA.users.size : 0
             const rpuB = vB.users.size > 10 ? vB.revenue / vB.users.size : 0
             
-            const totalSamples = vA.users.size + vB.users.size
+            // MÉTRICA MESTRE: RPU AJUSTADO PELA RETENÇÃO (Foco em LTV)
+            const rpuAdjA = rpuA * (0.5 + retA) // Peso para retenção no longo prazo
+            const rpuAdjB = rpuB * (0.5 + retB)
 
-            // EXPLORAÇÃO ADAPTATIVA (Epsilon Dinâmico)
-            // Quanto mais dados, menor o epsilon (exploração). Mínimo 5%, Máximo 50%.
+            const totalSamples = vA.users.size + vB.users.size
             const epsilon = Math.max(0.05, Math.min(0.5, 2 / Math.sqrt(totalSamples || 1)))
 
-            // MONITORAÇÃO DE ROLLBACK (Média Móvel 3 dias)
-            const daysArr = Object.keys(dailyStats).sort().reverse()
-            let rollbackTriggered = false
-            if (daysArr.length >= 3) {
-                const recentPerformance = daysArr.slice(0, 3).every(d => {
-                    const rpvB = dailyStats[d].B.u > 0 ? dailyStats[d].B.r / dailyStats[d].B.u : 0
-                    return rpuA > 0 && rpvB < (rpuA * 0.80) // Queda de 20% por 3 dias seguidos
-                })
-                if (recentPerformance) rollbackTriggered = true
-            }
-
-            if (rollbackTriggered) {
-                decisions[seg] = { variant: 'A', mode: 'rollback', epsilon: 0.2 }
-                return
-            }
-
-            // DECISÃO POR LIFT DE RPU (Threshold 10%)
-            if (rpuB > (rpuA * 1.10)) {
-                decisions[seg] = { variant: 'B', mode: 'winner', epsilon }
-            } else if (rpuA > (rpuB * 1.10)) {
-                decisions[seg] = { variant: 'A', mode: 'winner', epsilon }
+            // DECISÃO POR RPU AJUSTADO (Threshold 12% para compensar ruído de retenção)
+            if (rpuAdjB > (rpuAdjA * 1.12)) {
+                decisions[seg] = { variant: 'B', mode: 'winner', epsilon, metrics: { rpuAdj: rpuAdjB, ret: retB } }
+            } else if (rpuAdjA > (rpuAdjB * 1.12)) {
+                decisions[seg] = { variant: 'A', mode: 'winner', epsilon, metrics: { rpuAdj: rpuAdjA, ret: retA } }
             } else {
                 decisions[seg] = { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 }
             }
