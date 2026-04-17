@@ -180,6 +180,19 @@ export async function analyticsRoutes(app: FastifyInstance) {
             }
         })
 
+        const annualRate = stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0
+
+        // Incremento de Receita Projetado (Incremental Revenue)
+        let incrementalRevenue = 0
+        Object.keys(liftStats).forEach(seg => {
+            const lift = Number(liftStats[seg].lift)
+            const rpvA = Number(liftStats[seg].A_rpv)
+            if (lift > 0) {
+                const views = vMetrics[`A_${seg}`]?.views || 0
+                incrementalRevenue += (rpvA * (lift / 100)) * views
+            }
+        })
+
         return { 
             stats, 
             conversion, 
@@ -191,7 +204,55 @@ export async function analyticsRoutes(app: FastifyInstance) {
             abResults,
             ab_validity,
             segmentedResults,
-            liftStats
+            liftStats,
+            incrementalRevenue: incrementalRevenue.toFixed(2)
         }
+    })
+
+    // Endpoint para decidir qual variante servir para cada segmento
+    app.get('/active-variants', async (request) => {
+        // Lógica de decisão automática:
+        // 1. Coletar lift por segmento
+        // 2. Se validade (7 dias) e Lift > 2%, retornar vencedora
+        // 3. Caso contrário, 50/50 ramdom (exploração)
+
+        const variantData = await prisma.analyticsEvent.findMany({
+            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
+            select: { event: true, metadata: true, timestamp: true }
+        })
+
+        const firstEvent = variantData[0]?.timestamp
+        const days = firstEvent ? Math.ceil((Date.now() - firstEvent.getTime()) / (1000 * 60 * 60 * 24)) : 0
+        
+        const segments = ['high', 'medium', 'low']
+        const decisions: any = {}
+
+        segments.forEach(seg => {
+            const vA = { views: 0, revenue: 0 }
+            const vB = { views: 0, revenue: 0 }
+
+            variantData.forEach(e => {
+                const meta = e.metadata as any
+                if (meta.user_segment === seg) {
+                    const target = meta.ab_variant === 'A' ? vA : vB
+                    if (e.event === 'upgrade_view') target.views++
+                    if (e.event === 'pix_paid') target.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
+                }
+            })
+
+            const rpvA = vA.views > 10 ? vA.revenue / vA.views : 0
+            const rpvB = vB.views > 10 ? vB.revenue / vB.views : 0
+
+            // Se B é pelo menos 5% melhor que A após 7 dias
+            if (days >= 7 && rpvB > (rpvA * 1.05)) {
+                decisions[seg] = 'B'
+            } else if (days >= 7 && rpvA > (rpvB * 1.05)) {
+                decisions[seg] = 'A'
+            } else {
+                decisions[seg] = 'RANDOM'
+            }
+        })
+
+        return decisions
     })
 }
