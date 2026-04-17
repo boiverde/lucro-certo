@@ -30,13 +30,33 @@ export async function analyticsRoutes(app: FastifyInstance) {
         return reply.status(204).send()
     })
 
-    // Listar eventos (apenas para admin simulado ou auditoria)
-    app.get('/events', async (request) => {
-        const events = await prisma.analyticsEvent.findMany({
-            orderBy: { timestamp: 'desc' },
-            take: 100,
-            include: { user: { select: { name: true, email: true } } }
+    // Métricas do Funil de Conversão
+    app.get('/funnel', async (request) => {
+        const events = await prisma.analyticsEvent.groupBy({
+            by: ['event'],
+            _count: { id: true }
         })
-        return events
+
+        const stats = {
+            view: events.find(e => e.event === 'upgrade_view')?._count.id || 0,
+            click: events.find(e => e.event === 'upgrade_click')?._count.id || 0,
+            qrcode: events.find(e => e.event === 'pix_created')?._count.id || 0,
+            paid: events.find(e => e.event === 'pix_paid')?._count.id || 0
+        }
+
+        const conversion = {
+            view_to_click: stats.view > 0 ? (stats.click / stats.view * 100).toFixed(1) : 0,
+            click_to_paid: stats.click > 0 ? (stats.paid / stats.click * 100).toFixed(1) : 0,
+            total_conversion: stats.view > 0 ? (stats.paid / stats.view * 100).toFixed(1) : 0
+        }
+
+        // Conversão por Origem
+        const origins = await prisma.analyticsEvent.groupBy({
+            where: { event: 'upgrade_view' },
+            by: ['origin'],
+            _count: { id: true }
+        })
+
+        return { stats, conversion, origins }
     })
 }

@@ -28,6 +28,7 @@ import BannerAcessoWeb from "../components/dashboard/BannerAcessoWeb";
 import PainelEstoque from "../components/dashboard/PainelEstoque";
 import UsageTracker from "../components/dashboard/UsageTracker";
 import LucratividadeBanner from "../components/dashboard/LucratividadeBanner";
+import RenewalNotice from "../components/dashboard/RenewalNotice";
 
 const hoje = new Date();
 const inicioMesObj = startOfMonth(hoje);
@@ -154,7 +155,7 @@ export default function Dashboard() {
         </div>
 
         <WelcomeMessage user={user} hasData={hasData} />
-
+        <RenewalNotice user={user} stats={dashboardStats} />
         <LucratividadeBanner stats={dashboardStats} />
         <UsageTracker usage={dashboardStats?.usage} />
 
