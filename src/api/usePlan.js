@@ -8,17 +8,17 @@ function getCached() {
     try {
         const raw = localStorage.getItem(CACHE_KEY);
         if (!raw) return null;
-        const { plan, ts } = JSON.parse(raw);
-        if (Date.now() - ts < CACHE_TTL) return plan;
+        const { data, ts } = JSON.parse(raw);
+        if (Date.now() - ts < CACHE_TTL) return data;
         return null;
     } catch {
         return null;
     }
 }
 
-function setCache(plan) {
+function setCache(data) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ plan, ts: Date.now() }));
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
     } catch { /* ignore */ }
 }
 
@@ -31,13 +31,13 @@ export function invalidatePlanCache() {
  * plan: 'free' | 'pro' | null
  */
 export function usePlan() {
-    const [plan, setPlan] = useState(() => getCached());
+    const [planData, setPlanData] = useState(() => getCached());
     const [loading, setLoading] = useState(!getCached());
 
     const fetchPlan = useCallback(async (force = false) => {
         const cached = getCached();
         if (cached && !force) {
-            setPlan(cached);
+            setPlanData(cached);
             setLoading(false);
             return;
         }
@@ -51,8 +51,8 @@ export function usePlan() {
         try {
             const data = await httpClient('/payments/plan-status');
             if (data?.plan) {
-                setCache(data.plan);
-                setPlan(data.plan);
+                setCache(data);
+                setPlanData(data);
             }
         } catch {
             // silencia erro — não quebra layout
@@ -65,5 +65,10 @@ export function usePlan() {
         fetchPlan();
     }, [fetchPlan]);
 
-    return { plan, loading, refresh: () => fetchPlan(true) };
+    return { 
+        plan: planData?.plan || 'free', 
+        expiresAt: planData?.planExpiresAt || null,
+        loading, 
+        refresh: () => fetchPlan(true) 
+    };
 }

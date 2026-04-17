@@ -105,10 +105,13 @@ export async function paymentsRoutes(app: FastifyInstance) {
         const userId = (request.user as any).sub
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            select: { plan: true }
+            select: { plan: true, planExpiresAt: true }
         })
         if (!user) return reply.status(404).send({ message: 'Usuário não encontrado' })
-        return { plan: user.plan }
+        return { 
+            plan: user.plan,
+            planExpiresAt: user.planExpiresAt
+        }
     })
 
     // =========================================================
@@ -205,9 +208,15 @@ export async function paymentsRoutes(app: FastifyInstance) {
                         data: { status: 'approved' }
                     })
 
+                    const expiresAt = new Date();
+                    expiresAt.setDate(expiresAt.getDate() + 30);
+
                     await prisma.user.update({
                         where: { id: transaction.userId },
-                        data: { plan: 'pro' }
+                        data: { 
+                            plan: 'pro',
+                            planExpiresAt: expiresAt
+                        }
                     })
 
                     console.log(`[PIX] Plan upgraded to PRO | userId: ${transaction.userId} | orderId: ${orderId}`)
@@ -246,9 +255,15 @@ export async function paymentsRoutes(app: FastifyInstance) {
                     where: { externalId: orderId, provider: 'pagseguro_pix' },
                     data: { status: 'approved' }
                 })
+                const expiresAt = new Date();
+                expiresAt.setDate(expiresAt.getDate() + 30);
+
                 await prisma.user.update({
                     where: { id: userId },
-                    data: { plan: 'pro' }
+                    data: { 
+                        plan: 'pro',
+                        planExpiresAt: expiresAt
+                    }
                 })
                 console.log(`[PIX-POLLING] Plan upgraded to PRO proativelly | userId: ${userId} | orderId: ${orderId}`)
                 return reply.send({ status: 'PAID', plan: 'pro' })

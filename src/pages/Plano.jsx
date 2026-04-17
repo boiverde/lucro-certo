@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Zap, CheckCircle2, Crown, Rocket, ShieldCheck, ArrowRight, QrCode, Copy, Check, Loader2, Clock } from 'lucide-react';
+import { Zap, CheckCircle2, Crown, Rocket, ShieldCheck, ArrowRight, QrCode, Copy, Check, Loader2, Clock, BarChart3, Store, Users } from 'lucide-react';
 import { usePlan } from '@/api/usePlan';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,34 +111,88 @@ export default function Plano() {
 
     // ── PLANO PRO ──────────────────────────────────────────────────
     if (plan === 'pro' || step === 'confirmed') {
+        const { expiresAt } = usePlan();
+        
+        let daysRemaining = 0;
+        if (expiresAt) {
+            const now = new Date();
+            const exp = new Date(expiresAt);
+            const diffTime = exp.getTime() - now.getTime();
+            daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+        }
+
         return (
-            <div className="max-w-xl mx-auto px-4 py-10">
-                <div className="rounded-2xl overflow-hidden shadow-xl border border-green-100">
-                    <div className="bg-gradient-to-br from-green-500 to-emerald-600 p-8 flex flex-col items-center text-white text-center">
-                        <Crown className="w-16 h-16 mb-4 drop-shadow-lg" />
-                        <h1 className="text-3xl font-extrabold mb-1">Plano PRO</h1>
-                        <span className="inline-flex items-center gap-1.5 bg-white/20 text-white text-sm font-semibold px-4 py-1 rounded-full mt-2">
-                            <CheckCircle2 className="w-4 h-4" /> Ativo
-                        </span>
+            <div className="max-w-xl mx-auto px-4 py-8">
+                {/* Header Card Premium */}
+                <div className="relative rounded-[2rem] overflow-hidden shadow-2xl bg-slate-900 border border-slate-800 mb-6">
+                    {/* Background decorativo */}
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Crown className="w-40 h-40 text-yellow-500" />
                     </div>
-                    <div className="bg-white p-8">
-                        <h2 className="text-lg font-bold text-gray-800 mb-4">Benefícios liberados</h2>
-                        <ul className="space-y-3 mb-8">
-                            {BENEFITS_PRO.map(b => (
-                                <li key={b} className="flex items-center gap-3 text-gray-700">
-                                    <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />
-                                    <span>{b}</span>
-                                </li>
-                            ))}
-                        </ul>
-                        <div className="rounded-xl bg-green-50 border border-green-100 p-4 text-sm text-green-800 text-center">
-                            Seu negócio está totalmente desbloqueado. Continue crescendo! 🚀
+                    
+                    <div className="p-8 relative z-10 flex flex-col items-center text-center">
+                        <div className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-2xl flex items-center justify-center shadow-lg shadow-yellow-500/20 mb-4 rotate-3">
+                            <Crown className="w-12 h-12 text-white" />
                         </div>
-                        <p className="text-xs text-gray-400 text-center mt-6">
-                            Para gerenciar cobranças acesse diretamente o PagSeguro/PagBank.
+                        
+                        <h1 className="text-3xl font-black text-white tracking-tight">Assinatura PRO</h1>
+                        <p className="text-slate-400 mt-1">Status: <span className="text-emerald-400 font-bold uppercase text-xs">Ativo e Vitalício</span></p>
+                        
+                        {/* Indicador de dias */}
+                        <div className="mt-8 grid grid-cols-1 w-full gap-4">
+                            <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl p-4 flex flex-col items-center">
+                                <span className="text-xs text-slate-500 uppercase font-black tracking-widest mb-1">Validade do Periodo</span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-4xl font-black text-white">{daysRemaining || 30}</span>
+                                    <span className="text-slate-500 font-medium">dias</span>
+                                </div>
+                                <div className="w-full bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-emerald-500 to-green-400" 
+                                        style={{ width: `${(daysRemaining / 30) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Grid de benefícios expandido */}
+                <div className="bg-white rounded-[2rem] p-8 shadow-xl border border-slate-100">
+                    <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                        <ShieldCheck className="w-6 h-6 text-emerald-500" />
+                        Vantagens Ativadas
+                    </h2>
+                    
+                    <div className="grid grid-cols-1 gap-4">
+                        {[
+                            { title: 'Vendas Ilimitadas', desc: 'Registre quantas vendas precisar sem bloqueios.', icon: Zap },
+                            { title: 'Relatórios Avançados', desc: 'Acesso total a gráficos de lucro e desempenho.', icon: BarChart3 },
+                            { title: 'Gestão de Estoque Pro', desc: 'Controle de lotes e alertas de reposição.', icon: Store },
+                            { title: 'Suporte Prioritário', desc: 'Fale com nossa equipe com prioridade máxima.', icon: Users },
+                        ].map((b, idx) => (
+                            <div key={idx} className="flex gap-4 p-4 rounded-2xl bg-gray-50 border border-gray-100 items-start">
+                                <div className="w-10 h-10 rounded-xl bg-white border border-gray-200 flex items-center justify-center shrink-0 shadow-sm">
+                                    <b.icon className="w-5 h-5 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-gray-900 text-sm">{b.title}</h3>
+                                    <p className="text-gray-500 text-xs leading-relaxed">{b.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="mt-8 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                        <p className="text-emerald-800 text-sm text-center font-medium italic">
+                            "Seu negócio agora tem asas para voar. Sucesso nas vendas!" 📈
                         </p>
                     </div>
                 </div>
+
+                <p className="text-center text-slate-400 text-[10px] mt-8 uppercase tracking-widest font-bold">
+                    ID da transação: {pix?.orderId || 'SESSÃO_ATIVA'}
+                </p>
             </div>
         );
     }
