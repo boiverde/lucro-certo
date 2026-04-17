@@ -182,18 +182,36 @@ export async function analyticsRoutes(app: FastifyInstance) {
 
         const annualRate = stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0
 
-        // UNIT ECONOMICS: LTV e CAC Máximo por Segmento
+        // ANÁLISE DE CANAIS (UTMs)
+        const channelData = await prisma.analyticsEvent.groupBy({
+            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
+            by: ['metadata', 'event'],
+            _count: { id: true }
+        })
+
+        const channels: any = {}
+        channelData.forEach(c => {
+            const source = (c.metadata as any)?.utm_source || 'organic'
+            if (!channels[source]) channels[source] = { views: 0, paid: 0, revenue: 0 }
+            if (c.event === 'upgrade_view') channels[source].views += c._count.id
+            if (c.event === 'pix_paid') {
+                channels[source].paid += c._count.id
+                const planId = (c.metadata as any)?.planId
+                channels[source].revenue += (planId === 'pro_yearly' ? 249 : 29.99) * c._count.id
+            }
+        })
+
+        // UNIT ECONOMICS: LTV e CAC Máximo por Segmento (Real vs Teórico)
         const unitEconomics = Object.keys(liftStats).map(seg => {
-            const rpv = Number(liftStats[seg].B_rpv || liftStats[seg].A_rpv || 0)
-            
-            // LTV Estimado (Baseado em 6 meses de retenção média mensal)
-            const ltv = rpv * 6
+            const rpvReal = Number(segmentedResults.find(r => r.segment === seg)?.rpv || 0)
+            const rpvTheo = Number(liftStats[seg].B_rpv || liftStats[seg].A_rpv || 0)
             
             return {
                 segment: seg,
-                ltv: ltv.toFixed(2),
-                cac_max: (ltv * 0.4).toFixed(2), // Alvo de 40% de margem (SaaS health)
-                payback_days: rpv > 0 ? Math.ceil((ltv * 0.4) / (rpv / 30)) : 0
+                ltv_theo: (rpvTheo * 6).toFixed(2),
+                ltv_real: (rpvReal * 6).toFixed(2),
+                cac_max: (rpvReal * 6 * 0.4).toFixed(2),
+                efficiency: rpvTheo > 0 ? (rpvReal / rpvTheo).toFixed(2) : 0
             }
         })
 
@@ -221,7 +239,8 @@ export async function analyticsRoutes(app: FastifyInstance) {
             segmentedResults,
             liftStats,
             incrementalRevenue: incrementalRevenue.toFixed(2),
-            unitEconomics
+            unitEconomics,
+            channels
         }
     })
 
