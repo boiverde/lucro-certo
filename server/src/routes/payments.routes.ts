@@ -42,26 +42,20 @@ export async function paymentsRoutes(app: FastifyInstance) {
             }
         });
 
-        // Gerar URL de Checkout Real
         const baseUrl = process.env.PAGSEGURO_BASE_URL?.includes('sandbox')
             ? 'https://sandbox.pagseguro.uol.com.br/v2/checkout/payment.html'
             : 'https://pagseguro.uol.com.br/v2/checkout/payment.html';
         
         const checkoutUrl = `${baseUrl}?code=${checkout.code}`;
-
         return { checkoutUrl, code: checkout.code };
     })
 
     // 2. Webhook / Retorno de Notificação do PagSeguro
-    // Aceita requisições form-urlencoded via fastify-formbody
     app.post('/pagseguro/webhook', async (request, reply) => {
         const { notificationCode, notificationType } = request.body as any;
 
         if (notificationType === 'transaction') {
-            // Consultar detalhes da transação no PagSeguro para validar segurança
             const transactionData = await getTransactionStatus(notificationCode);
-            
-            // Status PagSeguro: 3 = Pago, 4 = Disponível (ambos indicam sucesso na cobrança)
             const status = Number(transactionData.status);
             const reference = transactionData.reference;
 
@@ -73,32 +67,32 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 if (localTransaction && localTransaction.status !== 'approved') {
                     const isPaid = (status === 3 || status === 4);
 
-                    // Atualizar status da transação
-                    await prisma.transaction.update({
-                        where: { id: localTransaction.id },
-                        data: {
-                            status: isPaid ? 'approved' : status.toString(),
-                            externalId: transactionData.code // O 'code' aqui é o ID real da transação no PS
-                        }
-                    });
-
-                    // Ativar plano se for pago
                     if (isPaid) {
-                        await prisma.user.update({
-                            where: { id: localTransaction.userId },
-                            data: { plan: 'pro' }
-                        });
-                        console.log(`[SUBSCRIPTION-PAGSEGURO] Plan upgraded to PRO automatically | User: ${localTransaction.userId} | MP ID: ${transactionData.code}`);
+                        await prisma.$transaction(async (tx) => {
+                            await tx.transaction.update({
+                                where: { id: localTransaction.id },
+                                data: { status: 'approved', externalId: transactionData.code }
+                            })
+                            const expiresAt = new Date()
+                            expiresAt.setDate(expiresAt.getDate() + 30)
+                            await tx.user.update({
+                                where: { id: localTransaction.userId },
+                                data: { plan: 'pro', planExpiresAt: expiresAt }
+                            })
+                        })
+                    } else {
+                        await prisma.transaction.update({
+                            where: { id: localTransaction.id },
+                            data: { status: status.toString(), externalId: transactionData.code }
+                        })
                     }
                 }
             }
         }
-
-        // PagSeguro não espera corpo na resposta, apenas status 200
         return reply.status(200).send();
     })
 
-    // 3. Verificar status atual do plano (usado pelo frontend após retorno do checkout)
+    // 3. Verificar status atual do plano
     app.withTypeProvider<ZodTypeProvider>().get('/plan-status', {
         onRequest: [app.authenticate as any]
     }, async (request, reply) => {
@@ -108,24 +102,14 @@ export async function paymentsRoutes(app: FastifyInstance) {
             select: { plan: true, planExpiresAt: true }
         })
         if (!user) return reply.status(404).send({ message: 'Usuário não encontrado' })
-        return { 
-            plan: user.plan,
-            planExpiresAt: user.planExpiresAt
-        }
+        return { plan: user.plan, planExpiresAt: user.planExpiresAt }
     })
 
-    // =========================================================
-    // PIX — Nova integração via PagBank API v4 (JSON/Bearer)
-    // =========================================================
-
-    // 4. Criar cobrança Pix para upgrade Plano Pro
+    // 4. Criar cobrança Pix
     app.withTypeProvider<ZodTypeProvider>().post('/pix', {
         onRequest: [app.authenticate as any],
         schema: {
-            body: z.object({
-                // CPF do comprador — obrigatório pela PagBank API v4
-                cpf: z.string().min(11).max(14)
-            })
+            body: z.object({ cpf: z.string().min(11).max(14) })
         }
     }, async (request, reply) => {
         const userId = (request.user as any).sub
@@ -139,7 +123,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
         }
 
         const referenceId = `pix_pro_${userId}_${Date.now()}`
-        const amountCents = 2999 // R$ 29,99
+        const amountCents = 2999 
 
         try {
             const pix = await createPixCharge({
@@ -151,7 +135,6 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 notificationUrl: process.env.PAGSEGURO_NOTIFICATION_URL || ''
             })
 
-            // Registrar intenção no banco
             await prisma.transaction.create({
                 data: {
                     userId,
@@ -170,112 +153,76 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 expiresAt: pix.expiresAt
             })
         } catch (err: any) {
-            const errorData = err.response?.data;
-            console.error('[PIX ROUTE ERROR]', JSON.stringify(errorData, null, 2) || err.message);
-
-            // Tentar extrair mensagem amigável da PagSeguro
-            let friendlyMessage = 'Erro ao criar cobrança Pix';
-            if (errorData?.error_messages?.[0]?.description) {
-                friendlyMessage = errorData.error_messages[0].description;
-            }
-
-            return reply.status(500).send({
-                message: friendlyMessage,
-                detail: errorData || err.message
-            })
+            return reply.status(500).send({ message: 'Erro ao criar Pix' })
         }
     })
 
-    // 5. Webhook Pix — notificação da PagBank API v4 (JSON)
+    // 5. Webhook Pix - Idempotente e Atômico
     app.post('/pix/webhook', async (request, reply) => {
         try {
             const body = request.body as any
-            console.log('[PIX WEBHOOK] Received:', JSON.stringify(body, null, 2))
-
             const orderId = body?.id
             const charges = body?.charges || []
-
             const isPaid = charges.some((c: any) => c.status === 'PAID')
 
             if (orderId && isPaid) {
-                const transaction = await prisma.transaction.findFirst({
-                    where: { externalId: orderId, provider: 'pagseguro_pix' }
+                const transaction = await prisma.transaction.findUnique({
+                    where: { externalId: orderId }
                 })
 
                 if (transaction && transaction.status !== 'approved') {
-                    await prisma.transaction.update({
-                        where: { id: transaction.id },
-                        data: { status: 'approved' }
+                    await prisma.$transaction(async (tx) => {
+                        await tx.transaction.update({
+                            where: { id: transaction.id },
+                            data: { status: 'approved' }
+                        })
+
+                        const expiresAt = new Date()
+                        expiresAt.setDate(expiresAt.getDate() + 30)
+
+                        await tx.user.update({
+                            where: { id: transaction.userId },
+                            data: { plan: 'pro', planExpiresAt: expiresAt }
+                        })
                     })
-
-                    const expiresAt = new Date();
-                    expiresAt.setDate(expiresAt.getDate() + 30);
-
-                    await prisma.user.update({
-                        where: { id: transaction.userId },
-                        data: { 
-                            plan: 'pro',
-                            planExpiresAt: expiresAt
-                        }
-                    })
-
-                    console.log(`[PIX] Plan upgraded to PRO | userId: ${transaction.userId} | orderId: ${orderId}`)
+                    console.log(`[PIX-WEBHOOK] Upgrade Successful | order: ${orderId}`)
                 }
             }
         } catch (err: any) {
-            console.error('[PIX WEBHOOK ERROR]', err.message)
+            console.error('[PIX-WEBHOOK-ERROR]', err.message)
         }
-
-        // PagBank exige apenas status 200 na resposta do webhook
         return reply.status(200).send()
     })
 
-    // 6. Polling de status do Pix (frontend consulta para confirmar pagamento)
+    // 6. Polling Pix - Idempotente e Atômico
     app.withTypeProvider<ZodTypeProvider>().get('/pix/status/:orderId', {
         onRequest: [app.authenticate as any]
     }, async (request, reply) => {
         const { orderId } = request.params as { orderId: string }
         const userId = (request.user as any).sub
 
-        // Verifica se o usuário já foi promovido
         const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })
-        if (user?.plan === 'pro') {
-            return reply.send({ status: 'PAID', plan: 'pro' })
-        }
+        if (user?.plan === 'pro') return reply.send({ status: 'PAID' })
 
-        // Consulta a API do PagBank para status em tempo real
         try {
             const response = await pagbankClient.get(`/orders/${orderId}`)
-            const charges = response.data?.qr_codes || []
             const isPaid = response.data?.charges?.some((c: any) => c.status === 'PAID')
 
-            if (isPaid && user?.plan !== 'pro') {
-                // Atualiza o banco proativamente se o webhook ainda não chegou
-                await prisma.transaction.updateMany({
-                    where: { externalId: orderId, provider: 'pagseguro_pix' },
-                    data: { status: 'approved' }
-                })
-                const expiresAt = new Date();
-                expiresAt.setDate(expiresAt.getDate() + 30);
-
-                await prisma.user.update({
-                    where: { id: userId },
-                    data: { 
-                        plan: 'pro',
-                        planExpiresAt: expiresAt
-                    }
-                })
-                console.log(`[PIX-POLLING] Plan upgraded to PRO proativelly | userId: ${userId} | orderId: ${orderId}`)
-                return reply.send({ status: 'PAID', plan: 'pro' })
+            if (isPaid) {
+                const transaction = await prisma.transaction.findUnique({ where: { externalId: orderId } })
+                if (transaction && transaction.status !== 'approved') {
+                    await prisma.$transaction(async (tx) => {
+                        await tx.transaction.update({ where: { id: transaction.id }, data: { status: 'approved' } })
+                        const expiresAt = new Date()
+                        expiresAt.setDate(expiresAt.getDate() + 30)
+                        await tx.user.update({ where: { id: userId }, data: { plan: 'pro', planExpiresAt: expiresAt } })
+                    })
+                }
+                return reply.send({ status: 'PAID' })
             }
-
-            return reply.send({
-                status: isPaid ? 'PAID' : 'PENDING',
-                plan: isPaid ? 'pro' : (user?.plan || 'free')
-            })
+            return reply.send({ status: 'PENDING' })
         } catch (err: any) {
-            console.error('[PIX STATUS ERROR]', err.response?.data || err.message)
-            return reply.send({ status: 'UNKNOWN', plan: user?.plan || 'free' })
+            return reply.send({ status: 'UNKNOWN' })
         }
     })
 }

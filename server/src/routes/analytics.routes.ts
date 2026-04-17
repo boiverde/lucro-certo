@@ -31,7 +31,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     })
 
     // Métricas do Funil de Conversão
-    app.get('/funnel', async (request) => {
+        // Métricas do Funil de Conversão
         const events = await prisma.analyticsEvent.groupBy({
             by: ['event'],
             _count: { id: true }
@@ -44,10 +44,19 @@ export async function analyticsRoutes(app: FastifyInstance) {
             paid: events.find(e => e.event === 'pix_paid')?._count.id || 0
         }
 
+        // Recuperação de pagamentos (cliques em banners de pendente)
+        const recovered = await prisma.analyticsEvent.count({
+            where: { 
+                event: 'upgrade_view', 
+                origin: { contains: 'pagamento' } 
+            }
+        })
+
         const conversion = {
             view_to_click: stats.view > 0 ? (stats.click / stats.view * 100).toFixed(1) : 0,
             click_to_paid: stats.click > 0 ? (stats.paid / stats.click * 100).toFixed(1) : 0,
-            total_conversion: stats.view > 0 ? (stats.paid / stats.view * 100).toFixed(1) : 0
+            total_conversion: stats.view > 0 ? (stats.paid / stats.view * 100).toFixed(1) : 0,
+            recovery_rate: stats.qrcode > 0 ? (recovered / stats.qrcode * 100).toFixed(1) : 0
         }
 
         // Conversão por Origem
@@ -57,6 +66,6 @@ export async function analyticsRoutes(app: FastifyInstance) {
             _count: { id: true }
         })
 
-        return { stats, conversion, origins }
+        return { stats, conversion, origins, recovered }
     })
 }

@@ -76,43 +76,52 @@ export default function UpgradeModal() {
         return () => clearInterval(timer);
     }, [step, pix, savePendingPix]);
 
-    // Lógica de Polling do Pagamento
+    // Lógica de Polling do Pagamento com Backoff
     useEffect(() => {
         let timer;
+        let attempts = 0;
+        
         if (pollingActive && pix?.orderId) {
-            timer = setInterval(async () => {
+            const checkStatus = async () => {
+                attempts++;
                 try {
                     const response = await fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/payments/pix/status/${pix.orderId}`, {
                         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
                     });
                     const data = await response.json();
+                    
                     if (data.status === 'PAID') {
                         setStep('confirmed');
                         setPollingActive(false);
-                        savePendingPix(null); // Limpar persistência
+                        savePendingPix(null);
                         toast.success("Pagamento confirmado! Plano PRO ativado.");
                         
-                        // Analytics: Pagamento Confirmado
-                        fetch(`${import.meta.env.VITE_API_URL || 'https://lucro-certo-api.onrender.com'}/analytics/event`, {
-                            method: 'POST',
-                            headers: { 
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${localStorage.getItem('token')}`
-                            },
-                            body: JSON.stringify({ event: 'pix_paid', origin: reason || 'direct', metadata: { orderId: pix.orderId } })
-                        }).catch(e => console.error('Analytics error', e));
-
-                        setTimeout(() => {
-                            window.location.reload(); 
-                        }, 3000);
+                        setTimeout(() => window.location.reload(), 3000);
+                        return;
                     }
+
+                    // Segurança: se o status for UNKNOWN (não encontrado no backend), cancela
+                    if (data.status === 'UNKNOWN' && attempts > 3) {
+                        toast.error("Cobrança não localizada. Por favor, tente gerar novamente.");
+                        setPollingActive(false);
+                        savePendingPix(null);
+                        setStep('cpf');
+                        return;
+                    }
+
                 } catch (e) {
                     console.error("Erro polling", e);
                 }
-            }, 4000);
+
+                // Backoff: 4s inicialmente, 8s após 1 minuto de espera
+                const nextInterval = (attempts * 4000) > 60000 ? 8000 : 4000;
+                timer = setTimeout(checkStatus, nextInterval);
+            };
+
+            timer = setTimeout(checkStatus, 4000);
         }
-        return () => clearInterval(timer);
-    }, [pollingActive, pix, reason, savePendingPix]);
+        return () => clearTimeout(timer);
+    }, [pollingActive, pix, savePendingPix]);
 
     if (!isOpen) return null;
 
