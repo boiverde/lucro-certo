@@ -87,9 +87,8 @@ export default function Layout({ children, currentPageName }) {
         const currentUser = await base44.auth.me();
         setUser(currentUser);
       } catch (error) {
-        handleApiError(error, 'validar sessão')
-      handleApiError(error, 'validar sessão')
-      console.error('Falha ao validar sessão:', error);
+        handleApiError(error, 'validar sessão');
+        console.error('Falha ao validar sessão:', error);
         if (error.status === 401 || !localStorage.getItem('auth_token')) {
           window.location.href = '/Login';
         } else {
