@@ -209,62 +209,82 @@ export async function analyticsRoutes(app: FastifyInstance) {
         }
     })
 
-    // Endpoint para decidir qual variante servir para cada segmento (Foco em LTV)
+    // Endpoint para decidir qual variante servir para cada segmento (Métrica EV_7d)
     app.get('/active-variants', async (request) => {
         const now = new Date()
         const fourteenDaysAgo = new Date(now.getTime() - (14 * 24 * 60 * 60 * 1000))
-        const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
 
-        const windowData = await prisma.analyticsEvent.findMany({
+        const allEvents = await prisma.analyticsEvent.findMany({
             where: { timestamp: { gte: fourteenDaysAgo } },
-            select: { event: true, metadata: true, timestamp: true, userId: true }
+            select: { event: true, metadata: true, timestamp: true, userId: true },
+            orderBy: { timestamp: 'asc' }
         })
 
         const segments = ['high', 'medium', 'low']
         const decisions: any = {}
 
         segments.forEach(seg => {
-            const vA = { users: new Set<string>(), activeUsers: new Set<string>(), revenue: 0 }
-            const vB = { users: new Set<string>(), activeUsers: new Set<string>(), revenue: 0 }
-            
-            windowData.forEach(e => {
+            const userData: any = {} // userId -> { variant: string, firstSeen: Date, revenue7d: number, qualified: boolean }
+
+            allEvents.forEach(e => {
                 const meta = e.metadata as any
                 if (meta.user_segment === seg) {
-                    const target = meta.ab_variant === 'A' ? vA : vB
-                    
-                    // Contagem de usuários únicos na variante
-                    if (e.event === 'upgrade_view') target.users.add(e.userId)
-                    
-                    // Contagem de receita
-                    if (e.event === 'pix_paid') target.revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
-                    
-                    // Monitoramento de Retenção (Atividade nos últimos 7 dias)
-                    if (e.timestamp >= sevenDaysAgo) {
-                        target.activeUsers.add(e.userId)
+                    if (e.event === 'upgrade_view' && !userData[e.userId]) {
+                        userData[e.userId] = { 
+                            variant: meta.ab_variant, 
+                            firstSeen: e.timestamp, 
+                            revenue7d: 0, 
+                            qualified: false 
+                        }
+                    }
+
+                    if (userData[e.userId]) {
+                        const user = userData[e.userId]
+                        const daysSinceFirstSeen = (e.timestamp.getTime() - user.firstSeen.getTime()) / (1000 * 60 * 60 * 24)
+
+                        // Coleta de Receita em 7 dias
+                        if (e.event === 'pix_paid' && daysSinceFirstSeen <= 7) {
+                            user.revenue7d += meta.planId === 'pro_yearly' ? 249 : 29.99
+                        }
+
+                        // Retenção Qualificada (Ação relevante além de ver o modal)
+                        const relevantEvents = ['venda_create', 'produto_create', 'config_update']
+                        if (relevantEvents.includes(e.event) && daysSinceFirstSeen <= 7) {
+                            user.qualified = true
+                        }
                     }
                 }
             })
 
-            // Cálculo de Retenção de 7 dias
-            const retA = vA.users.size > 0 ? vA.activeUsers.size / vA.users.size : 0
-            const retB = vB.users.size > 0 ? vB.activeUsers.size / vB.users.size : 0
-
-            // RPU Base
-            const rpuA = vA.users.size > 10 ? vA.revenue / vA.users.size : 0
-            const rpuB = vB.users.size > 10 ? vB.revenue / vB.users.size : 0
+            // Agregação por Variante
+            const vMetrics: any = { A: { users: 0, totalEV: 0, qualifiedCount: 0 }, B: { users: 0, totalEV: 0, qualifiedCount: 0 } }
             
-            // MÉTRICA MESTRE: RPU AJUSTADO PELA RETENÇÃO (Foco em LTV)
-            const rpuAdjA = rpuA * (0.5 + retA) // Peso para retenção no longo prazo
-            const rpuAdjB = rpuB * (0.5 + retB)
+            Object.values(userData).forEach((u: any) => {
+                const target = vMetrics[u.variant]
+                if (target) {
+                    target.users++
+                    target.totalEV += u.revenue7d
+                    if (u.qualified) target.qualifiedCount++
+                }
+            })
 
-            const totalSamples = vA.users.size + vB.users.size
+            // EV_7d = Receita Total na Janela / Total de Usuários
+            const evA = vMetrics.A.users > 10 ? vMetrics.A.totalEV / vMetrics.A.users : 0
+            const evB = vMetrics.B.users > 10 ? vMetrics.B.totalEV / vMetrics.B.users : 0
+            
+            // Retenção Qualificada %
+            const qRetA = vMetrics.A.users > 0 ? vMetrics.A.qualifiedCount / vMetrics.A.users : 0
+            const qRetB = vMetrics.B.users > 0 ? vMetrics.B.qualifiedCount / vMetrics.B.users : 0
+
+            const totalSamples = vMetrics.A.users + vMetrics.B.users
             const epsilon = Math.max(0.05, Math.min(0.5, 2 / Math.sqrt(totalSamples || 1)))
 
-            // DECISÃO POR RPU AJUSTADO (Threshold 12% para compensar ruído de retenção)
-            if (rpuAdjB > (rpuAdjA * 1.12)) {
-                decisions[seg] = { variant: 'B', mode: 'winner', epsilon, metrics: { rpuAdj: rpuAdjB, ret: retB } }
-            } else if (rpuAdjA > (rpuAdjB * 1.12)) {
-                decisions[seg] = { variant: 'A', mode: 'winner', epsilon, metrics: { rpuAdj: rpuAdjA, ret: retA } }
+            // DECISÃO POR EV_7d (A métrica mais pura de valor de negócio)
+            // Shield de 8% de Lift necessário para promoção
+            if (evB > (evA * 1.08)) {
+                decisions[seg] = { variant: 'B', mode: 'winner', epsilon, metrics: { ev7d: evB, qRet: qRetB } }
+            } else if (evA > (evB * 1.08)) {
+                decisions[seg] = { variant: 'A', mode: 'winner', epsilon, metrics: { ev7d: evA, qRet: qRetA } }
             } else {
                 decisions[seg] = { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 }
             }
