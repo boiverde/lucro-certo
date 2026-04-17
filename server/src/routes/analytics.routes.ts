@@ -93,14 +93,34 @@ export async function analyticsRoutes(app: FastifyInstance) {
             else if (planId === 'pro_monthly') planStats.monthly += p._count.id
         })
 
-        const annualRate = stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0
+        // Critérios de Validade do Teste A/B (Confiança)
+        const firstABEvent = await prisma.analyticsEvent.findFirst({
+            where: { metadata: { path: ['ab_variant'], not: null } },
+            orderBy: { timestamp: 'asc' }
+        })
+        
+        const testDays = firstABEvent 
+            ? Math.ceil((new Date().getTime() - firstABEvent.timestamp.getTime()) / (1000 * 60 * 60 * 24))
+            : 0
 
-        // Conversão por Origem
-        const origins = await prisma.analyticsEvent.groupBy({
+        const ab_validity = {
+            is_valid: stats.paid >= 200 || testDays >= 7,
+            days_active: testDays,
+            total_payments: stats.paid
+        }
+
+        // Conversão por Segmento de Usuário
+        const segmentStats = await prisma.analyticsEvent.groupBy({
             where: { event: 'upgrade_view' },
-            by: ['origin'],
+            by: ['metadata'],
             _count: { id: true }
         })
+
+        const segments = {
+            high: segmentStats.find(s => (s.metadata as any)?.user_segment === 'high_potential')?._count.id || 0,
+            medium: segmentStats.find(s => (s.metadata as any)?.user_segment === 'medium_potential')?._count.id || 0,
+            low: segmentStats.find(s => (s.metadata as any)?.user_segment === 'low_potential')?._count.id || 0
+        }
 
         return { 
             stats, 
@@ -110,7 +130,9 @@ export async function analyticsRoutes(app: FastifyInstance) {
             planStats, 
             rpv, 
             annualRate,
-            abResults
+            abResults,
+            ab_validity,
+            segments
         }
     })
 }
