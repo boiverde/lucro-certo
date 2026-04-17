@@ -31,7 +31,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
     })
 
     // Métricas do Funil de Conversão
-        // Métricas do Funil de Conversão
+    app.get('/funnel', async (request) => {
         const events = await prisma.analyticsEvent.groupBy({
             by: ['event'],
             _count: { id: true }
@@ -59,6 +59,26 @@ export async function analyticsRoutes(app: FastifyInstance) {
             recovery_rate: stats.qrcode > 0 ? (recovered / stats.qrcode * 100).toFixed(1) : 0
         }
 
+        // Receita por Visualização (RPV)
+        const totalRevenue = await prisma.transaction.aggregate({
+            where: { status: 'approved' },
+            _sum: { amount: true }
+        })
+
+        const rpv = stats.view > 0 ? (Number(totalRevenue._sum.amount || 0) / stats.view).toFixed(2) : 0
+
+        // Métricas por Variante A/B
+        const abStats = await prisma.analyticsEvent.groupBy({
+            where: { event: 'upgrade_view' },
+            by: ['metadata'],
+            _count: { id: true }
+        })
+
+        const abResults = {
+            variant_A: abStats.find(s => (s.metadata as any)?.ab_variant === 'A')?._count.id || 0,
+            variant_B: abStats.find(s => (s.metadata as any)?.ab_variant === 'B')?._count.id || 0
+        }
+
         // Conversão por Tipo de Plano (Anual vs Mensal)
         const planTypes = await prisma.analyticsEvent.groupBy({
             where: { event: 'pix_paid' },
@@ -66,17 +86,31 @@ export async function analyticsRoutes(app: FastifyInstance) {
             _count: { id: true }
         })
 
-        const planStats = {
-            monthly: 0,
-            yearly: 0
-        }
-
+        const planStats = { monthly: 0, yearly: 0 }
         planTypes.forEach(p => {
             const planId = (p.metadata as any)?.planId
             if (planId === 'pro_yearly') planStats.yearly += p._count.id
             else if (planId === 'pro_monthly') planStats.monthly += p._count.id
         })
 
-        return { stats, conversion, origins, recovered, planStats }
+        const annualRate = stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0
+
+        // Conversão por Origem
+        const origins = await prisma.analyticsEvent.groupBy({
+            where: { event: 'upgrade_view' },
+            by: ['origin'],
+            _count: { id: true }
+        })
+
+        return { 
+            stats, 
+            conversion, 
+            origins, 
+            recovered, 
+            planStats, 
+            rpv, 
+            annualRate,
+            abResults
+        }
     })
 }

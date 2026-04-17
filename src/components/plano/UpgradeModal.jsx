@@ -3,7 +3,7 @@ import { useUpgrade } from '@/context/UpgradeContext';
 import { 
     X, QrCode, Loader2, Check, Copy, Clock, 
     Crown, Rocket, ShieldCheck, TrendingUp, AlertCircle, Calendar,
-    ArrowRight, Star
+    ArrowRight, Star, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,8 @@ import { useQuery } from "@tanstack/react-query";
 export default function UpgradeModal() {
     const { isOpen, closeUpgrade, reason, pendingPix, savePendingPix } = useUpgrade();
     const [step, setStep] = useState('plan'); // plan, cpf, loading, qrcode, confirmed
-    const [selectedPlan, setSelectedPlan] = useState('pro_yearly'); // Pré-selecionar Anual
+    const [selectedPlan, setSelectedPlan] = useState('pro_yearly'); 
+    const [abVariant, setAbVariant] = useState('A'); // A: Pre-selected, B: No pre-selection
     const [cpf, setCpf] = useState('');
     const [pix, setPix] = useState(null);
     const [copied, setCopied] = useState(false);
@@ -28,29 +29,42 @@ export default function UpgradeModal() {
         enabled: isOpen,
     });
 
-    const lucroPotencial = dashboardStats?.insights?.lucroPotencial || 0;
+    const lucroPotencialMensal = dashboardStats?.insights?.lucroPotencial || 0;
+    
+    // Cálculo do Payback
+    const paybackDays = lucroPotencialMensal > 0 
+        ? Math.ceil(249 / (lucroPotencialMensal / 30))
+        : null;
 
     useEffect(() => {
         if (isOpen) {
+            // A/B Test Assignment
+            const variant = Math.random() > 0.5 ? 'A' : 'B';
+            setAbVariant(variant);
+
             if (pendingPix && new Date(pendingPix.expiresAt) > new Date()) {
                 setPix(pendingPix);
                 setStep('qrcode');
                 setPollingActive(true);
             } else {
                 setStep('plan');
-                setSelectedPlan('pro_yearly'); // Reset para Anual ao abrir
+                setSelectedPlan(variant === 'A' ? 'pro_yearly' : null);
                 setPix(null);
                 setPollingActive(false);
             }
             
-            // Analytics: Visualização do Modal
+            // Analytics: Visualização do Modal com variante A/B
             fetch(`${import.meta.env.VITE_API_URL}/analytics/event`, {
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 },
-                body: JSON.stringify({ event: 'upgrade_view', origin: reason || 'direct' })
+                body: JSON.stringify({ 
+                    event: 'upgrade_view', 
+                    origin: reason || 'direct',
+                    metadata: { ab_variant: variant }
+                })
             }).catch(e => console.error('Analytics error', e));
         }
     }, [isOpen, pendingPix, reason]);
@@ -113,6 +127,11 @@ export default function UpgradeModal() {
     if (!isOpen) return null;
 
     const handleCreatePix = async (planToSet = selectedPlan) => {
+        if (!planToSet) {
+            toast.info("Por favor, selecione um plano");
+            return;
+        }
+
         if (step === 'plan') {
             setSelectedPlan(planToSet);
             setStep('cpf');
@@ -147,7 +166,13 @@ export default function UpgradeModal() {
                 fetch(`${import.meta.env.VITE_API_URL}/analytics/event`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
-                    body: JSON.stringify({ event: 'pix_created', metadata: { planId: planToSet } })
+                    body: JSON.stringify({ 
+                        event: 'pix_created', 
+                        metadata: { 
+                            planId: planToSet, 
+                            ab_variant: abVariant 
+                        } 
+                    })
                 }).catch(e => console.error('Analytics error', e));
             } else {
                 toast.error(data.message || "Erro ao gerar PIX");
@@ -179,8 +204,8 @@ export default function UpgradeModal() {
                         <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-4">
                             <Check className="w-10 h-10 text-emerald-600 animate-bounce" />
                         </div>
-                        <h2 className="text-2xl font-black text-slate-900 mb-2 underline decoration-emerald-500 decoration-4">SUCESSO!</h2>
-                        <p className="text-slate-600 mb-6 font-medium">Sua conta PRO está liberada.</p>
+                        <h1 className="text-2xl font-black text-slate-900 mb-2">PAGAMENTO CONFIRMADO!</h1>
+                        <p className="text-slate-600 mb-6 font-medium">Sua conta foi atualizada para PRO.</p>
                         <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
                     </div>
                 ) : (
@@ -190,14 +215,15 @@ export default function UpgradeModal() {
                             <Star className="absolute -bottom-4 -right-4 w-16 h-16 text-indigo-500/10 -rotate-12" />
                             
                             < Crown className="w-12 h-12 text-amber-500 mx-auto mb-4 drop-shadow-[0_0_15px_rgba(245,158,11,0.5)]" />
-                            <h2 className="text-2xl font-black tracking-tighter">Upgrade PRO 💎</h2>
-                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em] mt-1">Domine suas finanças</p>
+                            <h2 className="text-2xl font-black tracking-tighter text-white">Domine Lucro Certo 💎</h2>
+                            <p className="text-slate-400 text-[10px] uppercase font-bold tracking-[0.2em] mt-1">Escalabilidade Ilimitada</p>
                         </div>
 
                         <div className="p-8">
                             {step === 'plan' ? (
                                 <div className="space-y-4">
-                                    {/* PLANO ANUAL - O GRANDE DESTAQUE */}
+                                    <p className="text-sm text-slate-500 font-bold uppercase tracking-tight text-center">Planos Recomendados</p>
+                                    
                                     <div 
                                         onClick={() => setSelectedPlan('pro_yearly')}
                                         className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative ${selectedPlan === 'pro_yearly' ? 'border-amber-500 bg-amber-50/50 shadow-lg shadow-amber-500/10' : 'border-slate-100 hover:border-slate-200'}`}
@@ -209,24 +235,31 @@ export default function UpgradeModal() {
                                             <p className="font-black text-slate-900 text-lg leading-none">Plano Anual 🏆</p>
                                             <div className="text-right">
                                                 <p className="text-2xl font-black text-slate-900 leading-none">R$ 249</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Pagamento Único</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Ano</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100">
+                                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-100/50">
                                             <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
-                                            <p className="text-xs text-slate-600 font-medium">Equivale a <span className="font-black text-emerald-600 underline">R$ 20,75/mês</span></p>
+                                            <p className="text-xs text-slate-600 font-medium">Equivale a <span className="font-black text-emerald-600">R$ 20,75/mês</span></p>
                                         </div>
-                                        <p className="text-[10px] text-amber-600 font-black mt-1 uppercase tracking-tighter italic">Economize R$ 110,88 por ano!</p>
+                                        
+                                        {paybackDays && (
+                                            <div className="mt-3 bg-emerald-100 p-2 rounded-xl flex items-center gap-2 animate-in slide-in-from-left duration-500">
+                                                <Zap className="w-3.5 h-3.5 text-emerald-600 fill-emerald-600" />
+                                                <p className="text-[10px] text-emerald-900 font-black uppercase">
+                                                    Investimento recuperado em ~{paybackDays} dias
+                                                </p>
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* PLANO MENSAL - OPÇÃO SECUNDÁRIA */}
                                     <div 
                                         onClick={() => setSelectedPlan('pro_monthly')}
                                         className={`p-4 rounded-3xl border-2 transition-all cursor-pointer ${selectedPlan === 'pro_monthly' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100 hover:border-slate-200'}`}
                                     >
                                         <div className="flex justify-between items-center">
                                             <div>
-                                                <p className="font-bold text-slate-700">Plano Mensal</p>
+                                                <p className="font-black text-slate-700">Plano Mensal</p>
                                                 <p className="text-[10px] text-slate-400 font-medium">Sem permanência</p>
                                             </div>
                                             <p className="text-lg font-black text-slate-800">R$ 29,99</p>
@@ -241,11 +274,9 @@ export default function UpgradeModal() {
                                         <ArrowRight className="w-5 h-5" />
                                     </Button>
 
-                                    <div className="flex flex-col items-center gap-2 pt-2">
-                                        <div className="flex items-center gap-2 text-[9px] text-slate-400 font-black uppercase">
-                                            <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" /> Ativação Imediata via Pix
-                                        </div>
-                                    </div>
+                                    <p className="text-[9px] text-slate-400 font-black uppercase text-center tracking-widest">
+                                        Liberação Instantânea via Pix
+                                    </p>
                                 </div>
                             ) : step === 'cpf' || step === 'loading' ? (
                                 <div className="space-y-6">
@@ -258,7 +289,7 @@ export default function UpgradeModal() {
                                             placeholder="000.000.000-00"
                                             value={cpf}
                                             onChange={(e) => setCpf(e.target.value)}
-                                            className="h-14 rounded-2xl text-xl font-black border-slate-200 focus:ring-amber-500"
+                                            className="h-14 rounded-2xl text-xl font-black border-slate-200"
                                             disabled={step === 'loading'}
                                         />
                                     </div>
@@ -284,21 +315,21 @@ export default function UpgradeModal() {
                                         </div>
                                         <div className="h-10 w-px bg-slate-100" />
                                         <div className="text-center">
-                                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-tight">Válido por</p>
+                                            <p className="text-[9px] text-slate-400 uppercase font-black tracking-tight">Expira em</p>
                                             <p className="text-lg font-black text-indigo-600">{countdown}</p>
                                         </div>
                                     </div>
 
-                                    <Button onClick={handleCopy} variant="outline" className="w-full h-14 rounded-2xl border-slate-200 font-black text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all active:scale-95 shadow-sm">
+                                    <Button onClick={handleCopy} variant="outline" className="w-full h-14 rounded-2xl border-slate-200 font-black text-sm flex items-center justify-center gap-2 hover:bg-slate-50 transition-all active:scale-95 shadow-sm uppercase tracking-tighter">
                                         {copied ? <Check className="w-5 h-5 text-emerald-500" /> : <Copy className="w-5 h-5" />}
-                                        {copied ? "SÓ COLAR NO APP DO BANCO!" : "COPIAR CÓDIGO PIX"}
+                                        {copied ? "Só colar no banco!" : "Copiar Código Pix"}
                                     </Button>
                                     
-                                    <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex items-center gap-3">
-                                        <Loader2 className="w-5 h-5 text-amber-500 animate-spin shrink-0" />
+                                    <div className="bg-blue-50 border border-blue-100 p-4 rounded-2xl flex items-center gap-3">
+                                        <Loader2 className="w-5 h-5 text-blue-500 animate-spin shrink-0" />
                                         <div className="text-left">
-                                            <p className="text-amber-900 text-[10px] font-black uppercase">Monitorando Pagamento</p>
-                                            <p className="text-amber-700/80 text-[10px] leading-tight font-medium">Após pagar, sua conta PRO será ativada em menos de 10 segundos.</p>
+                                            <p className="text-blue-900 text-[10px] font-black uppercase">Detecção Ativa</p>
+                                            <p className="text-blue-700/80 text-[10px] leading-tight font-medium">Após pagar, sua conta PRO será ativada instantaneamente.</p>
                                         </div>
                                     </div>
                                 </div>
