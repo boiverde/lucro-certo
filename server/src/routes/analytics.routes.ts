@@ -59,13 +59,24 @@ export async function analyticsRoutes(app: FastifyInstance) {
             recovery_rate: stats.qrcode > 0 ? (recovered / stats.qrcode * 100).toFixed(1) : 0
         }
 
-        // Conversão por Origem
-        const origins = await prisma.analyticsEvent.groupBy({
-            where: { event: 'upgrade_view' },
-            by: ['origin'],
+        // Conversão por Tipo de Plano (Anual vs Mensal)
+        const planTypes = await prisma.analyticsEvent.groupBy({
+            where: { event: 'pix_paid' },
+            by: ['metadata'],
             _count: { id: true }
         })
 
-        return { stats, conversion, origins, recovered }
+        const planStats = {
+            monthly: 0,
+            yearly: 0
+        }
+
+        planTypes.forEach(p => {
+            const planId = (p.metadata as any)?.planId
+            if (planId === 'pro_yearly') planStats.yearly += p._count.id
+            else if (planId === 'pro_monthly') planStats.monthly += p._count.id
+        })
+
+        return { stats, conversion, origins, recovered, planStats }
     })
 }

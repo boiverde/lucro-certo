@@ -109,21 +109,20 @@ export async function paymentsRoutes(app: FastifyInstance) {
     app.withTypeProvider<ZodTypeProvider>().post('/pix', {
         onRequest: [app.authenticate as any],
         schema: {
-            body: z.object({ cpf: z.string().min(11).max(14) })
+            body: z.object({ 
+                cpf: z.string().min(11).max(14),
+                planId: z.enum(['pro_monthly', 'pro_yearly']).default('pro_monthly')
+            })
         }
     }, async (request, reply) => {
         const userId = (request.user as any).sub
-        const { cpf } = request.body as { cpf: string }
+        const { cpf, planId } = request.body
 
         const user = await prisma.user.findUnique({ where: { id: userId } })
         if (!user) return reply.status(401).send({ message: 'Acesso negado' })
 
-        if (user.plan === 'pro') {
-            return reply.status(400).send({ message: 'Você já possui o plano Pro' })
-        }
-
         const referenceId = `pix_pro_${userId}_${Date.now()}`
-        const amountCents = 2999 
+        const amountCents = planId === 'pro_yearly' ? 24900 : 2999 // R$ 249,00 ou R$ 29,99
 
         try {
             const pix = await createPixCharge({
@@ -142,7 +141,8 @@ export async function paymentsRoutes(app: FastifyInstance) {
                     status: 'pending',
                     externalReference: referenceId,
                     externalId: pix.orderId,
-                    provider: 'pagseguro_pix'
+                    provider: 'pagseguro_pix',
+                    planId: planId
                 }
             })
 
@@ -150,14 +150,15 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 orderId: pix.orderId,
                 qrCodeBase64: pix.qrCodeBase64,
                 qrCodeText: pix.qrCodeText,
-                expiresAt: pix.expiresAt
+                expiresAt: pix.expiresAt,
+                planId: planId
             })
         } catch (err: any) {
             return reply.status(500).send({ message: 'Erro ao criar Pix' })
         }
     })
 
-    // 5. Webhook Pix - Idempotente e Atômico
+    // 5. Webhook Pix - Idempotente e Atômico com Suporte Anual
     app.post('/pix/webhook', async (request, reply) => {
         try {
             const body = request.body as any
@@ -178,14 +179,19 @@ export async function paymentsRoutes(app: FastifyInstance) {
                         })
 
                         const expiresAt = new Date()
-                        expiresAt.setDate(expiresAt.getDate() + 30)
+                        const days = transaction.planId === 'pro_yearly' ? 365 : 30
+                        expiresAt.setDate(expiresAt.getDate() + days)
 
                         await tx.user.update({
                             where: { id: transaction.userId },
-                            data: { plan: 'pro', planExpiresAt: expiresAt }
+                            data: { 
+                                plan: 'pro', 
+                                planType: transaction.planId === 'pro_yearly' ? 'yearly' : 'monthly',
+                                planExpiresAt: expiresAt 
+                            }
                         })
                     })
-                    console.log(`[PIX-WEBHOOK] Upgrade Successful | order: ${orderId}`)
+                    console.log(`[PIX-WEBHOOK] Upgrade Successful | plan: ${transaction.planId}`)
                 }
             }
         } catch (err: any) {
@@ -194,7 +200,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
         return reply.status(200).send()
     })
 
-    // 6. Polling Pix - Idempotente e Atômico
+    // 6. Polling Pix - Idempotente e Atômico com Suporte Anual
     app.withTypeProvider<ZodTypeProvider>().get('/pix/status/:orderId', {
         onRequest: [app.authenticate as any]
     }, async (request, reply) => {
@@ -213,9 +219,19 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 if (transaction && transaction.status !== 'approved') {
                     await prisma.$transaction(async (tx) => {
                         await tx.transaction.update({ where: { id: transaction.id }, data: { status: 'approved' } })
+                        
                         const expiresAt = new Date()
-                        expiresAt.setDate(expiresAt.getDate() + 30)
-                        await tx.user.update({ where: { id: userId }, data: { plan: 'pro', planExpiresAt: expiresAt } })
+                        const days = transaction.planId === 'pro_yearly' ? 365 : 30
+                        expiresAt.setDate(expiresAt.getDate() + days)
+
+                        await tx.user.update({ 
+                            where: { id: userId }, 
+                            data: { 
+                                plan: 'pro', 
+                                planType: transaction.planId === 'pro_yearly' ? 'yearly' : 'monthly',
+                                planExpiresAt: expiresAt 
+                            } 
+                        })
                     })
                 }
                 return reply.send({ status: 'PAID' })

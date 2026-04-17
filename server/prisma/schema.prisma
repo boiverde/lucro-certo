@@ -14,6 +14,7 @@ model User {
   name          String
   password_hash String
   plan          String    @default("free")
+  planType      String?   // monthly, yearly
   planExpiresAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -55,6 +56,7 @@ model Transaction {
   externalId        String?  @unique // PagSeguro transaction code
   amount            Decimal
   status            String   @default("pending") // pending, approved, rejected, cancelled
+  planId            String?  // pro_monthly, pro_yearly
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -507,5 +509,5 @@ model AnalyticsEvent {
   timestamp DateTime @default(now())
   metadata  Json?
 
-  @@map(" analytics_events\)
+  @@map("analytics_events")
 }
