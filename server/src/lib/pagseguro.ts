@@ -28,33 +28,34 @@ export async function createCheckoutRequest(data: {
     userEmail: string;
     notificationUrl: string;
 }) {
-    const body = {
-        currency: 'BRL',
-        items: [
-            {
-                id: 'plan_pro_01',
-                description: data.description,
-                amount: data.amount.toFixed(2),
-                quantity: 1
-            }
-        ],
-        reference: data.reference,
-        sender: {
-            name: data.userName.trim().substring(0, 50),
-            email: data.userEmail
-        },
-        shipping: {
-            addressRequired: false
-        },
-        notificationURL: data.notificationUrl,
-        redirectURL: `${process.env.FRONTEND_URL}/Dashboard?payment=success`
-    };
+    const params = new URLSearchParams();
+    params.append('currency', 'BRL');
+    params.append('itemId1', 'plan_pro_01');
+    params.append('itemDescription1', data.description);
+    params.append('itemAmount1', data.amount.toFixed(2));
+    params.append('itemQuantity1', '1');
+    params.append('reference', data.reference);
+    params.append('senderName', data.userName.trim().substring(0, 50));
+    params.append('senderEmail', data.userEmail);
+    params.append('shippingAddressRequired', 'false');
+    
+    if (data.notificationUrl) {
+        params.append('notificationURL', data.notificationUrl);
+    }
+    
+    const redirectURL = `${process.env.FRONTEND_URL}/Dashboard?payment=success`;
+    params.append('redirectURL', redirectURL);
 
     try {
         console.log("=== PAGSEGURO DIAGOSTICO START ===");
-        console.log("PAGSEGURO REQUEST PAYLOAD:", JSON.stringify(body, null, 2));
+        console.log("PAGSEGURO REQUEST PAYLOAD:", params.toString());
         
-        const response = await pagseguroClient.post('/v2/checkout', body);
+        const response = await pagseguroClient.post('/v2/checkout', params.toString(), {
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=ISO-8859-1',
+                'Accept': 'application/json;charset=ISO-8859-1'
+            }
+        });
         
         console.log("PAGSEGURO SUCCESS RESPONSE:", JSON.stringify(response.data, null, 2));
         console.log("=== PAGSEGURO DIAGOSTICO END ===");
