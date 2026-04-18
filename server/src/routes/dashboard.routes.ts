@@ -7,56 +7,71 @@ export async function dashboardRoutes(app: FastifyInstance) {
 
     app.get('/stats', async (request, reply) => {
         const userId = request.user.sub
-        
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { plan: true }
-        })
-
-        // 1. Produtos
-        const totalProdutos = await prisma.produto.count({ where: { userId, ativo: true } })
-        const produtosComControle = await prisma.produto.findMany({
-            where: {
-                userId,
-                ativo: true,
-                controla_estoque: true,
-            },
-            select: { id: true, nome: true, estoque_atual: true, estoque_minimo: true, unidade: true }
-        })
-        
-        const produtosBaixos = produtosComControle.filter(p => p.estoque_atual <= p.estoque_minimo && p.estoque_minimo > 0 && p.estoque_atual > 0)
-        const produtosZerados = produtosComControle.filter(p => p.estoque_atual === 0)
-        
-        // 2. Ingredientes
-        const totalIngredientes = await prisma.ingrediente.count({ where: { userId, ativo: true } })
-        const ingredientesComAlerta = await prisma.ingrediente.findMany({
-            where: {
-                userId,
-                ativo: true,
-                estoque_minimo: { gt: 0 },
-            },
-            select: { id: true, nome: true, estoque_atual: true, estoque_minimo: true }
-        })
-        const ingredientesBaixos = ingredientesComAlerta.filter(i => i.estoque_atual <= i.estoque_minimo)
-
-        // 3. Comissões Vendas Revenda
-        const vendasRevenda = await prisma.vendaRevenda.findMany({
-            where: { userId, status: { not: 'cancelada' } }, 
-            select: {
-                status: true,
-                numero_parcelas: true,
-                comissao_total: true,
-                data_primeira_parcela: true,
-                parcelas: { select: { paga: true } }
-            }
-        })
-        
         const hoje = new Date()
-        const inicioMesObj = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-        const fimMesObj = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
+        const startOfMonth = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
+        const endOfMonth = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
 
+        // Rodando todas as consultas em paralelo para máxima velocidade
+        const [
+            user,
+            totalProdutos,
+            produtosComControle,
+            totalIngredientes,
+            ingredientesComAlerta,
+            vendasRevenda,
+            salesCount,
+            vendasNoMes,
+            comprasNoMes,
+            gastosNoMes
+        ] = await Promise.all([
+            prisma.user.findUnique({ where: { id: userId }, select: { plan: true } }),
+            prisma.produto.count({ where: { userId, ativo: true } }),
+            prisma.produto.findMany({
+                where: { userId, ativo: true, controla_estoque: true },
+                select: { estoque_atual: true, estoque_minimo: true }
+            }),
+            prisma.ingrediente.count({ where: { userId, ativo: true } }),
+            prisma.ingrediente.findMany({
+                where: { userId, ativo: true, estoque_minimo: { gt: 0 } },
+                select: { estoque_atual: true, estoque_minimo: true }
+            }),
+            prisma.vendaRevenda.findMany({
+                where: { userId, status: { not: 'cancelada' } },
+                select: {
+                    status: true,
+                    numero_parcelas: true,
+                    comissao_total: true,
+                    data_primeira_parcela: true,
+                    parcelas: { select: { paga: true } }
+                }
+            }),
+            prisma.venda.count({
+                where: { userId, createdAt: { gte: startOfMonth, lte: endOfMonth } }
+            }),
+            prisma.venda.findMany({
+                where: { userId, data_venda: { gte: startOfMonth, lte: endOfMonth } },
+                select: { itens: { select: { lucro_unitario: true, quantidade: true, margem_liquida: true, taxas_aplicadas: true, custo_total_unitario: true } } }
+            }),
+            prisma.compra.findMany({
+                where: { userId, data_compra: { gte: startOfMonth, lte: endOfMonth } },
+                select: { valor_total: true }
+            }),
+            prisma.gastoOperacional.findMany({
+                where: { userId, data: { gte: startOfMonth, lte: endOfMonth } },
+                select: { valor: true, tipo: true }
+            })
+        ])
+
+        // Processamento de Estoque mais eficiente
+        const produtosBaixos = produtosComControle.filter(p => p.estoque_atual <= p.estoque_minimo && p.estoque_minimo > 0 && p.estoque_atual > 0).length
+        const produtosZerados = produtosComControle.filter(p => p.estoque_atual === 0).length
+        const ingredientesBaixos = ingredientesComAlerta.filter(i => i.estoque_atual <= i.estoque_minimo).length
+
+        // Processamento de Comissões
         let comissoesDoMes = 0
         let comissoesAReceber = 0
+        const inicioMesObj = startOfMonth
+        const fimMesObj = endOfMonth
 
         vendasRevenda.forEach(venda => {
             if (!venda.numero_parcelas) return;
@@ -76,32 +91,10 @@ export async function dashboardRoutes(app: FastifyInstance) {
             }
         })
         
-        // 4. Uso do Plano (Vendas no mês para Barra de Progresso)
-        const startOfMonth = new Date(hoje.getFullYear(), hoje.getMonth(), 1)
-        const endOfMonth = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0, 23, 59, 59, 999)
-        
-        const salesCount = await prisma.venda.count({
-            where: {
-                userId,
-                createdAt: {
-                    gte: startOfMonth,
-                    lte: endOfMonth
-                }
-            }
-        })
-        
         const planLimit = 150
         const usagePercentage = Math.min(100, Math.round((salesCount / planLimit) * 100))
 
-        // 5. Lucratividade
-        const vendasNoMes = await prisma.venda.findMany({
-            where: {
-                userId,
-                data_venda: { gte: startOfMonth, lte: endOfMonth }
-            },
-            include: { itens: true }
-        })
-
+        // Lucratividade (Processando apenas os campos necessários)
         let lucroMes = 0
         let margemSomada = 0
         let itensComMargemCount = 0
@@ -117,7 +110,6 @@ export async function dashboardRoutes(app: FastifyInstance) {
                     itensComMargemCount++
                 }
 
-                // Cálculo simples do potencial de ganho (benchmark 30%)
                 const taxas = Number(item.taxas_aplicadas) || 0
                 const custoTotal = Number(item.custo_total_unitario) || 0
                 if (taxas > 0 && custoTotal > 0) {
@@ -153,6 +145,28 @@ export async function dashboardRoutes(app: FastifyInstance) {
                 lucroMes: Number(lucroMes.toFixed(2)),
                 margemMedia: Number((itensComMargemCount > 0 ? margemSomada / itensComMargemCount : 0).toFixed(1)),
                 lucroPotencial: Number(lucroPotencial.toFixed(2))
+            },
+            // Dados brutos simplificados para evitar queries extras no front
+            transacoes: {
+                totalVendas: vendasNoMes.reduce((sum, v) => sum + v.itens.reduce((s, i) => s + (Number(i.lucro_unitario || 0) + Number(i.custo_total_unitario || 0)) * i.quantidade, 0), 0),
+                totalCompras: comprasNoMes.reduce((sum, c) => sum + Number(c.valor_total || 0), 0),
+                totalGastos: gastosNoMes.reduce((sum, g) => sum + Number(g.valor || 0), 0),
+                contagens: {
+                    vendas: vendasNoMes.length,
+                    compras: comprasNoMes.length,
+                    gastos: gastosNoMes.length
+                },
+                detalhesGastos: {
+                    alimentacao: gastosNoMes.filter(g => g.tipo === 'alimentacao').reduce((sum, g) => sum + Number(g.valor || 0), 0),
+                    gasolina: gastosNoMes.filter(g => g.tipo === 'gasolina').reduce((sum, g) => sum + Number(g.valor || 0), 0),
+                    diarias: gastosNoMes.filter(g => g.tipo === 'diaria_funcionario').reduce((sum, g) => sum + Number(g.valor || 0), 0)
+                },
+                // Listas recentes para os componentes do dashboard
+                recentes: {
+                    vendas: vendasNoMes.slice(0, 10),
+                    compras: comprasNoMes.slice(0, 10),
+                    gastos: gastosNoMes.slice(0, 10)
+                }
             }
         }
     })

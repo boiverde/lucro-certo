@@ -57,85 +57,38 @@ export default function Dashboard() {
     loadUser();
   }, []);
 
-  const { data: compras = [] } = useQuery({
-    queryKey: ['compras', user?.email],
-    queryFn: async () => {
-      // Optimizado: busca apenas do mês atual no banco
-      return await base44.entities.Compra.filter({ 
-        created_by: user.email,
-        data_inicio: inicioMesStr,
-        data_fim: fimMesStr
-      }, '-data_compra');
-    },
-    enabled: !!user?.email && !loading,
-  });
-
-  const { data: vendas = [] } = useQuery({
-    queryKey: ['vendas', user?.email],
-    queryFn: async () => {
-      return await base44.entities.Venda.filter({ 
-        created_by: user.email,
-        data_inicio: inicioMesStr,
-        data_fim: fimMesStr
-      }, '-data_venda');
-    },
-    enabled: !!user?.email && !loading,
-  });
-
-  const { data: gastos = [] } = useQuery({
-    queryKey: ['gastos', user?.email],
-    queryFn: async () => {
-      return await base44.entities.GastoOperacional.filter({ 
-        created_by: user.email,
-        data_inicio: inicioMesStr,
-        data_fim: fimMesStr
-      }, '-data');
-    },
-    enabled: !!user?.email && !loading,
-  });
-
-  const { data: dashboardStats } = useQuery({
+  const { data: dashboardStats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', user?.email],
     queryFn: async () => {
       return await httpClient('/dashboard/stats');
     },
     enabled: !!user?.email && !loading,
+    staleTime: 1000 * 60 * 5, // Mantém os dados zerados por 5 minutos enquanto navega
+    cacheTime: 1000 * 60 * 30, // Mantém no cache por 30 minutos
   });
 
   const { data: vendasRevenda = [] } = useQuery({
     queryKey: ['vendas-revenda-dashboard', user?.email],
     queryFn: async () => {
-      // Limite para Últimas Transações e ResumoLucro
       return await base44.entities.VendaRevenda.filter({ created_by: user.email, limit: 10 }, '-data_primeira_parcela');
     },
     enabled: !!user?.email && !loading,
+    staleTime: 1000 * 60 * 5,
   });
 
-  // Como já filtramos no backend, e a querystring filtra por data_venda (compras, vendas, gastos),
-  // as arrays principais são virtualmente apenas do mês atual. 
-  // Removendo o filtro cliente-side pra evitar varredura em N elementos.
-  const comprasMes = compras;
-  const vendasMes = vendas;
-  const gastosMes = gastos;
-
-  // Usa o stats delegado ao banco para O(1) fetch ao em vez de map client-side
-  const comissoesDoMes = dashboardStats?.comissoes?.comissoesDoMes || 0;
-  const comissoesAReceber = dashboardStats?.comissoes?.comissoesAReceber || 0;
-
-  const totalComprasMes = comprasMes.reduce((sum, c) => sum + c.valor_total, 0);
-  const totalVendasMes = vendasMes.reduce((sum, v) => sum + v.valor_total, 0);
-  const totalGastosMes = gastosMes.reduce((sum, g) => sum + g.valor, 0);
+  // Dados unificados do backend otimizado
+  const transacoes = dashboardStats?.transacoes || {};
+  const totalVendasMes = transacoes.totalVendas || 0;
+  const totalComprasMes = transacoes.totalCompras || 0;
+  const totalGastosMes = transacoes.totalGastos || 0;
   
-  // CORRIGIDO: Lucro líquido = Vendas + Comissões - Compras - Gastos
-  const lucroBrutoMes = totalVendasMes + comissoesDoMes - totalComprasMes - totalGastosMes;
+  const lucroBrutoMes = totalVendasMes + (dashboardStats?.comissoes?.comissoesDoMes || 0) - totalComprasMes - totalGastosMes;
 
-  const gastosAlimentacao = gastosMes.filter(g => g.tipo === 'alimentacao').reduce((sum, g) => sum + g.valor, 0);
-  const gastosGasolina = gastosMes.filter(g => g.tipo === 'gasolina').reduce((sum, g) => sum + g.valor, 0);
-  const gastosDiarias = gastosMes.filter(g => g.tipo === 'diaria_funcionario').reduce((sum, g) => sum + g.valor, 0);
+  const { alimentacao, gasolina, diarias } = transacoes.detalhesGastos || { alimentacao: 0, gasolina: 0, diarias: 0 };
 
-  const hasData = compras.length > 0 || vendas.length > 0 || gastos.length > 0 || vendasRevenda.length > 0;
+  const hasData = (transacoes.contagens?.vendas > 0) || (transacoes.contagens?.compras > 0) || (transacoes.contagens?.gastos > 0);
 
-  if (loading || !user) {
+  if (loading || statsLoading || !user) {
     return (
       <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
         <div className="max-w-7xl mx-auto">
@@ -197,7 +150,7 @@ export default function Dashboard() {
             <CardContent className="px-4 pb-4">
               <div className="text-xl md:text-2xl font-bold">R$ {totalVendasMes.toFixed(2)}</div>
               <p className="text-xs opacity-90 mt-1">
-                {vendasMes.length} vendas
+                {transacoes.contagens?.vendas || 0} vendas
               </p>
             </CardContent>
           </Card>
@@ -212,7 +165,7 @@ export default function Dashboard() {
             <CardContent className="px-4 pb-4">
               <div className="text-xl md:text-2xl font-bold">R$ {totalComprasMes.toFixed(2)}</div>
               <p className="text-xs opacity-90 mt-1">
-                {comprasMes.length} compras
+                {transacoes.contagens?.compras || 0} compras
               </p>
             </CardContent>
           </Card>
@@ -227,7 +180,7 @@ export default function Dashboard() {
             <CardContent className="px-4 pb-4">
               <div className="text-xl md:text-2xl font-bold">R$ {totalGastosMes.toFixed(2)}</div>
               <p className="text-xs opacity-90 mt-1">
-                {gastosMes.length} gastos
+                {transacoes.contagens?.gastos || 0} gastos
               </p>
             </CardContent>
           </Card>
@@ -260,7 +213,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <div className="text-2xl md:text-3xl font-bold">R$ {comissoesDoMes.toFixed(2)}</div>
+              <div className="text-2xl md:text-3xl font-bold">R$ {(dashboardStats?.comissoes?.comissoesDoMes || 0).toFixed(2)}</div>
               <p className="text-xs opacity-90 mt-1">Parcelas pagas este mês</p>
             </CardContent>
           </Card>
@@ -273,7 +226,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <div className="text-2xl md:text-3xl font-bold">R$ {comissoesAReceber.toFixed(2)}</div>
+              <div className="text-2xl md:text-3xl font-bold">R$ {(dashboardStats?.comissoes?.comissoesAReceber || 0).toFixed(2)}</div>
               <p className="text-xs opacity-90 mt-1">Total de parcelas pendentes</p>
             </CardContent>
           </Card>
@@ -290,7 +243,7 @@ export default function Dashboard() {
               <Utensils className="h-4 w-4 text-gray-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-orange-600">R$ {gastosAlimentacao.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-orange-600">R$ {alimentacao.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -300,7 +253,7 @@ export default function Dashboard() {
               <Fuel className="h-4 w-4 text-gray-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">R$ {gastosGasolina.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-blue-600">R$ {gasolina.toFixed(2)}</div>
             </CardContent>
           </Card>
 
@@ -310,7 +263,7 @@ export default function Dashboard() {
               <Users className="h-4 w-4 text-gray-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">R$ {gastosDiarias.toFixed(2)}</div>
+              <div className="text-2xl font-bold text-green-600">R$ {diarias.toFixed(2)}</div>
             </CardContent>
           </Card>
         </div>
@@ -318,17 +271,17 @@ export default function Dashboard() {
         <div className="grid lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <ResumoLucro 
-              compras={compras}
-              vendas={vendas}
-              gastos={gastos}
+              compras={transacoes.recentes?.compras || []}
+              vendas={transacoes.recentes?.vendas || []}
+              gastos={transacoes.recentes?.gastos || []}
               vendasRevenda={vendasRevenda}
             />
           </div>
           <div>
             <UltimasTransacoes 
-              compras={compras}
-              vendas={vendas}
-              gastos={gastos}
+              compras={transacoes.recentes?.compras || []}
+              vendas={transacoes.recentes?.vendas || []}
+              gastos={transacoes.recentes?.gastos || []}
               vendasRevenda={vendasRevenda}
             />
           </div>
