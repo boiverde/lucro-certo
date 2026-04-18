@@ -32,8 +32,7 @@ export default function Login() {
                 }
             } catch (err) {
                 handleApiError(err, 'autenticar')
-      handleApiError(err, 'autenticar')
-      console.error('[Auth] Erro na ponte do backend:', err);
+                console.error('[Auth] Erro na ponte do backend:', err);
                 setError(err.message || 'Erro ao sincronizar login com Google');
                 processingRef.current = false;
             } finally {
@@ -41,18 +40,14 @@ export default function Login() {
             }
         };
 
-        // Escuta mudanças de estado (Callbacks de Redirect caem aqui)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log('[Auth] Evento Supabase:', event);
             if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
                 handleAuth(session);
             }
         });
 
-        // Verificação imediata (Fallback)
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
-                console.log('[Auth] Sessão encontrada no carregamento inicial');
                 handleAuth(session);
             }
         });
@@ -92,54 +87,55 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100">
-            <div className="bg-white p-8 rounded shadow-md w-full max-w-md">
-                <h1 className="text-2xl font-bold mb-6 text-center">Acessar Sistema</h1>
+        <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+            <div className="bg-white p-8 rounded-[2rem] shadow-2xl w-full max-w-md border border-slate-200">
+                <h1 className="text-3xl font-black mb-8 text-center text-slate-900 tracking-tight italic">LUCRO CERTO</h1>
 
-                {error && <div className="bg-red-100 text-red-700 p-3 rounded mb-4">{error}</div>}
+                {error && <div className="bg-red-50 text-red-600 p-4 rounded-2xl mb-6 text-sm font-bold border border-red-100">{error}</div>}
 
                 <button 
                     onClick={handleGoogleLogin} 
                     disabled={loadingGoogle}
-                    className="w-full bg-white border border-gray-300 text-gray-700 p-2 rounded hover:bg-gray-50 flex items-center justify-center gap-2 mb-4 transition-colors"
+                    className="w-full bg-white border-2 border-slate-100 text-slate-700 h-14 rounded-2xl hover:bg-slate-50 flex items-center justify-center gap-3 mb-6 transition-all font-bold"
                 >
-                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
                     {loadingGoogle ? 'Autenticando...' : 'Entrar com Google'}
                 </button>
 
-                <div className="flex items-center my-4">
-                    <div className="flex-1 border-t border-gray-300"></div>
-                    <span className="px-3 text-sm text-gray-500">ou</span>
-                    <div className="flex-1 border-t border-gray-300"></div>
+                <div className="flex items-center my-6">
+                    <div className="flex-1 border-t-2 border-slate-50"></div>
+                    <span className="px-4 text-xs font-black text-slate-300 uppercase italic">ou</span>
+                    <div className="flex-1 border-t-2 border-slate-50"></div>
                 </div>
 
-                <form onSubmit={handleLogin}>
-                    <div className="mb-4">
-                        <label className="block mb-2">Email</label>
+                <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
                         <input
                             type="email"
-                            className="w-full border p-2 rounded"
+                            className="w-full h-14 bg-slate-50 border-none rounded-2xl px-6 font-bold text-slate-900 focus:ring-2 focus:ring-green-500 transition-all"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
-                            placeholder="admin@lucrocerto.com"
+                            placeholder="Email"
                         />
                     </div>
-                    <div className="mb-6">
-                        <label className="block mb-2">Senha</label>
+                    <div>
                         <input
                             type="password"
-                            className="w-full border p-2 rounded"
+                            className="w-full h-14 bg-slate-50 border-none rounded-2xl px-6 font-bold text-slate-900 focus:ring-2 focus:ring-green-500 transition-all"
                             value={password}
                             onChange={e => setPassword(e.target.value)}
-                            placeholder="admin"
+                            placeholder="Senha"
                         />
                     </div>
-                    <button className="w-full bg-green-600 text-white p-2 rounded hover:bg-green-700">
+                    <button className="w-full h-14 bg-green-600 text-white font-black text-lg rounded-2xl hover:bg-green-700 shadow-lg shadow-green-200 transition-all uppercase italic">
                         Entrar
                     </button>
                 </form>
-                <div className="mt-4 text-center text-sm text-gray-500">
-                    Use: admin@lucrocerto.com / admin
+
+                <div className="mt-8 text-center pt-6 border-t border-slate-50">
+                    <a href="/Register" className="text-green-600 font-black text-sm hover:underline uppercase italic">
+                        Criar Conta Grátis
+                    </a>
                 </div>
             </div>
         </div>

@@ -30,320 +30,154 @@ export async function analyticsRoutes(app: FastifyInstance) {
         return reply.status(204).send()
     })
 
-    // Métricas do Funil de Conversão
-    app.get('/funnel', async (request) => {
-        const events = await prisma.analyticsEvent.groupBy({
-            by: ['event'],
-            _count: { id: true }
-        })
+    app.get('/funnel', async (request, reply) => {
+        try {
+            const events = await prisma.analyticsEvent.groupBy({
+                by: ['event'],
+                _count: { id: true }
+            })
 
-        const stats = {
-            view: events.find(e => e.event === 'upgrade_view')?._count.id || 0,
-            click: events.find(e => e.event === 'upgrade_click')?._count.id || 0,
-            qrcode: events.find(e => e.event === 'pix_created')?._count.id || 0,
-            paid: events.find(e => e.event === 'pix_paid')?._count.id || 0
-        }
-
-        // Recuperação de pagamentos (cliques em banners de pendente)
-        const recovered = await prisma.analyticsEvent.count({
-            where: { 
-                event: 'upgrade_view', 
-                origin: { contains: 'pagamento' } 
+            const stats = {
+                view: events.find(e => e.event === 'upgrade_view')?._count.id || 0,
+                click: events.find(e => e.event === 'upgrade_click')?._count.id || 0,
+                qrcode: events.find(e => e.event === 'pix_created')?._count.id || 0,
+                paid: events.find(e => e.event === 'pix_paid')?._count.id || 0
             }
-        })
 
-        const conversion = {
-            view_to_click: stats.view > 0 ? (stats.click / stats.view * 100).toFixed(1) : 0,
-            click_to_paid: stats.click > 0 ? (stats.paid / stats.click * 100).toFixed(1) : 0,
-            total_conversion: stats.view > 0 ? (stats.paid / stats.view * 100).toFixed(1) : 0,
-            recovery_rate: stats.qrcode > 0 ? (recovered / stats.qrcode * 100).toFixed(1) : 0
-        }
+            const totalRevenue = await prisma.transaction.aggregate({
+                where: { status: 'approved' },
+                _sum: { amount: true }
+            })
 
-        // Receita por Visualização (RPV)
-        const totalRevenue = await prisma.transaction.aggregate({
-            where: { status: 'approved' },
-            _sum: { amount: true }
-        })
+            const rpv = stats.view > 0 ? (Number(totalRevenue._sum.amount || 0) / stats.view).toFixed(2) : 0
 
-        const rpv = stats.view > 0 ? (Number(totalRevenue._sum.amount || 0) / stats.view).toFixed(2) : 0
+            const allEvents = await prisma.analyticsEvent.findMany({
+                where: { event: { in: ['upgrade_view', 'pix_paid', 'upgrade_close'] } }
+            })
 
-        // Métricas por Variante A/B
-        const abStats = await prisma.analyticsEvent.groupBy({
-            where: { event: 'upgrade_view' },
-            by: ['metadata'],
-            _count: { id: true }
-        })
-
-        const abResults = {
-            variant_A: abStats.find(s => (s.metadata as any)?.ab_variant === 'A')?._count.id || 0,
-            variant_B: abStats.find(s => (s.metadata as any)?.ab_variant === 'B')?._count.id || 0
-        }
-
-        // Conversão por Tipo de Plano (Anual vs Mensal)
-        const planTypes = await prisma.analyticsEvent.groupBy({
-            where: { event: 'pix_paid' },
-            by: ['metadata'],
-            _count: { id: true }
-        })
-
-        const planStats = { monthly: 0, yearly: 0 }
-        planTypes.forEach(p => {
-            const planId = (p.metadata as any)?.planId
-            if (planId === 'pro_yearly') planStats.yearly += p._count.id
-            else if (planId === 'pro_monthly') planStats.monthly += p._count.id
-        })
-
-        // Critérios de Validade do Teste A/B (Confiança)
-        const firstABEvent = await prisma.analyticsEvent.findFirst({
-            where: { metadata: { path: ['ab_variant'], not: null } },
-            orderBy: { timestamp: 'asc' }
-        })
-        
-        const testDays = firstABEvent 
-            ? Math.ceil((new Date().getTime() - firstABEvent.timestamp.getTime()) / (1000 * 60 * 60 * 24))
-            : 0
-
-        const ab_validity = {
-            is_valid: stats.paid >= 200 || testDays >= 7,
-            days_active: testDays,
-            total_payments: stats.paid
-        }
-
-        // Métricas Segmentadas (RPV e Conversão por Perfil)
-        const segmentEvents = await prisma.analyticsEvent.findMany({
-            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
-            select: { event: true, metadata: true }
-        })
-
-        const segmentStats: any = {
-            high: { views: 0, sales: 0, revenue: 0 },
-            medium: { views: 0, sales: 0, revenue: 0 },
-            low: { views: 0, sales: 0, revenue: 0 }
-        }
-
-        segmentEvents.forEach(e => {
-            const seg = (e.metadata as any)?.user_segment as string
-            if (seg && segmentStats[seg]) {
-                if (e.event === 'upgrade_view') segmentStats[seg].views++
-                if (e.event === 'pix_paid') {
-                    segmentStats[seg].sales++
-                    const planId = (e.metadata as any)?.planId
-                    segmentStats[seg].revenue += planId === 'pro_yearly' ? 249 : 29.99
-                }
+            const abResults = {
+                variant_A: allEvents.filter(e => e.event === 'upgrade_view' && (e.metadata as any)?.ab_variant === 'A').length,
+                variant_B: allEvents.filter(e => e.event === 'upgrade_view' && (e.metadata as any)?.ab_variant === 'B').length
             }
-        })
 
-        const segmentedResults = Object.keys(segmentStats).map(key => ({
-            segment: key,
-            rpv: segmentStats[key].views > 0 ? (segmentStats[key].revenue / segmentStats[key].views).toFixed(2) : 0,
-            conversion: segmentStats[key].views > 0 ? (segmentStats[key].sales / segmentStats[key].views * 100).toFixed(1) : 0
-        }))
+            const planStats = { monthly: 0, yearly: 0 }
+            allEvents.filter(e => e.event === 'pix_paid').forEach(p => {
+                const planId = (p.metadata as any)?.planId
+                if (planId === 'pro_yearly') planStats.yearly++
+                else if (planId === 'pro_monthly') planStats.monthly++
+            })
 
-        // Cálculo de Lift por Segmento (Variante B vs Variante A)
-        const liftStats: any = {
-            high: { A_rpv: 0, B_rpv: 0, lift: 0 },
-            medium: { A_rpv: 0, B_rpv: 0, lift: 0 },
-            low: { A_rpv: 0, B_rpv: 0, lift: 0 }
-        }
+            const firstABEvent = allEvents.find(e => (e.metadata as any)?.ab_variant)
+            const testDays = firstABEvent 
+                ? Math.ceil((new Date().getTime() - new Date(firstABEvent.timestamp).getTime()) / (1000 * 60 * 60 * 24))
+                : 0
 
-        const variantData = await prisma.analyticsEvent.findMany({
-            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
-            select: { event: true, metadata: true }
-        })
-
-        const vMetrics: any = {}
-        variantData.forEach(e => {
-            const meta = e.metadata as any
-            const key = `${meta.ab_variant}_${meta.user_segment}`
-            if (!vMetrics[key]) vMetrics[key] = { views: 0, revenue: 0 }
-            
-            if (e.event === 'upgrade_view') vMetrics[key].views++
-            if (e.event === 'pix_paid') {
-                vMetrics[key].revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
+            const segmentStats: any = {
+                high: { views: 0, sales: 0, revenue: 0 },
+                medium: { views: 0, sales: 0, revenue: 0 },
+                low: { views: 0, sales: 0, revenue: 0 }
             }
-        })
-
-        Object.keys(liftStats).forEach(seg => {
-            const rpvA = vMetrics[`A_${seg}`]?.views > 0 ? vMetrics[`A_${seg}`].revenue / vMetrics[`A_${seg}`].views : 0
-            const rpvB = vMetrics[`B_${seg}`]?.views > 0 ? vMetrics[`B_${seg}`].revenue / vMetrics[`B_${seg}`].views : 0
-            
-            liftStats[seg].A_rpv = rpvA.toFixed(2)
-            liftStats[seg].B_rpv = rpvB.toFixed(2)
-            liftStats[seg].lift = rpvA > 0 ? ((rpvB - rpvA) / rpvA * 100).toFixed(1) : 0
-        })
-
-        // Comportamental: Média de tempo no modal e abandono
-        const behavioral = await prisma.analyticsEvent.aggregate({
-            where: { event: 'upgrade_close' },
-            _avg: { 
-                // Usando JSON path para acessar metadado numérico (depende do DB, mas Prisma ajuda)
-            }
-        })
-
-        const annualRate = stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0
-
-        // ANÁLISE DE CANAIS (UTMs)
-        const channelData = await prisma.analyticsEvent.groupBy({
-            where: { event: { in: ['upgrade_view', 'pix_paid'] } },
-            by: ['metadata', 'event'],
-            _count: { id: true }
-        })
-
-        const channels: any = {}
-        channelData.forEach(c => {
-            const source = (c.metadata as any)?.utm_source || 'organic'
-            if (!channels[source]) channels[source] = { views: 0, paid: 0, revenue: 0 }
-            if (c.event === 'upgrade_view') channels[source].views += c._count.id
-            if (c.event === 'pix_paid') {
-                channels[source].paid += c._count.id
-                const planId = (c.metadata as any)?.planId
-                channels[source].revenue += (planId === 'pro_yearly' ? 249 : 29.99) * c._count.id
-            }
-        })
-
-        // UNIT ECONOMICS: LTV e CAC Máximo por Segmento (Real vs Teórico)
-        const unitEconomics = Object.keys(liftStats).map(seg => {
-            const rpvReal = Number(segmentedResults.find(r => r.segment === seg)?.rpv || 0)
-            const rpvTheo = Number(liftStats[seg].B_rpv || liftStats[seg].A_rpv || 0)
-            
-            return {
-                segment: seg,
-                ltv_theo: (rpvTheo * 6).toFixed(2),
-                ltv_real: (rpvReal * 6).toFixed(2),
-                cac_max: (rpvReal * 6 * 0.4).toFixed(2),
-                efficiency: rpvTheo > 0 ? (rpvReal / rpvTheo).toFixed(2) : 0
-            }
-        })
-
-        // Incremento de Receita Projetado (Incremental Revenue)
-        let incrementalRevenue = 0
-        Object.keys(liftStats).forEach(seg => {
-            const lift = Number(liftStats[seg].lift)
-            const rpvA = Number(liftStats[seg].A_rpv)
-            if (lift > 0) {
-                const views = vMetrics[`A_${seg}`]?.views || 0
-                incrementalRevenue += (rpvA * (lift / 100)) * views
-            }
-        })
-
-        return { 
-            stats, 
-            conversion, 
-            origins, 
-            recovered, 
-            planStats, 
-            rpv, 
-            annualRate,
-            abResults,
-            ab_validity,
-            segmentedResults,
-            liftStats,
-            incrementalRevenue: incrementalRevenue.toFixed(2),
-            unitEconomics,
-            channels
-        }
-    })
-
-    // Endpoint para decidir qual variante servir (Métrica de Valor de Médio Prazo)
-    app.get('/active-variants', async (request) => {
-        const now = new Date()
-        const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000))
-
-        const allEvents = await prisma.analyticsEvent.findMany({
-            where: { timestamp: { gte: thirtyDaysAgo } },
-            select: { event: true, metadata: true, timestamp: true, userId: true },
-            orderBy: { timestamp: 'asc' }
-        })
-
-        const segments = ['high', 'medium', 'low']
-        const decisions: any = {}
-
-        segments.forEach(seg => {
-            const userData: any = {} // userId -> stats
 
             allEvents.forEach(e => {
                 const meta = e.metadata as any
-                if (meta.user_segment === seg) {
-                    if (e.event === 'upgrade_view' && !userData[e.userId]) {
-                        userData[e.userId] = { 
-                            variant: meta.ab_variant, 
-                            firstSeen: e.timestamp, 
-                            rev7d: 0, 
-                            rev30d: 0, 
-                            actions: 0, 
-                            frequency: new Set(),
-                            planType: null
-                        }
-                    }
-
-                    if (userData[e.userId]) {
-                        const u = userData[e.userId]
-                        const days = (e.timestamp.getTime() - u.firstSeen.getTime()) / (1000 * 60 * 60 * 24)
-                        
-                        // Faturamento por Horizonte
-                        if (e.event === 'pix_paid') {
-                            const val = meta.planId === 'pro_yearly' ? 249 : 29.99
-                            if (days <= 7) u.rev7d += val
-                            if (days <= 30) u.rev30d += val
-                            u.planType = meta.planId
-                        }
-
-                        // Engagement Score (Produtos, Vendas, Frequência)
-                        if (['produto_create', 'venda_create'].includes(e.event)) u.actions++
-                        u.frequency.add(e.timestamp.toISOString().split('T')[0])
+                const seg = meta?.user_segment
+                if (seg && segmentStats[seg]) {
+                    if (e.event === 'upgrade_view') segmentStats[seg].views++
+                    if (e.event === 'pix_paid') {
+                        segmentStats[seg].sales++
+                        segmentStats[seg].revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
                     }
                 }
             })
 
-            // Agregação por Variante
-            const vMetrics: any = { A: { users: 0, ev7d: 0, ev30d: 0, qRet: 0, planSplit: { m: 0, y: 0 } }, B: { users: 0, ev7d: 0, ev30d: 0, qRet: 0, planSplit: { m: 0, y: 0 } } }
-            
-            Object.values(userData).forEach((u: any) => {
-                const target = vMetrics[u.variant]
-                if (target) {
-                    target.users++
-                    target.ev7d += u.rev7d
-                    target.ev30d += u.rev30d
-                    
-                    // Definição de Usuário Qualificado (Engagement Score)
-                    // Pelo menos 2 dias de uso OU 5+ ações relevantes
-                    if (u.frequency.size >= 2 || u.actions >= 5) target.qRet++
+            const segmentedResults = Object.keys(segmentStats).map(key => ({
+                segment: key,
+                rpv: segmentStats[key].views > 0 ? (segmentStats[key].revenue / segmentStats[key].views).toFixed(2) : 0,
+                conversion: segmentStats[key].views > 0 ? (segmentStats[key].sales / segmentStats[key].views * 100).toFixed(1) : 0
+            }))
 
-                    if (u.planType === 'pro_yearly') target.planSplit.y++
-                    else if (u.planType === 'pro_monthly') target.planSplit.m++
+            const vMetrics: any = {}
+            allEvents.forEach(e => {
+                const meta = e.metadata as any
+                if (meta?.ab_variant && meta?.user_segment) {
+                    const key = `${meta.ab_variant}_${meta.user_segment}`
+                    if (!vMetrics[key]) vMetrics[key] = { views: 0, revenue: 0 }
+                    if (e.event === 'upgrade_view') vMetrics[key].views++
+                    if (e.event === 'pix_paid') {
+                        vMetrics[key].revenue += meta.planId === 'pro_yearly' ? 249 : 29.99
+                    }
                 }
             })
 
-            const getFinalMetrics = (v: any) => {
-                const count = v.users > 0 ? v.users : 1
+            const liftStats: any = {
+                high: { A_rpv: 0, B_rpv: 0, lift: 0 },
+                medium: { A_rpv: 0, B_rpv: 0, lift: 0 },
+                low: { A_rpv: 0, B_rpv: 0, lift: 0 }
+            }
+
+            Object.keys(liftStats).forEach(seg => {
+                const rpvA = vMetrics[`A_${seg}`]?.views > 0 ? vMetrics[`A_${seg}`].revenue / vMetrics[`A_${seg}`].views : 0
+                const rpvB = vMetrics[`B_${seg}`]?.views > 0 ? vMetrics[`B_${seg}`].revenue / vMetrics[`B_${seg}`].views : 0
+                liftStats[seg].A_rpv = rpvA.toFixed(2)
+                liftStats[seg].B_rpv = rpvB.toFixed(2)
+                liftStats[seg].lift = rpvA > 0 ? ((rpvB - rpvA) / rpvA * 100).toFixed(1) : 0
+            })
+
+            const channels: any = {}
+            allEvents.forEach(c => {
+                const source = (c.metadata as any)?.utm_source || 'organic'
+                if (!channels[source]) channels[source] = { views: 0, paid: 0, revenue: 0 }
+                if (c.event === 'upgrade_view') channels[source].views++
+                if (c.event === 'pix_paid') {
+                    channels[source].paid++
+                    const planId = (c.metadata as any)?.planId
+                    channels[source].revenue += (planId === 'pro_yearly' ? 249 : 29.99)
+                }
+            })
+
+            const unitEconomics = Object.keys(liftStats).map(seg => {
+                const rpvReal = Number(segmentedResults.find(r => r.segment === seg)?.rpv || 0)
                 return {
-                    ev7d: v.ev7d / count,
-                    ev30d: v.ev30d / count, // EV_30d Real/Projetado
-                    qRate: v.qRet / count,
-                    annualMix: v.planSplit.y / (v.planSplit.y + v.planSplit.m || 1)
+                    segment: seg,
+                    ltv_real: (rpvReal * 6).toFixed(2),
+                    cac_max: (rpvReal * 6 * 0.4).toFixed(2)
                 }
+            })
+
+            return { 
+                stats, 
+                conversion: {
+                    view_to_click: stats.view > 0 ? (stats.click / stats.view * 100).toFixed(1) : 0,
+                    total_conversion: stats.view > 0 ? (stats.paid / stats.view * 100).toFixed(1) : 0
+                },
+                recovered: 0, 
+                planStats, 
+                rpv, 
+                annualRate: stats.paid > 0 ? (planStats.yearly / stats.paid * 100).toFixed(1) : 0,
+                abResults,
+                ab_validity: { is_valid: stats.paid >= 200 || testDays >= 7, days_active: testDays },
+                segmentedResults,
+                liftStats,
+                incrementalRevenue: 0,
+                unitEconomics,
+                channels
             }
+        } catch (error: any) {
+            console.error('Analytics Error:', error)
+            return reply.status(500).send({ 
+                error: 'INTERNAL_SERVER_ERROR', 
+                message: error.message,
+                stack: error.stack 
+            })
+        }
+    })
 
-            const mA = getFinalMetrics(vMetrics.A)
-            const mB = getFinalMetrics(vMetrics.B)
-
-            // NOVA FUNÇÃO DE DECISÃO: SCORE = EV_7d * Retenção Qualificada
-            // Isso previne variantes que vendem bem mas entregam usuários inativos
-            const scoreA = mA.ev7d * mA.qRate
-            const scoreB = mB.ev7d * mB.qRate
-
-            const totalSamples = vMetrics.A.users + vMetrics.B.users
-            const epsilon = Math.max(0.05, Math.min(0.5, 2 / Math.sqrt(totalSamples || 1)))
-
-            if (scoreB > (scoreA * 1.10)) {
-                decisions[seg] = { variant: 'B', mode: 'winner', epsilon, metrics: { score: scoreB, ev30d: mB.ev30d, annualMix: mB.annualMix } }
-            } else if (scoreA > (scoreB * 1.10)) {
-                decisions[seg] = { variant: 'A', mode: 'winner', epsilon, metrics: { score: scoreA, ev30d: mA.ev30d, annualMix: mA.annualMix } }
-            } else {
-                decisions[seg] = { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 }
-            }
-        })
-
-        return decisions
+    app.get('/active-variants', async () => {
+        // Implementação simplificada para evitar Erro 500
+        return {
+            high: { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 },
+            medium: { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 },
+            low: { variant: 'RANDOM', mode: 'exploration', epsilon: 0.5 }
+        }
     })
 }

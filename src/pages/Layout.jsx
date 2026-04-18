@@ -74,7 +74,7 @@ export default function Layout({ children, currentPageName }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { plan } = usePlan();
 
-  const paginasPublicas = ["Home", "PoliticaDePrivacidade", "MarketingAssets", "GuiaPlayStore", "GuiaGooglePlay", "Login"];
+  const paginasPublicas = ["Home", "PoliticaDePrivacidade", "MarketingAssets", "GuiaPlayStore", "GuiaGooglePlay", "Login", "Register"];
   const isPaginaPublica = paginasPublicas.includes(currentPageName);
 
   useEffect(() => {
@@ -155,14 +155,26 @@ export default function Layout({ children, currentPageName }) {
           <div className="min-h-screen flex w-full bg-gray-50">
             <Sidebar className="border-r border-gray-200">
               <SidebarHeader className="border-b border-gray-200 p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
-                    <DollarSign className="w-6 h-6 text-white" />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-green-600 rounded-lg flex items-center justify-center">
+                      <DollarSign className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="font-bold text-gray-900 leading-tight">Lucro Certo</h2>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-60">Control Panel</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="font-bold text-gray-900">Lucro Certo</h2>
-                    <p className="text-xs text-gray-500">Gestão do seu negócio</p>
-                  </div>
+                  {/* Link administrativo condicional */}
+                  {user?.email === 'admin@lucrocerto.com' && (
+                    <Link 
+                      to="/Growth" 
+                      className="p-2 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all rounded-xl shadow-sm border border-indigo-100 group"
+                      title="Growth Dashboard"
+                    >
+                      <Zap className="w-5 h-5 group-hover:animate-pulse" />
+                    </Link>
+                  )}
                 </div>
               </SidebarHeader>
 

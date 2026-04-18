@@ -16,6 +16,13 @@ model User {
   plan          String    @default("free")
   planType      String?   // monthly, yearly
   planExpiresAt DateTime?
+  
+  // Unit Economics
+  taxa_impostos          Decimal @default(0) @db.Decimal(10, 2)
+  taxa_cartao            Decimal @default(0) @db.Decimal(10, 2)
+  custo_fixo_por_unidade Decimal @default(0) @db.Decimal(10, 2)
+  margem_lucro_padrao    Decimal @default(30) @db.Decimal(10, 2)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

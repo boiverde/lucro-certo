@@ -45,10 +45,13 @@ export async function authRoutes(app: FastifyInstance) {
                 name: z.string(),
                 email: z.string().email(),
                 password: z.string().min(6),
+                utm_source: z.string().optional(),
+                utm_medium: z.string().optional(),
+                utm_campaign: z.string().optional(),
             }),
         },
     }, async (request, reply) => {
-        const { name, email, password } = request.body
+        const { name, email, password, utm_source, utm_medium, utm_campaign } = request.body
 
         const userExists = await prisma.user.findUnique({
             where: { email },
@@ -65,8 +68,20 @@ export async function authRoutes(app: FastifyInstance) {
                 name,
                 email,
                 password_hash,
+                // Aqui você pode adicionar campos ao User no futuro se quiser salvar UTMs
+                // Por enquanto o backend de analytics já lida com os eventos.
             },
         })
+
+        // Registrar evento de registro com UTM
+        await prisma.analyticsEvent.create({
+            data: {
+                userId: user.id,
+                event: 'user_registered',
+                origin: utm_source || 'organic',
+                metadata: { utm_medium, utm_campaign }
+            }
+        });
 
         return reply.status(201).send({ id: user.id, email: user.email })
     })
@@ -125,9 +140,9 @@ export async function authRoutes(app: FastifyInstance) {
 
     // Me
     app.withTypeProvider<ZodTypeProvider>().get('/me', {
-        onRequest: [app.authenticate]
+        onRequest: [(app as any).authenticate]
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         let user = await prisma.user.findUnique({
             where: { id: userId },
             select: {

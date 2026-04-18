@@ -93,10 +93,10 @@ export async function vendasRoutes(app: FastifyInstance) {
                 where: { userId, createdAt: { gte: startOfMonth } }
             })
 
-            if (total >= 150) {
+            if (total >= 5) { // Reduzido para teste de QA
                 return reply.status(403).send({
                     error: "LIMIT_REACHED",
-                    message: "Você atingiu o limite de 150 vendas no plano gratuito."
+                    message: "Você atingiu o limite de teste de 5 vendas no plano gratuito."
                 })
             }
         }

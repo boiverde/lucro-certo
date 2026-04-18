@@ -26,6 +26,7 @@ import { funcionariosRoutes } from './routes/funcionarios.routes'
 import { diariasRoutes } from './routes/diarias.routes'
 import { adminRoutes } from './routes/admin.routes'
 import { paymentsRoutes } from './routes/payments.routes'
+import { analyticsRoutes } from './routes/analytics.routes'
 
 export const app = fastify().withTypeProvider<ZodTypeProvider>()
 
@@ -121,7 +122,8 @@ app.setErrorHandler((error: any, request, reply) => {
 
     return reply.status(500).send({
         error: 'INTERNAL_SERVER_ERROR',
-        message: 'Ocorreu um erro interno imprevisto no servidor.',
+        message: error.message,
+        details: error,
         statusCode: 500
     });
 });
@@ -149,6 +151,7 @@ app.register(funcionariosRoutes, { prefix: '/funcionarios' })
 app.register(diariasRoutes, { prefix: '/diarias' })
 app.register(adminRoutes, { prefix: '/admin' })
 app.register(paymentsRoutes, { prefix: '/payments' })
+app.register(analyticsRoutes, { prefix: '/analytics' })
 
 app.get('/health', async () => {
     return { status: 'ok', server: 'fastify', db: 'postgres' }
