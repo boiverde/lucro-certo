@@ -175,71 +175,75 @@ export default function Relatorios() {
                         </div>
                     </Card>
 
-                    {/* Inteligência High Precision v1.8 */}
+                    {/* Governança Total v1.9 */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 overflow-hidden relative group">
                         <div className="flex justify-between items-start mb-4">
-                            <Target className="w-8 h-8 text-indigo-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">High Precision v1.8</span>
+                            <ShieldAlert className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Governança v1.9</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vendas/30d</span></h3>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vendas/Ciclo</span></h3>
                         
-                        {!resumo?.estatisticas?.amostraSuficiente ? (
-                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-slate-100 rounded-2xl w-fit">
-                                <Search className="w-4 h-4 text-slate-400" />
-                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Aguardando Massa Crítica</p>
-                            </div>
-                        ) : resumo?.regime === 'CONFIRMADO' ? (
-                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-indigo-600 rounded-2xl w-fit shadow-lg shadow-indigo-200">
-                                <ShieldCheck className="w-4 h-4 text-white animate-pulse" />
-                                <p className="text-[10px] font-black text-white uppercase tracking-wider">REGIME CONSOLIDADO</p>
+                        {!resumo?.governança?.robustez ? (
+                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-amber-50 rounded-2xl w-fit border border-amber-100">
+                                <AlertCircle className="w-4 h-4 text-amber-500" />
+                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-wider italic">Amostra Frágil ({resumo?.governança?.diasAmostra} dias)</p>
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-emerald-50 rounded-xl border border-emerald-100 w-fit">
-                                <Activity className="w-3 h-3 text-emerald-600" />
-                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight italic">Dados de Alta Confiança</p>
+                            <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-indigo-50 rounded-xl border border-indigo-100 w-fit">
+                                <Activity className="w-3 h-3 text-indigo-600" />
+                                <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Dados Robustos Verificados</p>
                             </div>
                         )}
                     </Card>
 
-                    {/* Ganho Mensal Projetado */}
+                    {/* Ganho Realista (Range) */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-emerald-100/20 bg-emerald-600 p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
-                            <TrendingUp className="w-8 h-8 text-white opacity-40" />
-                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Impacto Mensal Estimado</span>
+                            <PieChart className="w-8 h-8 text-white opacity-40" />
+                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Lucro Realista Projetado</span>
                         </div>
                         <div className="space-y-1">
-                            <h3 className="text-3xl font-black text-white">
-                                + R$ {rankings?.detalhado?.reduce((acc, p) => acc + (Number(p.ganhoUnitario) * p.quantidade), 0).toFixed(2)}
-                            </h3>
-                            <p className="text-[10px] font-black text-emerald-200 uppercase tracking-tighter italic">Se aplicar todas as correções</p>
+                            {(() => {
+                                const ganhoOtimista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(p.ganhoUnitario || 0) * p.quantidade), 0) || 0;
+                                const ganhoRealista = ganhoOtimista * 0.85;
+                                return (
+                                    <>
+                                        <h3 className="text-2xl font-black text-white">
+                                            R$ {ganhoRealista.toFixed(0)} ~ {ganhoOtimista.toFixed(0)}
+                                        </h3>
+                                        <p className="text-[10px] font-black text-emerald-200 uppercase tracking-tighter italic">Projeção com atrito operacional</p>
+                                    </>
+                                )
+                            })()}
                         </div>
                         <div className="absolute -right-4 -bottom-4 opacity-[0.1] group-hover:scale-110 transition-transform">
-                            <DollarSign className="w-32 h-32 text-white" />
+                            <TrendingUp className="w-32 h-32 text-white" />
                         </div>
                     </Card>
 
-                    {/* D-Day Adaptativo (CV) */}
+                    {/* D-Day Blindado */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-2">
-                                <Shield className="w-8 h-8 text-indigo-600 opacity-40" />
-                                <div className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border ${Number(resumo?.estatisticas?.CV) > 0.4 ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
-                                    CV {resumo?.estatisticas?.CV}
+                                <Clock className="w-8 h-8 text-indigo-600 opacity-40" />
+                                <div className="text-[8px] font-black px-1.5 py-0.5 rounded-full border bg-slate-50 border-slate-200 text-slate-500 uppercase tracking-tighter">
+                                    CV {resumo?.governança?.CV}
                                 </div>
                             </div>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Sincronizada</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Blindada</span>
                         </div>
                         <div className="space-y-1">
                             {resumo?.dDayRange !== "Equilibrado" ? (
                                 <>
                                     <h3 className="text-3xl font-black text-gray-900">{resumo.dDayRange}</h3>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Intervalo sintonizado ao fluxo</p>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Meta de equilíbrio de caixa</p>
                                 </>
                             ) : (
-                                <h3 className="text-2xl font-black text-emerald-600 uppercase">Fluxo em Dia</h3>
+                                <h3 className="text-2xl font-black text-emerald-600 uppercase italic">Caixa Saudável</h3>
                             )}
                         </div>
                     </Card>
+                    
                 </div>
 
                 {resumo?.impactoFinanceiro > 0 && (
@@ -345,9 +349,14 @@ export default function Relatorios() {
                                                                         + R$ {suggestion?.ganhoUnitario}/unid
                                                                     </div>
                                                                 </div>
-                                                                {suggestion?.ciclosRestantes > 0 && (
-                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-gray-400 italic">
-                                                                        Ajuste gradual em {suggestion?.ciclosRestantes} ciclos restantes
+                                                                {suggestion?.ciclosTotais > 1 && (
+                                                                    <div className="flex items-center gap-2 text-[9px] font-black text-gray-400 italic">
+                                                                        <div className="flex items-center gap-0.5">
+                                                                            {Array.from({ length: suggestion?.ciclosTotais }).map((_, idx) => (
+                                                                                <div key={idx} className={`w-3 h-1 rounded-full ${idx < suggestion?.cicloAtual ? 'bg-indigo-500' : 'bg-gray-200'}`}></div>
+                                                                            ))}
+                                                                        </div>
+                                                                        Ajuste {suggestion?.cicloAtual} de {suggestion?.ciclosTotais}
                                                                     </div>
                                                                 )}
                                                             </div>

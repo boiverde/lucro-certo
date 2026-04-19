@@ -1,12 +1,13 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.8 - High Precision)
- * Cap Triplo (20% / R$10 / Tick R$5), Ganhos Projetados e Amostra Crítica.
+ * Assistente de Precificação Lucro Certo (v1.9 - Total Governance)
+ * Fator de Atrito, Ciclos Integrados e Realismo Financeiro.
  */
 
-const FORMULA_VERSION = "v1.8";
+const FORMULA_VERSION = "v1.9";
 const ABSOLUTE_CAP = 10.00; 
 const PERCENT_CAP = 0.20;   
-const MAX_TICK_STEP = 5.00; // Teto de variação bruto por ciclo (Tick)
+const MAX_TICK_STEP = 5.00; 
+const FRICTION_FACTOR = 0.85; // Fator de realismo (atrito operacional)
 
 const CANAIS_CONFIG = {
     balcao: { risk: 0.75, name: 'BALCÃO' },
@@ -15,12 +16,10 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Arredondamento com Cap Triplo
+ * Arredondamento com Cap Triplo & Realismo
  */
-function secureHighPrecisionRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
+function secureGovernanceRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
     const points = [0.00, 0.50, 0.90, 0.99];
-    
-    // Teto Triplo: Min (20%, R$ 10, R$ 5 fixo)
     const capValue = Math.min(currentPrice * PERCENT_CAP, ABSOLUTE_CAP, MAX_TICK_STEP);
     const maxAllowed = currentPrice + capValue;
     const minAllowed = currentPrice - capValue;
@@ -47,15 +46,13 @@ function secureHighPrecisionRounding(targetPrice, currentPrice, cost, taxesDec, 
 }
 
 /**
- * Motor de Precificação High Precision v1.8
+ * Motor de Precificação Governança v1.9
  */
 export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
-    const canalInfo = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
     const { taxa_impostos = 0, taxa_cartao = 0 } = configs;
-
     const margemKey = canal === 'balcao' ? 'margem_balcao' : (canal === 'delivery' ? 'margem_delivery' : 'margem_marketplace');
     const margemAlvoBase = (parseFloat(configs[margemKey]) || 30) + categoryOffset;
     
@@ -63,33 +60,31 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     const margemAlvoDec = margemAlvoBase / 100;
 
     const divisor = 1 - (taxasVariaveisDec + margemAlvoDec);
-    if (divisor <= 0.05) return { error: "INSOLVENT_MARGIN", message: "Inviabilidade no canal" };
+    if (divisor <= 0.05) return { error: "INSOLVENT_MARGIN" };
 
     const precoBase = parseFloat(cost) / divisor;
-    
-    // Recuperação Gradual (Passos de 5%)
     const stepDelta = precoBase * 0.05;
     const deltaAplicado = Math.max(-stepDelta, Math.min(stepDelta, parseFloat(deltaRaw || 0)));
 
-    const precoSugerido = secureHighPrecisionRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
+    const precoSugerido = secureGovernanceRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
 
+    const deltaTotalRestante = Math.abs(parseFloat(deltaRaw || 0));
+    const ciclosTotais = Math.ceil(deltaTotalRestante / (stepDelta || 1));
     const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (stepDelta || 1));
+    
     const lucroReal = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec));
-    const ganhoUnitario = lucroReal - (precoBase * margemAlvoDec);
+    const ganhoTeorico = lucroReal - (precoBase * margemAlvoDec);
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
-        ciclosRestantes,
-        ganhoUnitario: ganhoUnitario.toFixed(2),
-        zona: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "CRÍTICA" : "SEGURA",
-        color: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "rose" : "emerald",
-        versao: FORMULA_VERSION,
-        margemReal: ((lucroReal / precoSugerido) * 100).toFixed(1),
-        detalhes: {
-            isPrecision: true,
-            tripleCapActive: true
-        }
+        cicloAtual: (ciclosTotais - ciclosRestantes) + 1,
+        ciclosTotais: Math.max(1, ciclosTotais),
+        ganhoRealista: (ganhoTeorico * FRICTION_FACTOR).toFixed(2),
+        ganhoOtimista: ganhoTeorico.toFixed(2),
+        zona: (taxasVariaveisDec + margemAlvoDec) > (CANAIS_CONFIG[canal]?.risk || 0.7) ? "CRÍTICA" : "SEGURA",
+        color: (taxasVariaveisDec + margemAlvoDec) > (CANAIS_CONFIG[canal]?.risk || 0.7) ? "rose" : "emerald",
+        versao: FORMULA_VERSION
     };
 }
 
