@@ -27,6 +27,7 @@ import { diariasRoutes } from './routes/diarias.routes'
 import { adminRoutes } from './routes/admin.routes'
 import { paymentsRoutes } from './routes/payments.routes'
 import { analyticsRoutes } from './routes/analytics.routes'
+import { reportsRoutes } from './routes/reports.routes'
 
 export const app = fastify().withTypeProvider<ZodTypeProvider>()
 
@@ -152,6 +153,7 @@ app.register(diariasRoutes, { prefix: '/diarias' })
 app.register(adminRoutes, { prefix: '/admin' })
 app.register(paymentsRoutes, { prefix: '/payments' })
 app.register(analyticsRoutes, { prefix: '/analytics' })
+app.register(reportsRoutes, { prefix: '/reports' })
 
 app.get('/health', async () => {
     return { status: 'ok', server: 'fastify', db: 'postgres' }
