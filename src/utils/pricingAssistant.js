@@ -1,10 +1,11 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.6 - Elite Control)
- * Cap de Variação, Histerese de Regime e Ciclos de Ajuste.
+ * Assistente de Precificação Lucro Certo (v1.7 - Predictive Intelligence)
+ * Cap Inteligente (Min 20%/R$10), Regime Escalonado e Impacto Total.
  */
 
-const FORMULA_VERSION = "v1.6";
-const PRICE_CAP_PERCENT = 0.20; // Máximo 20% de alteração manual/gradual por vez
+const FORMULA_VERSION = "v1.7";
+const ABSOLUTE_CAP = 10.00; // Teto absoluto de variação por ciclo
+const PERCENT_CAP = 0.20;   // Teto percentual por ciclo
 
 const CANAIS_CONFIG = {
     balcao: { risk: 0.75, name: 'BALCÃO' },
@@ -13,13 +14,15 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Arredondamento com Cap de Variação & Histerese
- * Protege contra aumentos abusivos e mudanças de regime falsas.
+ * Arredondamento com Cap Inteligente Híbrido
  */
-function secureEliteRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
+function securePredictiveRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
     const points = [0.00, 0.50, 0.90, 0.99];
-    const maxAllowed = currentPrice * (1 + PRICE_CAP_PERCENT);
-    const minAllowed = currentPrice * (1 - PRICE_CAP_PERCENT);
+    
+    // Teto Inteligente: O menor entre 20% ou R$ 10,00
+    const capValue = Math.min(currentPrice * PERCENT_CAP, ABSOLUTE_CAP);
+    const maxAllowed = currentPrice + capValue;
+    const minAllowed = currentPrice - capValue;
 
     const baseMeta = Math.max(minAllowed, Math.min(maxAllowed, targetPrice));
     
@@ -31,23 +34,20 @@ function secureEliteRounding(targetPrice, currentPrice, cost, taxesDec, targetMa
         }
     }
 
-    // Filtrar válidos (que respeitem a margem mínima e o teto de variação)
+    // Filtragem com Histerese Proativa (1.5%)
     let valid = candidates.filter(c => {
         if (c <= 0) return false;
         let profit = c - cost - (c * taxesDec);
         let margin = profit / c;
-        // Margem mínima aceitável com histerese de 2%
-        return margin >= (targetMarginDec - 0.02) && c <= maxAllowed;
+        return margin >= (targetMarginDec - 0.015) && c <= maxAllowed;
     });
 
     valid.sort((a, b) => a - b);
-    
-    // Pegar o menor ponto psicológico que seja >= meta suavizada
     return valid.find(c => c >= baseMeta) || baseMeta;
 }
 
 /**
- * Motor de Precificação Elite v1.6
+ * Motor de Precificação Preditivo v1.7
  */
 export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
@@ -63,7 +63,7 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     const margemAlvoDec = margemAlvoBase / 100;
 
     const divisor = 1 - (taxasVariaveisDec + margemAlvoDec);
-    if (divisor <= 0.05) return { error: "INSOLVENT_MARGIN", message: "Inviabilidade no canal " + canalInfo.name };
+    if (divisor <= 0.05) return { error: "INSOLVENT_MARGIN", message: "Inviabilidade no canal" };
 
     const precoBase = parseFloat(cost) / divisor;
     
@@ -71,23 +71,23 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     const clampDelta = precoBase * 0.05;
     const deltaAplicado = Math.max(-clampDelta, Math.min(clampDelta, parseFloat(deltaRaw || 0)));
 
-    const precoSugerido = secureEliteRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
+    const precoSugerido = securePredictiveRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
 
-    // Cálculo de Ciclos Restantes (Ajustes de 5% pendentes)
     const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (clampDelta || 1));
+    const lucroReal = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec));
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
         ciclosRestantes,
+        impactoFinanceiroUnitario: (lucroReal - (precoBase * margemAlvoDec)).toFixed(2),
         zona: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "CRÍTICA" : "SEGURA",
         color: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "rose" : "emerald",
         versao: FORMULA_VERSION,
-        margemReal: (((precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) / precoSugerido) * 100).toFixed(1),
-        canal: canalInfo.name,
+        margemReal: ((lucroReal / precoSugerido) * 100).toFixed(1),
         detalhes: {
-            isElite: true,
-            hasPriceCap: true
+            isPredictive: true,
+            smartCap: true
         }
     };
 }

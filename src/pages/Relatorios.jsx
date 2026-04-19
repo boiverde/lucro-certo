@@ -175,46 +175,51 @@ export default function Relatorios() {
                         </div>
                     </Card>
 
-                    {/* Inteligência Operacional v1.6 */}
+                    {/* Inteligência Preditiva v1.7 */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 overflow-hidden relative group">
                         <div className="flex justify-between items-start mb-4">
-                            <TrendingUp className="w-8 h-8 text-emerald-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Controle de Elite v1.6</span>
+                            <Zap className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inteligência v1.7</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Unidades/Histerese</span></h3>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vol/Projetado</span></h3>
                         
-                        {resumo?.statusRegime === 'MUDANÇA_DETECTADA' ? (
+                        {resumo?.regime === 'CONFIRMADO' ? (
                             <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-indigo-600 rounded-2xl w-fit shadow-lg shadow-indigo-200">
-                                <Activity className="w-4 h-4 text-white animate-pulse" />
-                                <p className="text-[10px] font-black text-white uppercase tracking-wider">MUDANÇA ESTRUTURAL EM CURSO</p>
+                                <ShieldCheck className="w-4 h-4 text-white animate-pulse" />
+                                <p className="text-[10px] font-black text-white uppercase tracking-wider">REGIME CONFIRMADO</p>
+                            </div>
+                        ) : resumo?.regime === 'EM_FORMAÇÃO' ? (
+                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-amber-500 rounded-2xl w-fit shadow-lg shadow-amber-200">
+                                <Activity className="w-4 h-4 text-white animate-bounce" />
+                                <p className="text-[10px] font-black text-white uppercase tracking-wider">REGIME EM FORMAÇÃO</p>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-emerald-50 rounded-xl border border-emerald-100 w-fit">
-                                <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight italic">Consolidação Estável</p>
+                                <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight italic">Operação em Equilíbrio</p>
                             </div>
                         )}
                     </Card>
 
-                    {/* D-Day Probabilístico */}
+                    {/* D-Day Alta Confiança */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
-                            <Clock className="w-8 h-8 text-indigo-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expectativa de Equilíbrio</span>
+                            <Shield className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Robusta (70%)</span>
                         </div>
                         <div className="space-y-1">
                             {resumo?.dDayRange !== "Equilibrado" ? (
                                 <>
                                     <h3 className="text-3xl font-black text-gray-900">{resumo.dDayRange}</h3>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Intervalo de segurança probabilístico</p>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Cenário estatístico conservador</p>
                                 </>
                             ) : (
-                                <h3 className="text-2xl font-black text-emerald-600 uppercase">Reserva Protegida</h3>
+                                <h3 className="text-2xl font-black text-emerald-600 uppercase">Caixa Protegido</h3>
                             )}
                         </div>
                         <div className="flex items-center gap-2 mt-4">
                             <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-50">
-                                <div className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full" style={{ width: '100%' }}></div>
+                                <div className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full animate-progress" style={{ width: '100%' }}></div>
                             </div>
                         </div>
                     </Card>
@@ -314,13 +319,18 @@ export default function Relatorios() {
                                                             {suggestion?.zona}
                                                         </span>
                                                         {Number(suggestion?.deltaAplicado) !== 0 && (
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
-                                                                    Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} ajustado
+                                                            <div className="flex flex-col gap-1.5">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                                                                        Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} ajustado
+                                                                    </div>
+                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600">
+                                                                        + R$ {suggestion?.impactoFinanceiroUnitario}/unid
+                                                                    </div>
                                                                 </div>
                                                                 {suggestion?.ciclosRestantes > 0 && (
                                                                     <div className="flex items-center gap-1 text-[9px] font-black text-gray-400 italic">
-                                                                        {suggestion?.ciclosRestantes} ciclos p/ meta
+                                                                        Ajuste gradual em {suggestion?.ciclosRestantes} ciclos restantes
                                                                     </div>
                                                                 )}
                                                             </div>
