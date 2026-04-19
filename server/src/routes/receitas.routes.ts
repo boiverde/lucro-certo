@@ -40,7 +40,7 @@ export async function receitasRoutes(app: FastifyInstance) {
         }
     })
 
-    // Detalhe
+    // Detalhe com Hardening (Resiliência contra remoção e monitor de custo)
     app.withTypeProvider<ZodTypeProvider>().get('/:id', {
         schema: {
             params: z.object({ id: z.string().uuid() })
@@ -51,11 +51,41 @@ export async function receitasRoutes(app: FastifyInstance) {
 
         const receita = await prisma.receitaProduto.findFirst({
             where: { id, userId },
-            include: { ingredientes: true }
+            include: { 
+                ingredientes: {
+                    include: { ingrediente: true }
+                } 
+            }
         })
 
         if (!receita) return reply.status(404).send()
-        return receita
+
+        // 1. Calcular Custo Atualizado (Monitor de Margem - Parte 4)
+        let custoAtualizadoTotal = 0
+        const ingredientesProcessados = receita.ingredientes.map(ri => {
+            const precoKg = ri.ingrediente?.preco_corrigido_kg || 0
+            const custoItem = Number((precoKg * ri.quantidade_kg).toFixed(2))
+            custoAtualizadoTotal += custoItem
+            
+            return {
+                ...ri,
+                custo_atual: custoItem,
+                ingrediente_nome: ri.ingrediente?.nome || ri.ingrediente_nome || 'Ingrediente Removido'
+            }
+        })
+
+        const diffCusto = Number(Math.abs(Number(receita.custo_total) - custoAtualizadoTotal).toFixed(2))
+        const isCustoDesatualizado = diffCusto > 0.01 // Diferença maior que 1 centavo
+
+        return {
+            ...receita,
+            ingredientes: ingredientesProcessados,
+            monitor_custo: {
+                custo_real_atual: Number(custoAtualizadoTotal.toFixed(2)),
+                esta_desatualizado: isCustoDesatualizado,
+                diferenca: diffCusto
+            }
+        }
     })
 
     // Criar Receita

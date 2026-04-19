@@ -245,41 +245,42 @@ export async function revendasRoutes(app: FastifyInstance) {
         // mutationFn: async (data) => { ... await Cliente.create ... return VendaRevenda.create(data) }
         // O 'data' passado para create é o ...dados do form, que tem { cliente: "Maria", ... }. Não tem clienteId.
 
-        // SOLUÇÃO: Vamos buscar o cliente pelo nome 'data.cliente' aqui no backend.
+        // Hardening: Remover busca por nome. Exigir ID ou falhar.
         let clienteId = data.clienteId
-        if (!clienteId && data.cliente) {
-            const c = await prisma.cliente.findFirst({
-                where: { userId, nome: data.cliente }
+        if (!clienteId) {
+            return reply.status(400).send({ 
+                error: 'MISSING_CLIENT_ID', 
+                message: 'O ID do cliente é obrigatório para registrar a venda de revenda.' 
             })
-            if (c) clienteId = c.id
-            // Se não achar, cria? O frontend já criou. Mas por segurança...
-            else {
-                const novo = await prisma.cliente.create({
-                    data: { userId, nome: data.cliente, ativo: true }
-                })
-                clienteId = novo.id
-            }
         }
 
         const result = await prisma.$transaction(async (tx) => {
+            // Cálculo de Precisão de Centavos (Hardening Financeiro)
+            const numeroParcelas = data.numero_parcelas
+            const valorTotal = data.valor_total
+            const valorParcelaPadrao = data.valor_parcela
+            
+            // A última parcela assume a diferença para fechar o total exato
+            const somaAnteriores = valorParcelaPadrao * (numeroParcelas - 1)
+            const valorUltimaParcela = Number((valorTotal - somaAnteriores).toFixed(2))
+
             const venda = await tx.vendaRevenda.create({
                 data: {
                     userId,
                     empresaId: data.empresa_id,
                     clienteId: clienteId,
-                    valor_total: data.valor_total,
-                    numero_parcelas: data.numero_parcelas,
-                    valor_parcela: data.valor_parcela,
+                    valor_total: valorTotal,
+                    numero_parcelas: numeroParcelas,
+                    valor_parcela: valorParcelaPadrao,
                     comissao_total: data.valor_comissao_total,
                     data_primeira_parcela: new Date(data.data_primeira_parcela),
-                    descricao_produtos: data.produto, // Campo produto vai para descricao
+                    descricao_produtos: data.produto,
                     status: data.status,
-                    // Parcelas
                     parcelas: {
-                        create: Array.from({ length: data.numero_parcelas }).map((_, i) => ({
+                        create: Array.from({ length: numeroParcelas }).map((_, i) => ({
                             numero: i + 1,
                             data_vencimento: addMonths(new Date(data.data_primeira_parcela), i),
-                            valor: data.valor_parcela, // Pode ter dízima, mas MVP ok
+                            valor: (i === numeroParcelas - 1) ? valorUltimaParcela : valorParcelaPadrao,
                             paga: false
                         }))
                     }

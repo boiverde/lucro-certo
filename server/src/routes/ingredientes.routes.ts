@@ -58,7 +58,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         return ingrediente
     })
 
-    // Criar
+    // Criar Ingrediente com Cálculos de Backend
     app.withTypeProvider<ZodTypeProvider>().post('/', {
         schema: {
             body: z.object({
@@ -67,7 +67,6 @@ export async function ingredientesRoutes(app: FastifyInstance) {
                 valor_pago: z.number(),
                 preco_por_kg: z.number(),
                 fator_correcao: z.number().optional().default(1),
-                preco_corrigido_kg: z.number(),
                 estoque_atual: z.number(),
                 estoque_minimo: z.number().optional().default(0),
                 ativo: z.boolean().optional().default(true),
@@ -77,15 +76,20 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         const userId = request.user.sub
         const data = request.body
 
+        // Hardening: Cálculo exato no servidor
+        const precoPorKg = data.preco_por_kg
+        const fatorCorrecao = data.fator_correcao || 1
+        const precoCorrigidoKg = Number((precoPorKg * fatorCorrecao).toFixed(2))
+
         const ingrediente = await prisma.ingrediente.create({
             data: {
                 userId,
                 nome: data.nome,
                 quantidade_comprada: data.quantidade_comprada,
                 valor_pago: data.valor_pago,
-                preco_por_kg: data.preco_por_kg,
-                fator_correcao: data.fator_correcao,
-                preco_corrigido_kg: data.preco_corrigido_kg,
+                preco_por_kg: precoPorKg,
+                fator_correcao: fatorCorrecao,
+                preco_corrigido_kg: precoCorrigidoKg,
                 estoque_atual: data.estoque_atual,
                 estoque_minimo: data.estoque_minimo,
                 ativo: data.ativo,
@@ -105,7 +109,6 @@ export async function ingredientesRoutes(app: FastifyInstance) {
                 valor_pago: z.number().optional(),
                 preco_por_kg: z.number().optional(),
                 fator_correcao: z.number().optional(),
-                preco_corrigido_kg: z.number().optional(),
                 estoque_atual: z.number().optional(),
                 estoque_minimo: z.number().optional(),
                 ativo: z.boolean().optional(),
@@ -116,25 +119,47 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         const userId = request.user.sub
         const data = request.body
 
-        const updateData: any = { ...data }
+        // Buscar dados atuais para recalcular se necessário
+        const current = await prisma.ingrediente.findFirst({ where: { id, userId } })
+        if (!current) return reply.status(404).send()
 
-        const ingrediente = await prisma.ingrediente.updateMany({
-            where: { id, userId },
+        const precoPorKg = data.preco_por_kg ?? Number(current.preco_por_kg)
+        const fatorCorrecao = data.fator_correcao ?? Number(current.fator_correcao)
+        const precoCorrigidoKg = Number((precoPorKg * fatorCorrecao).toFixed(2))
+
+        const updateData: any = { 
+            ...data,
+            preco_corrigido_kg: precoCorrigidoKg 
+        }
+
+        await prisma.ingrediente.update({
+            where: { id },
             data: updateData
         })
 
-        if (ingrediente.count === 0) return reply.status(404).send()
         return reply.status(200).send()
     })
 
-    // Deletar
+    // Deletar com Proteção (Hardening de Integridade)
     app.withTypeProvider<ZodTypeProvider>().delete('/:id', {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
         const userId = request.user.sub
 
-        await prisma.ingrediente.deleteMany({ where: { id, userId } })
+        // Verificação: O ingrediente está em alguma receita?
+        const emUso = await prisma.receitaIngrediente.findFirst({
+            where: { ingredienteId: id }
+        })
+
+        if (emUso) {
+            return reply.status(400).send({
+                error: 'INGREDIENT_IN_USE',
+                message: 'Este ingrediente não pode ser excluído pois está sendo usado em fichas técnicas ativas. Desative-o em vez de excluir.'
+            })
+        }
+
+        await prisma.ingrediente.delete({ where: { id } })
         return reply.status(204).send()
     })
 }
