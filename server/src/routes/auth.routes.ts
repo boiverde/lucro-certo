@@ -18,6 +18,7 @@ export async function authRoutes(app: FastifyInstance) {
 
         const user = await prisma.user.findUnique({
             where: { email },
+            select: { id: true, name: true, email: true, password_hash: true }
         })
 
         if (!user) {
@@ -114,6 +115,7 @@ export async function authRoutes(app: FastifyInstance) {
             // Buscar usuário local ou criar
             let userLocal = await prisma.user.findUnique({
                 where: { email: sbUser.email },
+                select: { id: true, name: true, email: true }
             })
 
             if (!userLocal) {
@@ -192,13 +194,17 @@ export async function authRoutes(app: FastifyInstance) {
         const userId = (request.user as any).sub
         
         const user = await prisma.user.findUnique({
-            where: { id: userId }
+            where: { id: userId },
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                plan: true
+            }
         })
 
         if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
 
-        // Filtramos os campos sensíveis e enviamos o resto
-        const { password_hash, ...safeUser } = user
-        return safeUser
+        return user
     })
 }
