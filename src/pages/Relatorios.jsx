@@ -175,16 +175,16 @@ export default function Relatorios() {
                         </div>
                     </Card>
 
-                    {/* Lucro Líquido Real */}
+                    {/* Inteligência Operacional */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8">
                         <div className="flex justify-between items-start mb-4">
                             <TrendingUp className="w-8 h-8 text-emerald-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lucro Líquido Real</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inteligência Operacional</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">R$ {resumo?.lucroLiquidoReal?.toFixed(2)}</h3>
-                        <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-gray-50 rounded-xl border border-gray-100 w-fit">
-                            <Calendar className="w-3 h-3 text-gray-400" />
-                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-tight italic">Ancoragem: {resumo?.volumeReferencia} unid/{resumo?.periodoReferencia || '30d'}</p>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeInteligente} <span className="text-sm text-gray-400 font-bold">Unidades/mês</span></h3>
+                        <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-indigo-50 rounded-xl border border-indigo-100 w-fit">
+                            <ShieldCheck className="w-3 h-3 text-indigo-600" />
+                            <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Algoritmo EWMA v1.3 Ativo</p>
                         </div>
                     </Card>
                 </div>
@@ -251,7 +251,7 @@ export default function Relatorios() {
                         </CardContent>
                     </Card>
 
-                    {/* Fuga de Capital com RADAR DE ZONAS */}
+                    {/* Radar Financeiro Algorítmico v1.3 */}
                     <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm border border-white">
                         <CardHeader className="border-b border-gray-100 py-6 px-8">
                             <div className="flex items-center gap-4">
@@ -259,16 +259,18 @@ export default function Relatorios() {
                                     <AlertTriangle className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-xl">Radar de Margem</CardTitle>
-                                    <p className="text-xs text-gray-400 font-medium tracking-tight">Variação de risco no canal {canal?.toUpperCase()}</p>
+                                    <CardTitle className="text-xl">Radar Financeiro</CardTitle>
+                                    <p className="text-xs text-gray-400 font-medium tracking-tight">Estabilidade sugerida (Clamp 5%) no canal {canal?.toUpperCase()}</p>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-8">
                             <div className="space-y-6">
-                                {rankings?.alertaCritico?.map((item) => {
-                                    const isCritical = item.margemMedia < 15 || item.deltaRecuperacao > 0.30;
-                                    
+                                {rankings?.detalhado?.filter(p => p.margemMedia < 25).slice(0, isPartial ? 2 : 10).map((item) => {
+                                    // Executar o Motor v1.3 no Frontend
+                                    const suggestion = calculatePriceSuggestion(item.custoBase, userData, canal, item.deltaRaw);
+                                    const isCritical = suggestion?.zona === 'CRÍTICA';
+
                                     return (
                                         <div key={item.id} className="p-6 rounded-[2rem] bg-gray-50/50 border border-gray-100 space-y-4 relative overflow-hidden group hover:bg-white transition-all">
                                             <div className={`absolute top-0 right-0 w-2 h-full ${isCritical ? 'bg-rose-500' : 'bg-amber-400'}`} />
@@ -278,31 +280,31 @@ export default function Relatorios() {
                                                     <h3 className="font-black text-gray-900 text-base leading-none mb-2">{item.nome}</h3>
                                                     <div className="flex flex-wrap items-center gap-2">
                                                         <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${isCritical ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
-                                                            ZONA {isCritical ? 'CRÍTICA' : 'ALERTA'}
+                                                            {suggestion?.zona}
                                                         </span>
-                                                        {item.deltaRecuperacao > 0 && (
+                                                        {Number(suggestion?.deltaAplicado) !== 0 && (
                                                             <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">
-                                                                <TrendingUp className="w-2 h-2" />
-                                                                Δ +R$ {item.deltaRecuperacao.toFixed(2)} (Ajuste Fixo)
+                                                                Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} suavizado
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="text-sm font-bold text-gray-400 line-through tracking-tighter">R$ {item.precoAtual.toFixed(2)}</p>
-                                                    <p className="text-2xl font-black text-emerald-600 tracking-tighter">R$ {item.precoSugerido.toFixed(2)}</p>
+                                                    <p className="text-2xl font-black text-emerald-600 tracking-tighter">R$ {suggestion?.precoSugerido}</p>
                                                 </div>
                                             </div>
 
                                             <Button 
                                                 size="sm"
                                                 onClick={() => {
-                                                    if (!isPartial) setSelectedProduct(item);
+                                                    const prodParaUpdate = { ...item, precoSugerido: suggestion.precoSugerido, margemAlvo: suggestion.margemLiquida };
+                                                    if (!isPartial) setSelectedProduct(prodParaUpdate);
                                                     else openUpgrade("Recupere sua margem agora.");
                                                 }}
                                                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-2xl group-hover:shadow-lg group-hover:shadow-indigo-600/20 transition-all"
                                             >
-                                                Corrigir Preço
+                                                Corrigir Agora
                                             </Button>
                                         </div>
                                     )

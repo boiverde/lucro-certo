@@ -1,68 +1,92 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.2 - High Stability)
- * Zonas de risco parametrizadas e Fator Delta (Δ).
+ * Assistente de Precificação Lucro Certo (v1.3 - Algorithmic)
+ * EWMA, Zonas por Categoria e Delta Suavizado com Clamp.
  */
 
-const FORMULA_VERSION = "v1.2";
+const FORMULA_VERSION = "v1.3";
+const ALPHA = 0.25; // EWMA Smoothing Factor
 
 const CANAIS_CONFIG = {
-    balcao: { field: 'margem_balcao', risk: 0.75, name: 'BALCÃO' },
-    delivery: { field: 'margem_delivery', risk: 0.70, name: 'DELIVERY' },
-    marketplace: { field: 'margem_marketplace', risk: 0.65, name: 'MARKETPLACE' }
+    balcao: { risk: 0.75, name: 'BALCÃO' },
+    delivery: { risk: 0.70, name: 'DELIVERY' },
+    marketplace: { risk: 0.65, name: 'MARKETPLACE' }
 };
 
 /**
- * Calcula a sugestão de preço com análise de zonas de risco
+ * Calcula EWMA para uma série de volumes
  */
-export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaRecuperacao = 0) {
+export function calculateEWMA(volumes) {
+    if (!volumes || volumes.length === 0) return 1;
+    let ewma = volumes[0];
+    for (let i = 1; i < volumes.length; i++) {
+        ewma = ALPHA * volumes[i] + (1 - ALPHA) * ewma;
+    }
+    return ewma;
+}
+
+/**
+ * Arredondamento Comercial Padronizado
+ */
+function standardizePrice(price) {
+    const rounded = Math.round(price * 10) / 10;
+    const decimal = price - Math.floor(price);
+    if (decimal > 0.85) return Math.floor(price) + 0.90;
+    if (decimal > 0.45 && decimal < 0.55) return Math.floor(price) + 0.50;
+    return Math.ceil(price);
+}
+
+/**
+ * Motor de Precificação Algorítmico v1.3
+ */
+export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
     const canalInfo = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
     const { taxa_impostos = 0, taxa_cartao = 0 } = configs;
 
-    const margemDesejada = parseFloat(configs[canalInfo.field]) || 30;
+    const margemKey = canal === 'balcao' ? 'margem_balcao' : (canal === 'delivery' ? 'margem_delivery' : 'margem_marketplace');
+    const margemDesejada = (parseFloat(configs[margemKey]) || 30) + categoryOffset;
+    
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
     const margemDesejadaDec = margemDesejada / 100;
 
     const somaCargos = taxasVariaveisDec + margemDesejadaDec;
-    
-    // Análise de Zonas de Risco
-    let zona = "SEGURA";
-    let warning = null;
-    let color = "emerald";
-
-    if (somaCargos > canalInfo.risk) {
-        zona = "CRÍTICA";
-        warning = `ZONA CRÍTICA: Os custos + lucro excedem ${canalInfo.risk * 100}% do preço no canal ${canalInfo.name}.`;
-        color = "red";
-    } else if (somaCargos > (canalInfo.risk - 0.15)) {
-        zona = "ALERTA";
-        warning = `ZONA DE ATENÇÃO: Margem de erro reduzida para este canal.`;
-        color = "amber";
-    }
-
-    if (somaCargos >= 0.95) {
-        return { error: "INSOLVENT_MARGIN", message: "Inviabilidade matemática no canal " + canalInfo.name };
-    }
-
     const divisor = 1 - somaCargos;
+
+    if (divisor <= 0.05) return { error: "INSOLVENT_MARGIN", message: "Inviabilidade no canal " + canalInfo.name };
+
     const precoBase = parseFloat(cost) / divisor;
-    const precoSugeridoFinal = precoBase + parseFloat(deltaRecuperacao || 0);
+    
+    // Delta Suavizado com Clamp (Trava de ±5%)
+    const maxDelta = precoBase * 0.05;
+    const minDelta = precoBase * -0.05;
+    const deltaSuavizado = Math.max(minDelta, Math.min(maxDelta, parseFloat(deltaRaw || 0)));
+
+    const precoFinalRaw = precoBase + deltaSuavizado;
+    const precoSugerido = standardizePrice(precoFinalRaw);
+
+    // Análise de Zonas
+    let zona = "SEGURA";
+    let color = "emerald";
+    if (somaCargos > canalInfo.risk) {
+        zona = "CRÍTICA"; color = "red";
+    } else if (somaCargos > (canalInfo.risk - 0.10)) {
+        zona = "ALERTA"; color = "amber";
+    }
 
     return {
-        precoSugerido: precoSugeridoFinal.toFixed(2),
-        delta: parseFloat(deltaRecuperacao || 0).toFixed(2),
+        precoSugerido: precoSugerido.toFixed(2),
+        deltaAplicado: deltaSuavizado.toFixed(2),
         zona,
         color,
-        warning,
         versao: FORMULA_VERSION,
-        lucroUnitario: (precoSugeridoFinal * margemDesejadaDec).toFixed(2),
+        lucroUnitario: (precoSugerido * margemDesejadaDec).toFixed(2),
         margemLiquida: margemDesejada.toFixed(1),
         canal: canalInfo.name,
         detalhes: {
-            markupEquivalente: (1 / divisor).toFixed(2),
-            divisor: divisor.toFixed(4)
+            markup: (1 / divisor).toFixed(2),
+            ewmaUsed: true
         }
     };
 }
