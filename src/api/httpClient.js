@@ -18,11 +18,21 @@ export async function httpClient(endpoint, options = {}) {
         headers,
     };
 
+    // Hardening: Adicionar timeout de 15 segundos para evitar spinners infinitos
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 15000);
+    config.signal = controller.signal;
+
     let response;
     try {
         response = await fetch(`${API_URL}${endpoint}`, config);
+        clearTimeout(id);
     } catch (e) {
-        const error = new Error('offline');
+        clearTimeout(id);
+        const error = e.name === 'AbortError' 
+            ? new Error('O servidor está demorando muito a responder. Tente novamente.')
+            : new Error('Não foi possível conectar ao servidor. Verifique sua rede.');
+        
         handleApiError(error, 'conectar ao servidor');
         error.handledGlobally = true;
         throw error;

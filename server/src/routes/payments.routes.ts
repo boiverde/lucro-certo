@@ -50,8 +50,10 @@ export async function paymentsRoutes(app: FastifyInstance) {
         return { checkoutUrl, code: checkout.code };
     })
 
-    // 2. Webhook / Retorno de Notificação do PagSeguro
+    // 2. Webhook / Retorno de Notificação do PagSeguro (Legado v2)
     app.post('/pagseguro/webhook', async (request, reply) => {
+        // O PagSeguro v2 envia um notificationCode. Nós consultamos o servidor DELES.
+        // Isso já é inerentemente seguro, pois o code só o PagSeguro sabe.
         const { notificationCode, notificationType } = request.body as any;
 
         if (notificationType === 'transaction') {
@@ -73,8 +75,16 @@ export async function paymentsRoutes(app: FastifyInstance) {
                                 where: { id: localTransaction.id },
                                 data: { status: 'approved', externalId: transactionData.code }
                             })
-                            const expiresAt = new Date()
+
+                            // Lógica de Renovação Preditiva (Acumula dias se já for PRO)
+                            const user = await tx.user.findUnique({ where: { id: localTransaction.userId }, select: { planExpiresAt: true } })
+                            const baseDate = (user?.planExpiresAt && new Date(user.planExpiresAt) > new Date()) 
+                                ? new Date(user.planExpiresAt) 
+                                : new Date()
+                            
+                            const expiresAt = new Date(baseDate)
                             expiresAt.setDate(expiresAt.getDate() + 30)
+
                             await tx.user.update({
                                 where: { id: localTransaction.userId },
                                 data: { plan: 'pro', planExpiresAt: expiresAt }
@@ -158,8 +168,18 @@ export async function paymentsRoutes(app: FastifyInstance) {
         }
     })
 
-    // 5. Webhook Pix - Idempotente e Atômico com Suporte Anual
+    // 5. Webhook Pix - Idempotente, Atômico e VALIDADO
     app.post('/pix/webhook', async (request, reply) => {
+        // Hardening: Validar se a requisição tem o Token de Autorização esperado
+        // O PagBank envia o token que você configurou no dashboard de notificações.
+        const authHeader = request.headers.authorization
+        const expectedToken = process.env.PAGSEGURO_TOKEN // Usando o mesmo token da API para simplificar se o usuário configurou assim
+
+        if (expectedToken && authHeader !== `Bearer ${expectedToken}`) {
+            console.warn('[PIX-WEBHOOK-SECURITY] Unauthorized notification attempt rejected.')
+            return reply.status(401).send({ message: 'Unauthorized' })
+        }
+
         try {
             const body = request.body as any
             const orderId = body?.id
@@ -178,7 +198,13 @@ export async function paymentsRoutes(app: FastifyInstance) {
                             data: { status: 'approved' }
                         })
 
-                        const expiresAt = new Date()
+                        // Lógica de Renovação Acumulativa
+                        const user = await tx.user.findUnique({ where: { id: transaction.userId }, select: { planExpiresAt: true } })
+                        const baseDate = (user?.planExpiresAt && new Date(user.planExpiresAt) > new Date())
+                            ? new Date(user.planExpiresAt)
+                            : new Date()
+
+                        const expiresAt = new Date(baseDate)
                         const days = transaction.planId === 'pro_yearly' ? 365 : 30
                         expiresAt.setDate(expiresAt.getDate() + days)
 
@@ -191,7 +217,7 @@ export async function paymentsRoutes(app: FastifyInstance) {
                             }
                         })
                     })
-                    console.log(`[PIX-WEBHOOK] Upgrade Successful | plan: ${transaction.planId}`)
+                    console.log(`[PIX-WEBHOOK] Upgrade Successful (Hardened) | plan: ${transaction.planId}`)
                 }
             }
         } catch (err: any) {

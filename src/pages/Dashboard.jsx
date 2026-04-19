@@ -39,32 +39,23 @@ const inicioMesStr = format(inicioMesObj, "yyyy-MM-dd");
 const fimMesStr = format(fimMesObj, "yyyy-MM-dd");
 
 export default function Dashboard() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   const { pendingPix, openUpgrade } = useUpgrade();
 
-  useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const currentUser = await base44.auth.me();
-        setUser(currentUser);
-      } catch (error) {
-        console.log('Erro ao carregar usuário');
-      } finally {
-        setLoading(false);
-      }
-    };
-    loadUser();
-  }, []);
+  // Usar o hook centralizado de plano/usuário (mais rápido e com cache)
+  const { data: user, isLoading: userLoading } = useQuery({
+    queryKey: ['user-me'],
+    queryFn: async () => await base44.auth.me(),
+    staleTime: 1000 * 60 * 30, // 30 minutos de cache
+  });
 
   const { data: dashboardStats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', user?.email],
     queryFn: async () => {
       return await httpClient('/dashboard/stats');
     },
-    enabled: !!user?.email && !loading,
-    staleTime: 1000 * 60 * 5, // Mantém os dados zerados por 5 minutos enquanto navega
-    cacheTime: 1000 * 60 * 30, // Mantém no cache por 30 minutos
+    enabled: !!user?.email,
+    staleTime: 1000 * 60 * 5,
+    cacheTime: 1000 * 60 * 30,
   });
 
   const { data: vendasRevenda = [] } = useQuery({
@@ -72,7 +63,7 @@ export default function Dashboard() {
     queryFn: async () => {
       return await base44.entities.VendaRevenda.filter({ created_by: user.email, limit: 10 }, '-data_primeira_parcela');
     },
-    enabled: !!user?.email && !loading,
+    enabled: !!user?.email,
     staleTime: 1000 * 60 * 5,
   });
 
@@ -83,70 +74,52 @@ export default function Dashboard() {
   const totalGastosMes = transacoes.totalGastos || 0;
   
   const lucroBrutoMes = totalVendasMes + (dashboardStats?.comissoes?.comissoesDoMes || 0) - totalComprasMes - totalGastosMes;
-
   const { alimentacao, gasolina, diarias } = transacoes.detalhesGastos || { alimentacao: 0, gasolina: 0, diarias: 0 };
-
   const hasData = (transacoes.contagens?.vendas > 0) || (transacoes.contagens?.compras > 0) || (transacoes.contagens?.gastos > 0);
 
-  if (loading || statsLoading || !user) {
-    return (
-      <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Removido o Skeleton total da página para melhorar percepção inicial
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-sm md:text-base text-gray-500 mt-1">
-            Bem-vindo, {user?.full_name || 'Usuário'}!
+            {userLoading ? <span className="inline-block w-32 h-4 bg-gray-200 animate-pulse rounded"></span> : `Bem-vindo, ${user?.full_name || 'Usuário'}!`}
           </p>
         </div>
 
-        <WelcomeMessage user={user} hasData={hasData} />
-        <RenewalNotice user={user} stats={dashboardStats} />
-        
-        {pendingPix && new Date(pendingPix.expiresAt) > new Date() && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top duration-500">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                <CreditCard className="w-6 h-6" />
+        {/* Componentes principais aparecem assim que o usuário é carregado */}
+        {!userLoading && (
+          <>
+            <WelcomeMessage user={user} hasData={hasData} />
+            <RenewalNotice user={user} stats={dashboardStats} />
+            
+            {pendingPix && new Date(pendingPix.expiresAt) > new Date() && (
+              <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top duration-500">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                    <CreditCard className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">Você tem um pagamento pendente</p>
+                    <p className="text-[10px] text-amber-700 font-medium">Finalize sua assinatura PRO para liberar todos os recursos.</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => openUpgrade("Retome o pagamento da sua assinatura PRO.")}
+                  className="h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl gap-2 shadow-lg shadow-amber-600/20"
+                >
+                  Concluir Pagamento <ArrowRight className="w-3.5 h-3.5" />
+                </Button>
               </div>
-              <div>
-                <p className="text-sm font-bold text-amber-900">Você tem um pagamento pendente</p>
-                <p className="text-[10px] text-amber-700 font-medium">Finalize sua assinatura PRO para liberar todos os recursos.</p>
-              </div>
-            </div>
-            <Button 
-              onClick={() => openUpgrade("Retome o pagamento da sua assinatura PRO.")}
-              className="h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl gap-2 shadow-lg shadow-amber-600/20"
-            >
-              Concluir Pagamento <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
+            )}
+
+            <LucratividadeBanner stats={dashboardStats} isLoading={statsLoading} />
+            <UsageTracker usage={dashboardStats?.usage} isLoading={statsLoading} />
+            <BannerAcessoWeb />
+          </>
         )}
 
-        <LucratividadeBanner stats={dashboardStats} />
-        <UsageTracker usage={dashboardStats?.usage} />
-
-        <BannerAcessoWeb />
-
-        {/* Cards de Resumo - Mobile Optimized */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6">
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xs md:text-sm font-medium opacity-90">Vendas</CardTitle>
-                <TrendingUp className="h-4 w-4 opacity-90" />
-              </div>
-            </CardHeader>
             <CardContent className="px-4 pb-4">
               <div className="text-xl md:text-2xl font-bold">R$ {totalVendasMes.toFixed(2)}</div>
               <p className="text-xs opacity-90 mt-1">

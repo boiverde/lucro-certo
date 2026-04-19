@@ -194,7 +194,7 @@ export async function vendasRoutes(app: FastifyInstance) {
         return result
     })
 
-    // Deletar Venda
+    // Deletar Venda com Devolução de Estoque
     app.withTypeProvider<ZodTypeProvider>().delete('/:id', {
         schema: {
             params: z.object({ id: z.string().uuid() }),
@@ -203,10 +203,43 @@ export async function vendasRoutes(app: FastifyInstance) {
         const { id } = request.params
         const userId = request.user.sub
 
-        const venda = await prisma.venda.findFirst({ where: { id, userId } })
+        // 1. Verificar se a venda existe e pertence ao usuário
+        const venda = await prisma.venda.findFirst({ 
+            where: { id, userId },
+            include: { itens: true }
+        })
+        
         if (!venda) throw { statusCode: 404, message: 'Venda não encontrada' }
 
-        await prisma.venda.delete({ where: { id } })
+        // 2. Executar deleção e devolução em uma única transação
+        await prisma.$transaction(async (tx) => {
+            // Devolver itens ao estoque
+            for (const item of venda.itens) {
+                if (item.produtoId) {
+                    await tx.produto.update({
+                        where: { id: item.produtoId },
+                        data: { estoque_atual: { increment: item.quantidade } }
+                    })
+
+                    // Registrar movimentação de ajuste (entrada por exclusão)
+                    await tx.movimentacaoEstoque.create({
+                        data: {
+                            userId,
+                            produtoId: item.produtoId,
+                            quantidade: item.quantidade,
+                            tipo: 'entrada',
+                            origem: 'ajuste',
+                            observacoes: `Estorno: Venda #${venda.id.slice(0, 8)} excluída`,
+                            data: new Date()
+                        }
+                    })
+                }
+            }
+
+            // Excluir a venda (os itens serão excluídos via CASCADE configurado no Prisma)
+            await tx.venda.delete({ where: { id } })
+        })
+
         return reply.status(204).send()
     })
 }
