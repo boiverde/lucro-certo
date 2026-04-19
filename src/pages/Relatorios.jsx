@@ -136,6 +136,51 @@ export default function Relatorios() {
                     </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    {/* Faturamento */}
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-indigo-600 text-white p-8">
+                        <div className="flex justify-between items-start mb-4">
+                            <DollarSign className="w-8 h-8 opacity-40" />
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Faturamento</span>
+                        </div>
+                        <h3 className="text-3xl font-black">R$ {resumo?.faturamento?.toFixed(2)}</h3>
+                    </Card>
+
+                    {/* Confronto de Custo Fixo */}
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
+                        <div className="relative z-10 flex flex-col justify-between h-full">
+                            <div className="flex justify-between items-start mb-4">
+                                <TrendingUp className="w-8 h-8 text-indigo-600 opacity-40" />
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Custo Fixo Real vs Proj.</span>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="flex justify-between items-end">
+                                    <h3 className={`text-2xl font-black ${resumo?.gastosOperacionaisReais > resumo?.gastosOperacionaisProjetados ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        R$ {resumo?.gastosOperacionaisReais?.toFixed(2)}
+                                    </h3>
+                                    <span className="text-xs font-bold text-gray-400">Proj: R$ {resumo?.gastosOperacionaisProjetados?.toFixed(2)}</span>
+                                </div>
+                                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div 
+                                        className={`h-full transition-all duration-1000 ${resumo?.gastosOperacionaisReais > (resumo?.gastosOperacionaisProjetados || 0) ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                                        style={{ width: `${Math.min((resumo?.gastosOperacionaisReais / (resumo?.gastosOperacionaisProjetados || 1)) * 100 || 0, 100)}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Lucro Líquido Real */}
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8">
+                        <div className="flex justify-between items-start mb-4">
+                            <TrendingUp className="w-8 h-8 text-emerald-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lucro Líquido Real</span>
+                        </div>
+                        <h3 className="text-3xl font-black text-gray-900">R$ {resumo?.lucroLiquidoReal?.toFixed(2)}</h3>
+                        <p className="text-xs font-bold text-gray-400 mt-1">Estimativa real do que sobrou no caixa.</p>
+                    </Card>
+                </div>
+
                 {resumo?.impactoFinanceiro > 0 && (
                     <div className="mb-8 bg-white border-2 border-indigo-100 p-8 rounded-[2rem] shadow-xl shadow-indigo-100/20 relative overflow-hidden group">
                         <div className="flex flex-col md:flex-row items-center gap-8 relative z-10">

@@ -539,6 +539,8 @@ model HistoricoPreco {
   custoMomento    Decimal  @db.Decimal(10, 2)
   margemMomento   Decimal  @db.Decimal(10, 2)
   
+  canal           String   @default("balcao")
+  versaoFormula   String   @default("v1.0")
   origem          String   @default("manual") // manual, automatico, lote
   createdAt       DateTime @default(now())
 

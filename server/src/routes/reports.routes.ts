@@ -11,11 +11,16 @@ export async function reportsRoutes(app: FastifyInstance) {
         schema: {
             querystring: z.object({
                 from: z.string().optional(),
-                to: z.string().optional()
+                to: z.string().optional(),
+                canal: z.string().optional()
             })
         }
     }, async (request, reply) => {
         const userId = request.user.sub
+        const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
+        const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
+        const canal = request.query.canal || 'balcao'
+
         const user = await prisma.user.findUnique({ 
             where: { id: userId }, 
             select: { 
@@ -28,22 +33,47 @@ export async function reportsRoutes(app: FastifyInstance) {
                 custo_fixo_mensal: true
             } 
         })
+
+        if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
+
+        // 0. RATEIO DE CUSTO FIXO (PROJETADO VS REAL)
+        const totalVendasPeriodo = await prisma.itemVenda.aggregate({
+            _sum: { quantidade: true },
+            where: {
+                venda: {
+                    userId,
+                    data_venda: { gte: from, lte: to }
+                }
+            }
+        })
+
+        const volumeTotal = Number(totalVendasPeriodo._sum.quantidade || 0)
         
-        const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
-        const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
-        const canal = (request.query as any).canal || 'balcao'
+        const totalGastosReaisAgg = await prisma.gastoOperacional.aggregate({
+            _sum: { valor: true },
+            where: {
+                userId,
+                data: { gte: from, lte: to }
+            }
+        })
+
+        const custoFixoMensalProjetado = Number(user.custo_fixo_mensal || 0)
+        const gastoFixoRealTotal = Number(totalGastosReaisAgg._sum.valor || 0)
+
+        // Preço Sugerido sempre usa o PROJETADO para estabilidade
+        const custoFixoUnidProjetado = volumeTotal > 0 ? (custoFixoMensalProjetado / volumeTotal) : 0
+        const custoFixoUnidReal = volumeTotal > 0 ? (gastoFixoRealTotal / volumeTotal) : 0
 
         // Sintonizar a margem alvo pelo canal escolhido
-        const margemMap = {
-            balcao: user?.margem_balcao,
-            delivery: user?.margem_delivery,
-            marketplace: user?.margem_marketplace
+        const margemMap: Record<string, any> = {
+            balcao: user.margem_balcao,
+            delivery: user.margem_delivery,
+            marketplace: user.margem_marketplace
         }
-        const margemAlvoRaw = Number(margemMap[canal] || 30)
+        const margemAlvoRaw = Number(margemMap[canal as string] || 30)
         const margemAlvo = margemAlvoRaw / 100
 
         // 1. TOP PRODUTOS POR LUCRO E VOLUME
-// ... resto do código ...
         const performanceProdutos = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
             where: {
@@ -69,37 +99,33 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         // Ranking Detalhado com Cálculos de Ação Implícitos
         const ranking = await Promise.all(performanceProdutos.map(async p => {
-            // Buscar custo atual do produto para sugerir novo preço
             const produtoMeta = await prisma.produto.findUnique({
-                where: { id: p.produtoId },
+                where: { id: p.produtoId as string },
                 select: { custo: true, preco: true }
             })
 
             const custoMateriaPrima = Number(produtoMeta?.custo || 0)
-            const custoTotalUnitario = custoMateriaPrima + custoFixoPorUnidade
-            
             const precoAtual = Number(produtoMeta?.preco || 0)
-            const taxas = (Number(user?.taxa_impostos || 0) + Number(user?.taxa_cartao || 0)) / 100
+            const taxas = (Number(user.taxa_impostos || 0) + Number(user.taxa_cartao || 0)) / 100
             
-            // Markup Divisor (HARDENING): Preço = CustoTotal / (1 - (Taxas + Margem))
+            // Sugestão baseada no Projetado (Hardening)
+            const custoTotalProjetado = custoMateriaPrima + custoFixoUnidProjetado
             const divisor = 1 - (taxas + margemAlvo)
-            const precoSugerido = divisor > 0.05 ? Number((custoTotalUnitario / divisor).toFixed(2)) : precoAtual * 1.3
+            const precoSugerido = divisor > 0.05 ? Number((custoTotalProjetado / divisor).toFixed(2)) : precoAtual * 1.3
             
-            // Média Móvel / Intervalo de Ganho (2% de variação aceitável)
-            const precoMin = Number((precoSugerido * 0.98).toFixed(2))
-            const precoMax = Number((precoSugerido * 1.02).toFixed(2))
-
-            const lucroTotalReal = Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2))
+            // Cálculo de Lucro Real (O que sobrou DE FATO no período)
+            const custoTotalReal = custoMateriaPrima + custoFixoUnidReal
+            const lucroTotalEfetivo = Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2))
             
-            // Perda Potencial: O que ele ganharia se estivesse com o preço sugerido
-            const lucroAlvoUnitario = precoSugerido - custo - (precoSugerido * taxas)
-            const ganhoSeCorrigido = Number(((lucroAlvoUnitario * (p._sum.quantidade || 0)) - lucroTotalReal).toFixed(2))
+            // Perda Potencial (Baseada no Preço Sugerido)
+            const lucroAlvoUnitario = precoSugerido - custoTotalProjetado - (precoSugerido * taxas)
+            const ganhoSeCorrigido = Number(((lucroAlvoUnitario * (p._sum.quantidade || 0)) - lucroTotalEfetivo).toFixed(2))
 
             return {
                 id: p.produtoId,
                 nome: p.nome_produto,
                 quantidade: p._sum.quantidade || 0,
-                lucroTotal: lucroTotalReal,
+                lucroTotal: lucroTotalEfetivo,
                 margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1)),
                 precoAtual,
                 precoSugerido,
@@ -109,19 +135,17 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         ranking.sort((a, b) => b.lucroTotal - a.lucroTotal)
 
-        const isFree = user?.plan === 'free'
+        const isFree = user.plan === 'free'
         const topLucro = isFree ? ranking.slice(0, 3) : ranking.slice(0, 10)
-        
-        // Alerta Crítico: Onde ele MAIS perde dinheiro ou margem
         const alertaCritico = [...ranking]
             .filter(p => p.margemMedia < 20 || p.lucroTotal < 0)
-            .sort((a, b) => b.ganhoPotencial - a.ganhoPotencial) // Ordenar por quem tem maior potencial de recuperação
+            .sort((a, b) => b.ganhoPotencial - a.ganhoPotencial)
             .slice(0, isFree ? 2 : 10)
 
         const totalPerdaOportunidade = ranking.reduce((acc, p) => acc + p.ganhoPotencial, 0)
 
         // 2. RESUMO POR PERÍODO (Agregações atômicas)
-        const [vendasAgg, comprasAgg, gastosAgg] = await Promise.all([
+        const [vendasAgg, comprasAgg] = await Promise.all([
             prisma.venda.aggregate({
                 _sum: { valor_total: true },
                 where: { userId, data_venda: { gte: from, lte: to } }
@@ -129,17 +153,12 @@ export async function reportsRoutes(app: FastifyInstance) {
             prisma.compra.aggregate({
                 _sum: { valor_total: true },
                 where: { userId, data_compra: { gte: from, lte: to } }
-            }),
-            prisma.gastoOperacional.aggregate({
-                _sum: { valor: true },
-                where: { userId, data: { gte: from, lte: to } }
             })
         ])
 
         const totalVendas = Number(vendasAgg._sum.valor_total || 0)
         const totalCompras = Number(comprasAgg._sum.valor_total || 0)
-        const totalGastos = Number(gastosAgg._sum.valor || 0)
-        const lucroLiquidoEstimado = totalVendas - totalCompras - totalGastos
+        const lucroLiquidoReal = totalVendas - totalCompras - gastoFixoRealTotal
 
         return {
             periodo: { from, to },
@@ -147,8 +166,9 @@ export async function reportsRoutes(app: FastifyInstance) {
             resumo: {
                 faturamento: totalVendas,
                 compras: totalCompras,
-                gastosOperacionais: totalGastos,
-                lucroLiquido: Number(lucroLiquidoEstimado.toFixed(2)),
+                gastosOperacionaisReais: gastoFixoRealTotal,
+                gastosOperacionaisProjetados: custoFixoMensalProjetado,
+                lucroLiquidoReal: Number(lucroLiquidoReal.toFixed(2)),
                 impactoFinanceiro: Number(totalPerdaOportunidade.toFixed(2))
             },
             rankings: {
@@ -159,8 +179,8 @@ export async function reportsRoutes(app: FastifyInstance) {
                 melhorProduto: ranking[0]?.nome,
                 piorProduto: ranking[ranking.length - 1]?.nome,
                 sugestao: totalPerdaOportunidade > 100 
-                    ? `Você pode ganhar R$ ${totalPerdaOportunidade.toFixed(2)} extras este mês corrigindo os produtos em alerta.`
-                    : (lucroLiquidoEstimado < 0 ? "Seus gastos superaram as vendas. Revise custos fixos." : "Operação saudável. Continue monitorando as margens.")
+                    ? `Perda de oportunidade de R$ ${totalPerdaOportunidade.toFixed(2)}. Corrija seus preços agora.`
+                    : (lucroLiquidoReal < 0 ? "Atenção: Gastos REAIS superaram o faturamento." : "Tudo sob controle!")
             } : null
         }
     })

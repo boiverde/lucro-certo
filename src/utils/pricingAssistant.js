@@ -1,7 +1,10 @@
 /**
- * Assistente de Precificação Lucro Certo (Refined Hardening)
- * Implementa o Markup Divisor com validações de sanidade matemática.
+ * Assistente de Precificação Lucro Certo (v1.1 - Stability & Hardening)
+ * Implementa o Markup Divisor com alertas de risco operacional.
  */
+
+const FORMULA_VERSION = "v1.1";
+const RISK_THRESHOLD = 0.70; // Alerta se taxas + margem > 70%
 
 const CANAIS_DEFAULT = {
     balcao: 'margem_balcao',
@@ -11,7 +14,6 @@ const CANAIS_DEFAULT = {
 
 /**
  * Calcula a sugestão de preço baseada no markup divisor
- * Validação Crítica: Taxas + Margem deve ser < 1 (100%)
  */
 export function calculatePriceSuggestion(cost, configs, canal = 'balcao') {
     if (!cost || cost <= 0) return null;
@@ -19,49 +21,38 @@ export function calculatePriceSuggestion(cost, configs, canal = 'balcao') {
 
     const {
         taxa_impostos = 0,
-        taxa_cartao = 0,
-        custo_fixo_mensal = 0
+        taxa_cartao = 0
     } = configs;
 
     // Selecionar margem baseada no canal
     const margemKey = CANAIS_DEFAULT[canal] || 'margem_balcao';
     const margemDesejada = parseFloat(configs[margemKey]) || 30;
 
-    // 1. Converter taxas para decimal
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
     const margemDesejadaDec = margemDesejada / 100;
 
-    // 2. Validação T+M < 1 (HARDENING)
-    // Se a soma das taxas e lucro for > 95%, bloqueamos para evitar preços infinitos
     const somaCargos = taxasVariaveisDec + margemDesejadaDec;
     
+    // Alerta de Risco Operacional (v1.1)
+    let warning = null;
+    if (somaCargos > RISK_THRESHOLD && somaCargos < 0.95) {
+        warning = "RISCO_OPERACIONAL: A soma das taxas e lucro ultrapassa 70%. O preço pode ficar acima do mercado.";
+    }
+
     if (somaCargos >= 0.95) {
         return {
             error: "INSOLVENT_MARGIN",
-            message: "A soma das taxas e lucro desejado é muito alta (>= 95%). O negócio é inviável nestas condições."
+            message: "A soma das taxas e lucro desejado é muito alta (>= 95%). Operação inviável."
         };
     }
 
     const divisor = 1 - somaCargos;
-
-    // 3. Custo Fixo Médio (Considerando Rateio Mensal Simplificado)
-    // No frontend, se não temos volume de vendas, usamos o custo fixo base ou zero
-    const custoFixoUnid = 0; // O rateio real será feito no backend com volume real
-
-    // 4. Preço Sugerido
-    const custoTotalUnitarioBase = parseFloat(cost);
-    const precoSugerido = custoTotalUnitarioBase / divisor;
-
-    // 5. Analise de Ganho (Intervalo de Confiança 2%)
-    const precoMinimo = precoSugerido * 0.98;
-    const precoMaximo = precoSugerido * 1.02;
+    const precoSugerido = parseFloat(cost) / divisor;
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
-        intervalo: {
-            min: precoMinimo.toFixed(2),
-            max: precoMaximo.toFixed(2)
-        },
+        warning,
+        versao: FORMULA_VERSION,
         lucroUnitario: (precoSugerido * margemDesejadaDec).toFixed(2),
         margemLiquida: margemDesejada.toFixed(1),
         canal: canal.toUpperCase(),

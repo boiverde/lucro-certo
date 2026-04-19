@@ -94,13 +94,21 @@ export default function PricingAssistant({ cost, currentPrice, configs, isPro, o
                                     <p className="text-lg font-black text-emerald-400">{suggestion.margemLiquida}%</p>
                                 </div>
                             </div>
+                            
+                            {suggestion.warning && (
+                                <div className="mt-4 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex gap-3 text-amber-200">
+                                    <AlertTriangle className="w-5 h-5 shrink-0" />
+                                    <p className="text-[11px] font-bold leading-tight">{suggestion.warning}</p>
+                                </div>
+                            )}
+
+                            <div className="pt-2 text-center">
+                                <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em]">Engine Algorithm {suggestion.versao}</span>
+                            </div>
                         </div>
                     </div>
                 )
             )}
-        </div>
-    );
-}
         </div>
     );
 }
