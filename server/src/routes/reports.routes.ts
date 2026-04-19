@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, eachDayOfInterval, format } from 'date-fns'
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, format, differenceInDays } from 'date-fns'
 
 export async function reportsRoutes(app: FastifyInstance) {
     app.addHook('onRequest', app.authenticate)
@@ -22,7 +22,7 @@ export async function reportsRoutes(app: FastifyInstance) {
         const canal = request.query.canal || 'balcao'
         
         const from30d = subDays(new Date(), 30)
-        const ALPHA = 0.25 
+        const from14d = subDays(new Date(), 14)
 
         const user = await prisma.user.findUnique({ 
             where: { id: userId }, 
@@ -39,57 +39,51 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
 
-        // 0. VOLUME HÍBRIDO + FILTRO DE QUARTIS (P25/P75)
-        const vendasItensDiarios = await prisma.venda.findMany({
-            where: { userId, data_venda: { gte: from30d, lte: new Date() } },
+        // 0. ANÁLISE DE VOLUMES E BANDA INTERQUARTIL
+        const todasVendas = await prisma.venda.findMany({
+            where: { userId, data_venda: { gte: from30d } },
             include: { itens: true }
         })
 
-        // Agrupar volume por dia
-        const volumesPorDiaMap: Record<string, number> = {}
-        vendasItensDiarios.forEach(v => {
-            const diames = format(v.data_venda, 'yyyy-MM-dd')
-            const vol = v.itens.reduce((acc, i) => acc + Number(i.quantidade), 0)
-            volumesPorDiaMap[diames] = (volumesPorDiaMap[diames] || 0) + vol
+        const volumesDiarios: Record<string, number> = {}
+        todasVendas.forEach(v => {
+            const d = format(v.data_venda, 'yyyy-MM-dd')
+            volumesDiarios[d] = (volumesDiarios[d] || 0) + v.itens.reduce((acc, i) => acc + Number(i.quantidade), 0)
         })
 
-        const serieVolumes = Object.values(volumesPorDiaMap).sort((a, b) => a - b)
-        
-        // Calcular P25 e P75
-        const q1Idx = Math.floor(serieVolumes.length * 0.25)
-        const q3Idx = Math.floor(serieVolumes.length * 0.75)
-        const volumesFiltrados = serieVolumes.slice(q1Idx, q3Idx + 1)
-        const mediaEstavel30d = volumesFiltrados.length > 0 
-            ? (volumesFiltrados.reduce((a, b) => a + b, 0) / volumesFiltrados.length) * 30
-            : 1
+        const serieSorted = Object.values(volumesDiarios).sort((a, b) => a - b)
+        const p25 = serieSorted[Math.floor(serieSorted.length * 0.25)] || 0
+        const p75 = serieSorted[Math.floor(serieSorted.length * 0.75)] || 1
 
-        // EWMA Simplificada (Peso na tendência recente)
-        const volumeEWMA = serieVolumes.length > 0 ? serieVolumes[serieVolumes.length - 1] * 20 : 0 // Tendência projetada
-        const volumeHibrido = (volumeEWMA * 0.7) + (mediaEstavel30d * 0.3)
-        const volumeFinal = Math.max(volumeHibrido, 1)
+        // 1. DETECÇÃO DE NOVO REGIME (ÚLTIMOS 7 DIAS)
+        const ultimos7Dias = Array.from({ length: 7 }).map((_, i) => format(subDays(new Date(), i), 'yyyy-MM-dd'))
+        const diasForaDaBanda = ultimos7Dias.filter(d => {
+            const vol = volumesDiarios[d] || 0
+            return vol > p75 || vol < p25
+        }).length
+        const isNovoRegime = diasForaDaBanda >= 5
 
-        // 1. DELTA ACUMULADO (14 DIAS)
-        const from14d = subDays(new Date(), 14)
-        const [gastos14d, vendas14d] = await Promise.all([
+        // Volume Inteligente Adaptativo
+        const mediaEstavel = serieSorted.length > 0 ? (serieSorted.reduce((a, b) => a + b, 0) / serieSorted.length) : 1
+        const volumeFinalProjetado = isNovoRegime 
+            ? (Object.values(volumesDiarios).slice(-7).reduce((a, b) => a + b, 0) / 7) * 30 
+            : mediaEstavel * 30
+
+        // 2. PREVISÃO DE EQUILÍBRIO (D-DAY)
+        const [gastos14d, itens14d] = await Promise.all([
             prisma.gastoOperacional.aggregate({ _sum: { valor: true }, where: { userId, data: { gte: from14d } } }),
-            prisma.itemVenda.aggregate({ _sum: { quantidade: true }, where: { venda: { userId, data_venda: { gte: from14d } } } })
+            prisma.itemVenda.aggregate({ _sum: { quantidade: true, lucro_unitario: true }, where: { venda: { userId, data_venda: { gte: from14d } } } })
         ])
 
-        const volReal14d = Number(vendas14d._sum.quantidade || 0)
         const gastoReal14d = Number(gastos14d._sum.valor || 0)
         const projecaoFixo14d = (Number(user.custo_fixo_mensal || 0) / 30) * 14
+        const desvioTotal = Math.max(0, gastoReal14d - projecaoFixo14d)
         
-        const desvioTotalAcumulado = Math.max(0, gastoReal14d - projecaoFixo14d)
-        
-        const custoFixoUnidProjetado = (Number(user.custo_fixo_mensal || 0) / volumeFinal)
-        const desvioUnitarioNecessario = volReal14d > 0 ? (desvioTotalAcumulado / volReal14d) : 0
+        const lucroDiarioMedio = Number(itens14d._sum.lucro_unitario || 0) / 14
+        const diasParaEquilibrio = lucroDiarioMedio > 0 ? Math.ceil(desvioTotal / lucroDiarioMedio) : null
 
-        // Sintonizar Margem
-        const margemMap: any = { balcao: user.margem_balcao, delivery: user.margem_delivery, marketplace: user.margem_marketplace }
-        const margemAlvo = Number(margemMap[canal as string] || 30) / 100
-
-        // 2. PROCESSAMENTO DE RANKING
-        const performanceProdutos = await prisma.itemVenda.groupBy({
+        // 3. RANKING
+        const performance = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
             where: { venda: { userId, data_venda: { gte: from, lte: to } } },
             _sum: { quantidade: true, lucro_unitario: true },
@@ -97,31 +91,30 @@ export async function reportsRoutes(app: FastifyInstance) {
             orderBy: { _sum: { lucro_unitario: true } }
         })
 
-        const ranking = await Promise.all(performanceProdutos.map(async p => {
-            const produto = await prisma.produto.findUnique({ where: { id: p.produtoId as string }, select: { custo: true, preco: true } })
+        const ranking = await Promise.all(performance.map(async p => {
+            const prod = await prisma.produto.findUnique({ where: { id: p.produtoId as string }, select: { custo: true, preco: true } })
             return {
                 id: p.produtoId,
                 nome: p.nome_produto,
                 quantidade: p._sum.quantidade || 0,
                 lucroTotal: Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2)),
                 margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1)),
-                precoAtual: Number(produto?.preco || 0),
-                custoBase: Number(produto?.custo || 0),
-                deltaRaw: desvioUnitarioNecessario
+                precoAtual: Number(prod?.preco || 0),
+                custoBase: Number(prod?.custo || 0),
+                deltaRaw: desvioTotal / (Number(itens14d._sum.quantidade || 1))
             }
         }))
 
         return {
-            periodo: { from, to, algoritmo: "Resiliência Híbrida v1.4" },
+            periodo: { from, to, motor: "Adaptive v1.5" },
             resumo: {
-                volumeHibrido: Math.round(volumeFinal),
-                mediaEstavel30d: Math.round(mediaEstavel30d),
-                desvioTotalAcumulado: Number(desvioTotalAcumulado.toFixed(2)),
-                gapRecuperacao: volReal14d > 0 ? Number(((desvioTotalAcumulado / (gastoReal14d || 1)) * 100).toFixed(1)) : 0
+                volumeReferencia: Math.round(volumeFinalProjetado),
+                desvioTotal: Number(desvioTotal.toFixed(2)),
+                diasParaEquilibrio,
+                regime: isNovoRegime ? (serieSorted[serieSorted.length - 1] > p75 ? "CRESCIMENTO" : "REDUÇÃO") : "ESTÁVEL",
+                banda: { p25: Math.round(p25), p75: Math.round(p75) }
             },
-            rankings: {
-                detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal)
-            }
+            rankings: { detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal) }
         }
     })
 }

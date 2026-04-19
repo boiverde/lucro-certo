@@ -176,30 +176,49 @@ export default function Relatorios() {
                     </Card>
 
                     {/* Inteligência Operacional */}
-                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8">
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 overflow-hidden relative group">
                         <div className="flex justify-between items-start mb-4">
                             <TrendingUp className="w-8 h-8 text-emerald-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Estabilidade Híbrida</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Motor Adaptativo v1.5</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeHibrido} <span className="text-sm text-gray-400 font-bold">Volume/v1.4</span></h3>
-                        <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-indigo-50 rounded-xl border border-indigo-100 w-fit">
-                            <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                            <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Filtro de Quartis (P25-P75) Ativo</p>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Volume/Mês</span></h3>
+                        
+                        {resumo?.regime !== 'ESTÁVEL' ? (
+                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-indigo-600 rounded-2xl w-fit shadow-lg shadow-indigo-200">
+                                <Zap className="w-4 h-4 text-white animate-bounce" />
+                                <p className="text-[10px] font-black text-white uppercase tracking-wider">NOVO REGIME: {resumo?.regime}</p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-gray-50 rounded-xl border border-gray-100 w-fit">
+                                <ShieldCheck className="w-3 h-3 text-gray-400" />
+                                <p className="text-[9px] font-black text-gray-500 uppercase tracking-tight italic">Regime Operacional Estável</p>
+                            </div>
+                        )}
+                        <div className="absolute -right-4 -bottom-4 opacity-[0.05] group-hover:scale-110 transition-transform">
+                            <Activity className="w-32 h-32" />
                         </div>
                     </Card>
 
-                    {/* Recuperação de Caixa */}
-                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group">
+                    {/* D-Day: Previsão de Equilíbrio */}
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
-                            <Shield className="w-8 h-8 text-rose-600 opacity-40 group-hover:animate-pulse" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saúde do Caixa (14d)</span>
+                            <Clock className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão de Equilíbrio</span>
                         </div>
-                        <h3 className="text-2xl font-black text-gray-900">R$ {resumo?.desvioTotalAcumulado?.toFixed(2)}</h3>
-                        <div className="flex items-center gap-2 mt-2">
-                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-rose-500 rounded-full" style={{ width: `${Math.min(100, (resumo?.gapRecuperacao || 0) * 2)}%` }}></div>
+                        <div className="space-y-1">
+                            {resumo?.diasParaEquilibrio !== null ? (
+                                <>
+                                    <h3 className="text-3xl font-black text-gray-900">{resumo.diasParaEquilibrio} <span className="text-sm text-gray-400 font-bold">Dias</span></h3>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Contagem regressiva para lucro total</p>
+                                </>
+                            ) : (
+                                <h3 className="text-2xl font-black text-emerald-600 uppercase">Caixa Equilibrado</h3>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-4">
+                            <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-50">
+                                <div className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full" style={{ width: `${resumo?.diasParaEquilibrio ? Math.max(10, 100 - (resumo.diasParaEquilibrio * 5)) : 100}%` }}></div>
                             </div>
-                            <span className="text-[10px] font-black text-rose-600 uppercase">Ajuste Gradual</span>
                         </div>
                     </Card>
                 </div>

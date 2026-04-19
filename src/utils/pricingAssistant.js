@@ -1,10 +1,9 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.4 - Hybrid Resilience)
- * Volume Híbrido, Validação Pós-Arredondamento e Recuperação de Caixa.
+ * Assistente de Precificação Lucro Certo (v1.5 - Adaptive Engine)
+ * Arredondamento Competitivo, Detecção de Regime e Previsão de Equilíbrio.
  */
 
-const FORMULA_VERSION = "v1.4";
-const ALPHA = 0.25; 
+const FORMULA_VERSION = "v1.5";
 
 const CANAIS_CONFIG = {
     balcao: { risk: 0.75, name: 'BALCÃO' },
@@ -13,30 +12,39 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Arredondamento Comercial com Validação de Margem Proativa
+ * Arredondamento Inteligente & Competitivo
+ * Busca o MENOR preço que respeita a margem alvo.
  */
-function secureRounding(targetPrice, cost, taxesDec, targetMarginDec) {
-    const points = [0.00, 0.50, 0.90, 0.99];
-    let base = Math.floor(targetPrice);
+function competitiveRounding(basePrice, cost, taxesDec, targetMarginDec) {
+    const points = [0.00, 0.50, 0.90, 0.99]; // Pontos psicológicos
+    let integerPart = Math.floor(basePrice);
     
-    // Testar pontos de arredondamento
-    for (let p of points) {
-        let candidate = base + p;
-        if (candidate < targetPrice) continue; // Garante que nunca arredonda pra baixo da necessidade basal
-
-        // Validar margem real do candidato
-        let profit = candidate - cost - (candidate * taxesDec);
-        let realMargin = profit / candidate;
-
-        if (realMargin >= targetMarginDec) return candidate;
+    // Testar pontos no real atual e no anterior (para ser agressivo se possível)
+    let candidates = [];
+    for (let offset of [-1, 0, 1]) {
+        for (let p of points) {
+            candidates.push(integerPart + offset + p);
+        }
     }
 
-    // Se nenhum ponto no real atual serviu, tenta o próximo real
-    return base + 1.90; 
+    // Filtrar apenas os que respeitam a margem
+    let validCandidates = candidates.filter(c => {
+        if (c <= 0) return false;
+        let profit = c - cost - (c * taxesDec);
+        let margin = profit / c;
+        return margin >= targetMarginDec;
+    });
+
+    // Ordenar e pegar o menor válido que não seja absurdamente menor que o base
+    validCandidates.sort((a, b) => a - b);
+    
+    // O menor válido que seja pelo menos próximo ao preço base necessário
+    const finalPrice = validCandidates.find(c => c >= (basePrice * 0.98)) || (integerPart + 1.10);
+    return finalPrice;
 }
 
 /**
- * Motor de Precificação Resiliente v1.4
+ * Motor de Precificação Adaptativo v1.5
  */
 export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
@@ -58,35 +66,26 @@ export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaR
 
     const precoBase = parseFloat(cost) / divisor;
     
-    // Clamp de Delta (Recuperação Escalonada)
+    // Clamp de Delta (Ajuste Suave)
     const maxDelta = precoBase * 0.05;
     const deltaAplicado = Math.max(-maxDelta, Math.min(maxDelta, parseFloat(deltaRaw || 0)));
 
     const precoMeta = precoBase + deltaAplicado;
-    const precoSugerido = secureRounding(precoMeta, cost, taxasVariaveisDec, margemDesejadaDec);
-
-    // Zonas DESACOPLADAS (Foco na estrutura de custo)
-    let zona = "SEGURA";
-    let color = "emerald";
-    if (somaCargos > canalInfo.risk) {
-        zona = "CRÍTICA"; color = "rose";
-    } else if (somaCargos > (canalInfo.risk - 0.12)) {
-        zona = "ALERTA"; color = "amber";
-    }
+    const precoSugerido = competitiveRounding(precoMeta, cost, taxasVariaveisDec, margemDesejadaDec);
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
         deltaPendente: (parseFloat(deltaRaw || 0) - deltaAplicado).toFixed(2),
-        zona,
-        color,
+        zona: somaCargos > canalInfo.risk ? "CRÍTICA" : (somaCargos > canalInfo.risk - 0.12 ? "ALERTA" : "SEGURA"),
+        color: somaCargos > canalInfo.risk ? "rose" : (somaCargos > canalInfo.risk - 0.12 ? "amber" : "emerald"),
         versao: FORMULA_VERSION,
         lucroReal: (precoSugerido - cost - (precoSugerido * taxasVariaveisDec)).toFixed(2),
         margemReal: (((precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) / precoSugerido) * 100).toFixed(1),
         canal: canalInfo.name,
         detalhes: {
-            isHybrid: true,
-            roundingValidated: true
+            adaptiveRounding: true,
+            regimeAware: true
         }
     };
 }
