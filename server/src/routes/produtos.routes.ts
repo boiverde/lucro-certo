@@ -66,7 +66,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         return produto
     })
 
-    // Atualizar Produto (Com Auditoria de Preço)
+    // Atualizar Produto (Com Auditoria de Produção v2.2)
     app.withTypeProvider<ZodTypeProvider>().put('/:id', {
         schema: {
             params: z.object({ id: z.string().uuid() }),
@@ -80,34 +80,35 @@ export async function produtosRoutes(app: FastifyInstance) {
                 ativo: z.boolean().optional(),
                 margem_prevista: z.number().optional(),
                 margem_realizada: z.number().optional(),
-                canal: z.string().optional()
+                canal: z.string().optional(),
+                origem: z.enum(['manual', 'inteligencia']).optional()
             }),
         },
     }, async (request, reply) => {
         const { id } = request.params
         const userId = request.user.sub
-        const { margem_prevista, margem_realizada, canal, ...body } = request.body as any
+        const { margem_prevista, margem_realizada, canal, origem, ...body } = request.body as any
 
         const oldProduto = await prisma.produto.findFirst({ 
             where: { id, userId },
             include: { user: { select: { taxa_impostos: true, taxa_cartao: true } } }
         })
 
-        if (!oldProduto) return reply.status(404).send()
+        if (!oldProduto) return reply.status(404).send({ message: "Produto não encontrado" })
 
         const produto = await prisma.produto.update({
             where: { id },
             data: body,
         })
 
-        // Auditoria: Registar se o preço de venda mudou
+        // Auditoria de Produção High Precision v2.2
         if (body.preco !== undefined && Number(body.preco) !== Number(oldProduto.preco)) {
             const taxas = (Number(oldProduto.user?.taxa_impostos || 0) + Number(oldProduto.user?.taxa_cartao || 0)) / 100
             const custo = Number(produto.custo || 0)
             const novoPreco = Number(produto.preco)
             
             const lucroNovo = novoPreco - custo - (novoPreco * taxas)
-            const margemNova = (lucroNovo / novoPreco) * 100
+            const margemNova = novoPreco > 0 ? (lucroNovo / novoPreco) * 100 : 0
 
             await prisma.historicoPreco.create({
                 data: {
@@ -116,12 +117,12 @@ export async function produtosRoutes(app: FastifyInstance) {
                     precoAnterior: oldProduto.preco,
                     precoNovo: produto.preco,
                     custoMomento: produto.custo || 0,
-                    margemMomento: margemNova || 0,
-                    margemPrevista: margem_prevista || 0,
+                    margemMomento: margemNova,
+                    margemPrevista: margem_prevista || margemNova,
                     margemRealizada: margem_realizada || 0,
                     canal: canal || "balcao",
-                    versaoFormula: "v1.2",
-                    origem: "manual"
+                    versaoFormula: "v2.2-adaptive",
+                    origem: origem || "manual"
                 }
             })
         }

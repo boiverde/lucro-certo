@@ -10,9 +10,21 @@ import {
     ArrowRight, 
     Calendar,
     ChevronRight,
-    Lock
     Lock,
-    DollarSign
+    Search,
+    BrainCircuit,
+    Lightbulb,
+    ShieldCheck,
+    CheckCircle,
+    Box,
+    Cpu,
+    Eye,
+    Clock,
+    DollarSign,
+    PieChart,
+    ShieldAlert,
+    Activity,
+    AlertCircle
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -62,7 +74,8 @@ export default function Relatorios() {
                     preco: selectedProduct.precoSugerido,
                     margem_prevista: selectedProduct.margemAlvo,
                     margem_realizada: selectedProduct.margemMedia,
-                    canal: canal 
+                    canal: canal,
+                    origem: "inteligencia"
                 })
             });
             setSelectedProduct(null);
