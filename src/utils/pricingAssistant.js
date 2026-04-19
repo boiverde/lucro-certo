@@ -1,24 +1,33 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.9 - Total Governance)
- * Fator de Atrito, Ciclos Integrados e Realismo Financeiro.
+ * Assistente de Precificação Lucro Certo (v2.0 - Adaptive Calibration)
+ * Atrito Dinâmico f(CV, Canal), Piso Tau e Diversidade de SKU.
  */
 
-const FORMULA_VERSION = "v1.9";
+const FORMULA_VERSION = "v2.0";
 const ABSOLUTE_CAP = 10.00; 
 const PERCENT_CAP = 0.20;   
 const MAX_TICK_STEP = 5.00; 
-const FRICTION_FACTOR = 0.85; // Fator de realismo (atrito operacional)
 
 const CANAIS_CONFIG = {
-    balcao: { risk: 0.75, name: 'BALCÃO' },
-    delivery: { risk: 0.70, name: 'DELIVERY' },
-    marketplace: { risk: 0.65, name: 'MARKETPLACE' }
+    balcao: { risk: 0.75, friction_base: 0.05, name: 'BALCÃO' },
+    delivery: { risk: 0.70, friction_base: 0.12, name: 'DELIVERY' },
+    marketplace: { risk: 0.65, friction_base: 0.18, name: 'MARKETPLACE' }
 };
 
 /**
- * Arredondamento com Cap Triplo & Realismo
+ * Cálculo de Atrito Adaptativo
+ * f(CV, Canal) = 1 - (CV * 0.4) - offset_canal
  */
-function secureGovernanceRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
+function calculateAdaptiveFriction(cv = 0.2, canal = 'balcao') {
+    const config = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
+    const friction = 1 - (cv * 0.4) - config.friction_base;
+    return Math.max(0.60, Math.min(0.95, friction));
+}
+
+/**
+ * Arredondamento com Governança v2.0
+ */
+function secureAdaptiveRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
     const points = [0.00, 0.50, 0.90, 0.99];
     const capValue = Math.min(currentPrice * PERCENT_CAP, ABSOLUTE_CAP, MAX_TICK_STEP);
     const maxAllowed = currentPrice + capValue;
@@ -46,15 +55,15 @@ function secureGovernanceRounding(targetPrice, currentPrice, cost, taxesDec, tar
 }
 
 /**
- * Motor de Precificação Governança v1.9
+ * Motor de Precificação Auto-Calibrado v2.0
  */
-export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
+export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, cv = 0.2) {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
     const { taxa_impostos = 0, taxa_cartao = 0 } = configs;
     const margemKey = canal === 'balcao' ? 'margem_balcao' : (canal === 'delivery' ? 'margem_delivery' : 'margem_marketplace');
-    const margemAlvoBase = (parseFloat(configs[margemKey]) || 30) + categoryOffset;
+    const margemAlvoBase = (parseFloat(configs[margemKey]) || 30);
     
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
     const margemAlvoDec = margemAlvoBase / 100;
@@ -66,24 +75,23 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     const stepDelta = precoBase * 0.05;
     const deltaAplicado = Math.max(-stepDelta, Math.min(stepDelta, parseFloat(deltaRaw || 0)));
 
-    const precoSugerido = secureGovernanceRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
+    const precoSugerido = secureAdaptiveRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
 
     const deltaTotalRestante = Math.abs(parseFloat(deltaRaw || 0));
     const ciclosTotais = Math.ceil(deltaTotalRestante / (stepDelta || 1));
     const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (stepDelta || 1));
     
-    const lucroReal = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec));
-    const ganhoTeorico = lucroReal - (precoBase * margemAlvoDec);
+    const lucroTeorico = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) - (precoBase * margemAlvoDec);
+    const friction = calculateAdaptiveFriction(cv, canal);
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
-        cicloAtual: (ciclosTotais - ciclosRestantes) + 1,
+        cicloAtual: (Math.max(1, ciclosTotais) - ciclosRestantes),
         ciclosTotais: Math.max(1, ciclosTotais),
-        ganhoRealista: (ganhoTeorico * FRICTION_FACTOR).toFixed(2),
-        ganhoOtimista: ganhoTeorico.toFixed(2),
-        zona: (taxasVariaveisDec + margemAlvoDec) > (CANAIS_CONFIG[canal]?.risk || 0.7) ? "CRÍTICA" : "SEGURA",
-        color: (taxasVariaveisDec + margemAlvoDec) > (CANAIS_CONFIG[canal]?.risk || 0.7) ? "rose" : "emerald",
+        ganhoRealista: (lucroTeorico * friction).toFixed(2),
+        ganhoOtimista: lucroTeorico.toFixed(2),
+        confianca: (friction * 100).toFixed(0),
         versao: FORMULA_VERSION
     };
 }

@@ -175,72 +175,55 @@ export default function Relatorios() {
                         </div>
                     </Card>
 
-                    {/* Governança Total v1.9 */}
+                    {/* Inteligência Adaptive v2.0 */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 overflow-hidden relative group">
                         <div className="flex justify-between items-start mb-4">
-                            <ShieldAlert className="w-8 h-8 text-indigo-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Governança v1.9</span>
+                            <Cpu className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Adaptive v2.0</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vendas/Ciclo</span></h3>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vendas/Periodo</span></h3>
                         
-                        {!resumo?.governança?.robustez ? (
-                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-amber-50 rounded-2xl w-fit border border-amber-100">
-                                <AlertCircle className="w-4 h-4 text-amber-500" />
-                                <p className="text-[10px] font-black text-amber-600 uppercase tracking-wider italic">Amostra Frágil ({resumo?.governança?.diasAmostra} dias)</p>
+                        {!resumo?.hasRelevancia ? (
+                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-slate-100 rounded-2xl w-fit">
+                                <Search className="w-4 h-4 text-slate-400" />
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider italic">Modo de Observação</p>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-indigo-50 rounded-xl border border-indigo-100 w-fit">
-                                <Activity className="w-3 h-3 text-indigo-600" />
-                                <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Dados Robustos Verificados</p>
+                                <Box className="w-3 h-3 text-indigo-600" />
+                                <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">{resumo?.calibragem?.skus} SKUs em Sintonia</p>
                             </div>
                         )}
                     </Card>
 
-                    {/* Ganho Realista (Range) */}
+                    {/* Ganho Realista Projetado */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-emerald-100/20 bg-emerald-600 p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
-                            <PieChart className="w-8 h-8 text-white opacity-40" />
-                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Lucro Realista Projetado</span>
+                            <TrendingUp className="w-8 h-8 text-white opacity-40" />
+                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Ganho Líquido Projetado</span>
                         </div>
                         <div className="space-y-1">
                             {(() => {
-                                const ganhoOtimista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(p.ganhoUnitario || 0) * p.quantidade), 0) || 0;
-                                const ganhoRealista = ganhoOtimista * 0.85;
+                                const totalRealista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(calculatePriceSuggestion(p.custoBase, p.precoAtual, configs, canal, p.deltaRaw, p.cv).ganhoRealista) * p.quantidade), 0) || 0;
                                 return (
                                     <>
-                                        <h3 className="text-2xl font-black text-white">
-                                            R$ {ganhoRealista.toFixed(0)} ~ {ganhoOtimista.toFixed(0)}
-                                        </h3>
-                                        <p className="text-[10px] font-black text-emerald-200 uppercase tracking-tighter italic">Projeção com atrito operacional</p>
+                                        <h3 className="text-3xl font-black text-white">R$ {totalRealista.toFixed(2)}</h3>
+                                        <p className="text-[10px] font-black text-emerald-100 uppercase tracking-tighter italic">Impacto Mensal Calibrado</p>
                                     </>
                                 )
                             })()}
                         </div>
-                        <div className="absolute -right-4 -bottom-4 opacity-[0.1] group-hover:scale-110 transition-transform">
-                            <TrendingUp className="w-32 h-32 text-white" />
-                        </div>
                     </Card>
 
-                    {/* D-Day Blindado */}
+                    {/* D-Day Sintonizado */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
-                            <div className="flex items-center gap-2">
-                                <Clock className="w-8 h-8 text-indigo-600 opacity-40" />
-                                <div className="text-[8px] font-black px-1.5 py-0.5 rounded-full border bg-slate-50 border-slate-200 text-slate-500 uppercase tracking-tighter">
-                                    CV {resumo?.governança?.CV}
-                                </div>
-                            </div>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Blindada</span>
+                            <Clock className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Equilíbrio Sintonizado</span>
                         </div>
                         <div className="space-y-1">
-                            {resumo?.dDayRange !== "Equilibrado" ? (
-                                <>
-                                    <h3 className="text-3xl font-black text-gray-900">{resumo.dDayRange}</h3>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Meta de equilíbrio de caixa</p>
-                                </>
-                            ) : (
-                                <h3 className="text-2xl font-black text-emerald-600 uppercase italic">Caixa Saudável</h3>
-                            )}
+                            <h3 className="text-3xl font-black text-gray-900">{resumo?.dDayRange}</h3>
+                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Fator de Confiança: {Number(resumo?.calibragem?.cv) < 0.2 ? '95%' : '75%'}</p>
                         </div>
                     </Card>
                     
@@ -345,8 +328,8 @@ export default function Relatorios() {
                                                                     <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
                                                                         Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} ajustado
                                                                     </div>
-                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                                                                        + R$ {suggestion?.ganhoUnitario}/unid
+                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 shadow-sm">
+                                                                        {suggestion?.confianca}% de confiança
                                                                     </div>
                                                                 </div>
                                                                 {suggestion?.ciclosTotais > 1 && (
