@@ -19,7 +19,6 @@ export async function reportsRoutes(app: FastifyInstance) {
         const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
         const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
         
-        const from30d = subDays(new Date(), 30)
         const from14d = subDays(new Date(), 14)
 
         const user = await prisma.user.findUnique({ 
@@ -29,55 +28,48 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
 
-        // 0. ANÁLISE DE VOLUMES v2.1 (ANTI-CONCENTRAÇÃO)
+        // 0. ANÁLISE ADAPTATIVA v2.2
         const todasVendas14d = await prisma.venda.findMany({
             where: { userId, data_venda: { gte: from14d } },
             include: { itens: true }
         })
 
-        const ldiarios: Record<string, { vol: number, lucro: number, skus: Record<string, number> }> = {}
+        let totalAmostra = 0
         const globalSKUs: Record<string, number> = {}
+        const ldiarios: Record<string, { vol: number, lucro: number }> = {}
 
         todasVendas14d.forEach(v => {
             const d = format(v.data_venda, 'yyyy-MM-dd')
-            if (!ldiarios[d]) ldiarios[d] = { vol: 0, lucro: 0, skus: {} }
-            
+            if (!ldiarios[d]) ldiarios[d] = { vol: 0, lucro: 0 }
             v.itens.forEach(i => {
-                ldiarios[d].vol += Number(i.quantidade)
-                ldiarios[d].lucro += (Number(i.lucro_unitario || 0) * Number(i.quantidade))
-                ldiarios[d].skus[i.produtoId as string] = (ldiarios[d].skus[i.produtoId as string] || 0) + Number(i.quantidade)
-                globalSKUs[i.produtoId as string] = (globalSKUs[i.produtoId as string] || 0) + Number(i.quantidade)
+                const q = Number(i.quantidade)
+                totalAmostra += q
+                ldiarios[d].vol += q
+                ldiarios[d].lucro += (Number(i.lucro_unitario || 0) * q)
+                globalSKUs[i.produtoId as string] = (globalSKUs[i.produtoId as string] || 0) + q
             })
         })
 
-        const totalAmostra = Object.values(ldiarios).reduce((acc, d) => acc + d.vol, 0)
         const skuDominanteVolume = Math.max(...Object.values(globalSKUs), 0)
-        const fatorConcentracao = totalAmostra > 0 ? skuDominanteVolume / totalAmostra : 0
-        const hasDiversidade = fatorConcentracao <= 0.70 && Object.keys(globalSKUs).length >= 3
-
+        const concentracao = totalAmostra > 0 ? skuDominanteVolume / totalAmostra : 0
         const lucrosArray = Object.values(ldiarios).map(d => d.lucro)
         const mediaLucro = lucrosArray.length > 0 ? (lucrosArray.reduce((a, b) => a + b, 0) / lucrosArray.length) : 0
-        const hasRelevancia = mediaLucro >= 50.0 && totalAmostra >= 15
-
-        // Diagnóstico de "O que falta"
-        const diagnostico = {
-            vendasFaltantes: Math.max(0, 15 - totalAmostra),
-            skusFaltantes: Math.max(0, 3 - Object.keys(globalSKUs).length),
-            concentracaoAlta: fatorConcentracao > 0.70
-        }
-
+        
+        // EWMA Adaptativo (Sensor de Tendência)
         const variancia = lucrosArray.length > 0 ? lucrosArray.reduce((acc, val) => acc + Math.pow(val - mediaLucro, 2), 0) / lucrosArray.length : 0
         const CV = mediaLucro > 0 ? Math.max(0.1, Math.min(1.0, Math.sqrt(variancia) / mediaLucro)) : 1
 
+        // 1. REGIME DESBLOQUEADO (Soft Anti-Baleia)
+        const hasRelevancia = mediaLucro >= 50.0 && totalAmostra >= 15
+        const regimeStatus = hasRelevancia ? "CONFIRMADO" : (totalAmostra >= 10 ? "FORMAÇÃO" : "ESTÁVEL")
+
+        // 2. MOTOR DE RECOMENDAÇÕES
+        const recomendacoes = []
+        if (totalAmostra < 15) recomendacoes.push(`Venda mais ${15 - totalAmostra} itens para estabilizar o radar.`)
+        if (concentracao > 0.70) recomendacoes.push("Alta dependência de um só produto. Diversifique para maior segurança.")
+        if (CV > 0.5) recomendacoes.push("Volatilidade alta detectada. Aguarde estabilização antes de grandes saltos.")
+
         const desvioTotal = Math.max(0, Number(await prisma.gastoOperacional.aggregate({ _sum: { valor: true }, where: { userId, data: { gte: from14d } } }).then(r => r._sum.valor || 0)) - ((Number(user.custo_fixo_mensal || 0) / 30) * 14))
-        
-        // REGIME v2.1 (REQUISITO: MASSA + DIVERSIDADE + ANTI-BALEIA)
-        const volumesArray = Object.values(ldiarios).map(d => d.vol).sort((a, b) => a - b)
-        const p75 = volumesArray[Math.floor(volumesArray.length * 0.75)] || 1
-        const ultimos5Ruptrura = Object.values(ldiarios).slice(-5).filter(d => d.vol > (p75 * 1.15)).length
-        
-        const regimeStatus = (hasRelevancia && hasDiversidade && ultimos5Ruptrura >= 4) ? "CONFIRMADO" : 
-                           (totalAmostra >= 10 && Object.keys(globalSKUs).length >= 2 && ultimos5Ruptrura >= 2 ? "FORMAÇÃO" : "ESTÁVEL")
 
         const performance = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
@@ -98,21 +90,21 @@ export async function reportsRoutes(app: FastifyInstance) {
                 precoAtual: Number(prod?.preco || 0),
                 custoBase: Number(prod?.custo || 0),
                 deltaRaw: desvioTotal / (Number(totalAmostra / 30) || 1),
-                cv: CV
+                cv: CV,
+                concentracao: concentracao
             }
         }))
 
         return {
-            periodo: { from, to, engine: "Decision Transparency v2.1" },
+            periodo: { engine: "Adaptive Decision v2.2" },
             resumo: {
                 hasRelevancia,
-                hasDiversidade,
-                diagnostico,
+                recomendacoes,
                 volumeReferencia: Math.round(totalAmostra),
                 desvioTotal: Number(desvioTotal.toFixed(2)),
-                dDayRange: (hasRelevancia && hasDiversidade) ? `${Math.ceil(desvioTotal / (mediaLucro * (1.1 - CV)))} - ${Math.ceil(desvioTotal / (mediaLucro * (0.9 - CV)))} dias` : "Aguardando Amostra Robusta",
+                dDayRange: hasRelevancia ? `${Math.ceil(desvioTotal / (mediaLucro * 1.1))} - ${Math.ceil(desvioTotal / (mediaLucro * 0.9))} dias` : "Coletando massa histórica",
                 regime: regimeStatus,
-                transparencia: { cv: CV.toFixed(2), skus: Object.keys(globalSKUs).length, concentracao: (fatorConcentracao * 100).toFixed(0) + "%" }
+                adaptabilidade: { cv: CV.toFixed(2), concentracao: (concentracao * 100).toFixed(0) + "%" }
             },
             rankings: { detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal) }
         }

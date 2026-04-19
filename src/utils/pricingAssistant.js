@@ -1,9 +1,9 @@
 /**
- * Assistente de Precificação Lucro Certo (v2.1 - Decision Transparency)
- * Confiança Semântica, EWMA Friction e Filtro de Representatividade.
+ * Assistente de Precificação Lucro Certo (v2.2 - Adaptive Decision)
+ * Confiança Híbrida, Anti-Baleia Soft e EWMA Dinâmico.
  */
 
-const FORMULA_VERSION = "v2.1";
+const FORMULA_VERSION = "v2.2";
 const ABSOLUTE_CAP = 10.00; 
 const PERCENT_CAP = 0.20;   
 const MAX_TICK_STEP = 5.00; 
@@ -15,18 +15,21 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Tradutor de Confiança Semântica
+ * Tradutor de Confiança Híbrida (v2.2)
  */
-function getConfidenceLabel(confidenceValue) {
-    if (confidenceValue >= 0.90) return { label: "ALTA", color: "emerald", desc: "Dados robustos e estáveis" };
-    if (confidenceValue >= 0.75) return { label: "MÉDIA", color: "indigo", desc: "Em fase de validação" };
-    return { label: "BAIXA", color: "amber", desc: "Dados voláteis ou parciais" };
+function getHybridConfidence(value, concentrationPenalty = 0) {
+    const finalVal = Math.max(0.40, value - concentrationPenalty);
+    const pct = (finalVal * 100).toFixed(0);
+    
+    if (finalVal >= 0.90) return { label: "ALTA", pct, color: "emerald" };
+    if (finalVal >= 0.70) return { label: "MÉDIA", pct, color: "indigo" };
+    return { label: "BAIXA", pct, color: "amber" };
 }
 
 /**
- * Motor de Precificação Transparência v2.1
+ * Motor de Precificação Adaptativo v2.2
  */
-export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, cv = 0.2) {
+export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, cv = 0.2, concentration = 0) {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
@@ -44,10 +47,9 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     const stepDelta = precoBase * 0.05;
     const deltaAplicado = Math.max(-stepDelta, Math.min(stepDelta, parseFloat(deltaRaw || 0)));
 
-    // Arredondamento High Precision (mantido da v2.0)
     const capValue = Math.min(parseFloat(currentPrice || precoBase) * PERCENT_CAP, ABSOLUTE_CAP, MAX_TICK_STEP);
-    const precoSugeridoBase = precoBase + deltaAplicado;
-    const precoSugerido = Math.max(parseFloat(currentPrice || precoBase) - capValue, Math.min(parseFloat(currentPrice || precoBase) + capValue, precoSugeridoBase));
+    const baseTarget = precoBase + deltaAplicado;
+    const precoSugerido = Math.max(parseFloat(currentPrice || precoBase) - capValue, Math.min(parseFloat(currentPrice || precoBase) + capValue, baseTarget));
 
     const deltaTotalRestante = Math.abs(parseFloat(deltaRaw || 0));
     const ciclosTotais = Math.ceil(deltaTotalRestante / (stepDelta || 1));
@@ -55,22 +57,21 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     
     const lucroTeorico = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) - (precoBase * margemAlvoDec);
     
-    // Atrito Suavizado v2.1
+    // Fator de Atrito Adaptativo com Penalidade de Concentração (Soft Anti-Baleia)
     const config = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
+    const concentrationPenalty = concentration > 0.70 ? (concentration - 0.70) * 0.5 : 0;
     const rawFriction = 1 - (cv * 0.4) - config.friction_base;
-    const friction = Math.max(0.60, Math.min(0.95, rawFriction));
     
-    const confidence = getConfidenceLabel(friction);
+    const confidence = getHybridConfidence(rawFriction, concentrationPenalty);
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
         cicloAtual: (Math.max(1, ciclosTotais) - ciclosRestantes),
         ciclosTotais: Math.max(1, ciclosTotais),
-        ganhoRealista: (lucroTeorico * friction).toFixed(2),
-        confianca: confidence.label,
+        ganhoRealista: (lucroTeorico * (Number(confidence.pct)/100)).toFixed(2),
+        confianca: `${confidence.label} (${confidence.pct}%)`,
         confiancaCor: confidence.color,
-        confiancaDesc: confidence.desc,
         versao: FORMULA_VERSION
     };
 }

@@ -175,65 +175,64 @@ export default function Relatorios() {
                         </div>
                     </Card>
 
-                    {/* Inteligência Transparency v2.1 */}
+                    {/* Inteligência Adaptive v2.2 */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 overflow-hidden relative group">
                         <div className="flex justify-between items-start mb-4">
-                            <Eye className="w-8 h-8 text-indigo-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transparency v2.1</span>
+                            <BrainCircuit className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Adaptive v2.2</span>
                         </div>
                         <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vendas</span></h3>
                         
-                        {(!resumo?.hasRelevancia || !resumo?.hasDiversidade) ? (
+                        {resumo?.recomendacoes?.length > 0 ? (
                             <div className="mt-4 space-y-2">
-                                <div className="flex items-center gap-2 py-2 px-4 bg-slate-100 rounded-2xl w-fit">
-                                    <Search className="w-4 h-4 text-slate-400" />
-                                    <p className="text-[10px] font-black text-slate-500 uppercase">Diagnóstico: {resumo?.diagnostico?.vendasFaltantes > 0 ? `Faltam ${resumo.diagnostico.vendasFaltantes} vendas` : (resumo?.diagnostico?.concentracaoAlta ? 'Concentração Alta' : 'Faltam SKUs')}</p>
-                                </div>
-                                <div className="h-1 bg-slate-100 rounded-full w-full overflow-hidden">
-                                    <div className="h-full bg-indigo-400" style={{ width: `${Math.min((resumo?.volumeReferencia / 15) * 100, 100)}%` }}></div>
-                                </div>
+                                {resumo.recomendacoes.slice(0, 2).map((rec, i) => (
+                                    <div key={i} className="flex items-start gap-2 py-2 px-4 bg-indigo-50/50 rounded-2xl border border-indigo-100/50">
+                                        <Lightbulb className="w-3 h-3 text-indigo-600 mt-0.5 shrink-0" />
+                                        <p className="text-[9px] font-bold text-indigo-700 leading-tight italic">{rec}</p>
+                                    </div>
+                                ))}
                             </div>
                         ) : (
-                            <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-indigo-50 rounded-xl border border-indigo-100 w-fit">
-                                <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                                <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Representatividade Real {resumo?.transparencia?.concentracao}</p>
+                            <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-emerald-50 rounded-xl border border-emerald-100 w-fit">
+                                <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight italic">Dados em Regime Adaptativo</p>
                             </div>
                         )}
                     </Card>
 
-                    {/* Ganho Realista (Fator v2.1) */}
+                    {/* Ganho Realista Projetado */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-emerald-100/20 bg-emerald-600 p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
                             <TrendingUp className="w-8 h-8 text-white opacity-40" />
-                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Lucro Real Estimado</span>
+                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Aceleração Mensal Projetada</span>
                         </div>
                         <div className="space-y-1">
                             {(() => {
-                                const totalRealista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(calculatePriceSuggestion(p.custoBase, p.precoAtual, configs, canal, p.deltaRaw, p.cv).ganhoRealista) * p.quantidade), 0) || 0;
+                                const totalRealista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(calculatePriceSuggestion(p.custoBase, p.precoAtual, configs, canal, p.deltaRaw, p.cv, p.concentracao).ganhoRealista) * p.quantidade), 0) || 0;
                                 return (
                                     <>
                                         <h3 className="text-3xl font-black text-white">R$ {totalRealista.toFixed(2)}</h3>
-                                        <p className="text-[10px] font-black text-emerald-100 uppercase tracking-tighter italic">Projeção Suavizada (EWMA)</p>
+                                        <p className="text-[10px] font-black text-emerald-100 uppercase tracking-tighter italic">Baseada no regime {resumo?.regime}</p>
                                     </>
                                 )
                             })()}
                         </div>
                     </Card>
 
-                    {/* D-Day Interpretável */}
+                    {/* D-Day Adaptativo */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-2">
                                 <Clock className="w-8 h-8 text-indigo-600 opacity-40" />
-                                <div className="text-[8px] font-black px-1.5 py-0.5 rounded-full border bg-slate-50 border-slate-200 text-slate-500 uppercase tracking-tighter italic">
-                                    Concentração: {resumo?.transparencia?.concentracao}
+                                <div className="text-[8px] font-black px-1.5 py-0.5 rounded-full border bg-emerald-50 border-emerald-200 text-emerald-600 uppercase tracking-tighter italic shadow-sm">
+                                    Tendência Ativa
                                 </div>
                             </div>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Confiança Interpretável</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Dinâmica</span>
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-3xl font-black text-gray-900">{resumo?.dDayRange}</h3>
-                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Base: {resumo?.transparencia?.skus} SKUs | CV {resumo?.transparencia?.cv}</p>
+                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Sincronia: {resumo?.adaptabilidade?.concentracao} foco | CV {resumo?.adaptabilidade?.cv}</p>
                         </div>
                     </Card>
                     
@@ -338,8 +337,9 @@ export default function Relatorios() {
                                                                     <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
                                                                         Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} ajustado
                                                                     </div>
-                                                                    <div className={`flex items-center gap-1 text-[9px] font-black text-${suggestion?.confiancaCor}-600 bg-${suggestion?.confiancaCor}-50 px-2 py-0.5 rounded-full border border-${suggestion?.confiancaCor}-100 shadow-sm`} title={suggestion?.confiancaDesc}>
-                                                                        CONFIANÇA {suggestion?.confianca}
+                                                                    <div className={`flex items-center gap-1.5 text-[9px] font-black text-${suggestion?.confiancaCor}-600 bg-${suggestion?.confiancaCor}-50 px-2.5 py-1 rounded-full border border-${suggestion?.confiancaCor}-100 shadow-sm items-center`}>
+                                                                        <div className={`w-1 h-1 rounded-full bg-${suggestion?.confiancaCor}-500 animate-pulse`}></div>
+                                                                        {suggestion?.confianca}
                                                                     </div>
                                                                 </div>
                                                                 {suggestion?.ciclosTotais > 1 && (
