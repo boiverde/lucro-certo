@@ -12,6 +12,20 @@ model User {
   email         String    @unique
   name          String
   password_hash String
+  plan          String    @default("free")
+  planType      String?
+  planExpiresAt DateTime?
+
+  // Unit Economics & Presets
+  taxa_impostos          Decimal @default(0) @db.Decimal(10, 2)
+  taxa_cartao            Decimal @default(0) @db.Decimal(10, 2)
+  custo_fixo_mensal      Decimal @default(0) @db.Decimal(10, 2)
+
+  // Margens por Canal
+  margem_balcao          Decimal @default(30) @db.Decimal(10, 2)
+  margem_delivery        Decimal @default(40) @db.Decimal(10, 2)
+  margem_marketplace     Decimal @default(50) @db.Decimal(10, 2)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

@@ -34,6 +34,14 @@ export async function gastosOperacionaisRoutes(app: FastifyInstance) {
             where,
             take,
             skip,
+            select: {
+                id: true,
+                descricao: true,
+                valor: true,
+                data: true,
+                categoria: true,
+                userId: true
+            },
             orderBy: { data: 'desc' },
         })
 

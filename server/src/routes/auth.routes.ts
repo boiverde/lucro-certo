@@ -177,4 +177,21 @@ export async function authRoutes(app: FastifyInstance) {
 
         return user
     })
+    
+    // Obter Dados do Usuário (Identidade)
+    app.get('/me', {
+        onRequest: [(app as any).authenticate]
+    }, async (request) => {
+        const userId = (request.user as any).sub
+        
+        const user = await prisma.user.findUnique({
+            where: { id: userId }
+        })
+
+        if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
+
+        // Filtramos os campos sensíveis e enviamos o resto
+        const { password_hash, ...safeUser } = user
+        return safeUser
+    })
 }

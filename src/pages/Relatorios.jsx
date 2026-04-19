@@ -21,8 +21,6 @@ import {
     PieChart,
     ShieldAlert,
     BrainCircuit,
-    Lightbulb,
-    ShieldCheck,
     CheckCircle,
     ShieldCheck as ShieldIcon,
     Search
