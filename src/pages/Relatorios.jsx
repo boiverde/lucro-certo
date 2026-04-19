@@ -179,12 +179,27 @@ export default function Relatorios() {
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8">
                         <div className="flex justify-between items-start mb-4">
                             <TrendingUp className="w-8 h-8 text-emerald-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inteligência Operacional</span>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Estabilidade Híbrida</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeInteligente} <span className="text-sm text-gray-400 font-bold">Unidades/mês</span></h3>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeHibrido} <span className="text-sm text-gray-400 font-bold">Volume/v1.4</span></h3>
                         <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-indigo-50 rounded-xl border border-indigo-100 w-fit">
                             <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                            <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Algoritmo EWMA v1.3 Ativo</p>
+                            <p className="text-[9px] font-black text-indigo-600 uppercase tracking-tight italic">Filtro de Quartis (P25-P75) Ativo</p>
+                        </div>
+                    </Card>
+
+                    {/* Recuperação de Caixa */}
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group">
+                        <div className="flex justify-between items-start mb-4">
+                            <Shield className="w-8 h-8 text-rose-600 opacity-40 group-hover:animate-pulse" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Saúde do Caixa (14d)</span>
+                        </div>
+                        <h3 className="text-2xl font-black text-gray-900">R$ {resumo?.desvioTotalAcumulado?.toFixed(2)}</h3>
+                        <div className="flex items-center gap-2 mt-2">
+                            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div className="h-full bg-rose-500 rounded-full" style={{ width: `${Math.min(100, (resumo?.gapRecuperacao || 0) * 2)}%` }}></div>
+                            </div>
+                            <span className="text-[10px] font-black text-rose-600 uppercase">Ajuste Gradual</span>
                         </div>
                     </Card>
                 </div>
@@ -283,8 +298,15 @@ export default function Relatorios() {
                                                             {suggestion?.zona}
                                                         </span>
                                                         {Number(suggestion?.deltaAplicado) !== 0 && (
-                                                            <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">
-                                                                Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} suavizado
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                                                                    Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} aplicado
+                                                                </div>
+                                                                {Number(suggestion?.deltaPendente) > 0 && (
+                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-gray-400 italic">
+                                                                        Faltam R$ {suggestion?.deltaPendente}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -298,7 +320,7 @@ export default function Relatorios() {
                                             <Button 
                                                 size="sm"
                                                 onClick={() => {
-                                                    const prodParaUpdate = { ...item, precoSugerido: suggestion.precoSugerido, margemAlvo: suggestion.margemLiquida };
+                                                    const prodParaUpdate = { ...item, precoSugerido: suggestion.precoSugerido, margemAlvo: suggestion.margemReal };
                                                     if (!isPartial) setSelectedProduct(prodParaUpdate);
                                                     else openUpgrade("Recupere sua margem agora.");
                                                 }}

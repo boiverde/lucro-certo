@@ -1,10 +1,10 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.3 - Algorithmic)
- * EWMA, Zonas por Categoria e Delta Suavizado com Clamp.
+ * Assistente de Precificação Lucro Certo (v1.4 - Hybrid Resilience)
+ * Volume Híbrido, Validação Pós-Arredondamento e Recuperação de Caixa.
  */
 
-const FORMULA_VERSION = "v1.3";
-const ALPHA = 0.25; // EWMA Smoothing Factor
+const FORMULA_VERSION = "v1.4";
+const ALPHA = 0.25; 
 
 const CANAIS_CONFIG = {
     balcao: { risk: 0.75, name: 'BALCÃO' },
@@ -13,30 +13,30 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Calcula EWMA para uma série de volumes
+ * Arredondamento Comercial com Validação de Margem Proativa
  */
-export function calculateEWMA(volumes) {
-    if (!volumes || volumes.length === 0) return 1;
-    let ewma = volumes[0];
-    for (let i = 1; i < volumes.length; i++) {
-        ewma = ALPHA * volumes[i] + (1 - ALPHA) * ewma;
+function secureRounding(targetPrice, cost, taxesDec, targetMarginDec) {
+    const points = [0.00, 0.50, 0.90, 0.99];
+    let base = Math.floor(targetPrice);
+    
+    // Testar pontos de arredondamento
+    for (let p of points) {
+        let candidate = base + p;
+        if (candidate < targetPrice) continue; // Garante que nunca arredonda pra baixo da necessidade basal
+
+        // Validar margem real do candidato
+        let profit = candidate - cost - (candidate * taxesDec);
+        let realMargin = profit / candidate;
+
+        if (realMargin >= targetMarginDec) return candidate;
     }
-    return ewma;
+
+    // Se nenhum ponto no real atual serviu, tenta o próximo real
+    return base + 1.90; 
 }
 
 /**
- * Arredondamento Comercial Padronizado
- */
-function standardizePrice(price) {
-    const rounded = Math.round(price * 10) / 10;
-    const decimal = price - Math.floor(price);
-    if (decimal > 0.85) return Math.floor(price) + 0.90;
-    if (decimal > 0.45 && decimal < 0.55) return Math.floor(price) + 0.50;
-    return Math.ceil(price);
-}
-
-/**
- * Motor de Precificação Algorítmico v1.3
+ * Motor de Precificação Resiliente v1.4
  */
 export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
@@ -58,35 +58,35 @@ export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaR
 
     const precoBase = parseFloat(cost) / divisor;
     
-    // Delta Suavizado com Clamp (Trava de ±5%)
+    // Clamp de Delta (Recuperação Escalonada)
     const maxDelta = precoBase * 0.05;
-    const minDelta = precoBase * -0.05;
-    const deltaSuavizado = Math.max(minDelta, Math.min(maxDelta, parseFloat(deltaRaw || 0)));
+    const deltaAplicado = Math.max(-maxDelta, Math.min(maxDelta, parseFloat(deltaRaw || 0)));
 
-    const precoFinalRaw = precoBase + deltaSuavizado;
-    const precoSugerido = standardizePrice(precoFinalRaw);
+    const precoMeta = precoBase + deltaAplicado;
+    const precoSugerido = secureRounding(precoMeta, cost, taxasVariaveisDec, margemDesejadaDec);
 
-    // Análise de Zonas
+    // Zonas DESACOPLADAS (Foco na estrutura de custo)
     let zona = "SEGURA";
     let color = "emerald";
     if (somaCargos > canalInfo.risk) {
-        zona = "CRÍTICA"; color = "red";
-    } else if (somaCargos > (canalInfo.risk - 0.10)) {
+        zona = "CRÍTICA"; color = "rose";
+    } else if (somaCargos > (canalInfo.risk - 0.12)) {
         zona = "ALERTA"; color = "amber";
     }
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
-        deltaAplicado: deltaSuavizado.toFixed(2),
+        deltaAplicado: deltaAplicado.toFixed(2),
+        deltaPendente: (parseFloat(deltaRaw || 0) - deltaAplicado).toFixed(2),
         zona,
         color,
         versao: FORMULA_VERSION,
-        lucroUnitario: (precoSugerido * margemDesejadaDec).toFixed(2),
-        margemLiquida: margemDesejada.toFixed(1),
+        lucroReal: (precoSugerido - cost - (precoSugerido * taxasVariaveisDec)).toFixed(2),
+        margemReal: (((precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) / precoSugerido) * 100).toFixed(1),
         canal: canalInfo.name,
         detalhes: {
-            markup: (1 / divisor).toFixed(2),
-            ewmaUsed: true
+            isHybrid: true,
+            roundingValidated: true
         }
     };
 }
