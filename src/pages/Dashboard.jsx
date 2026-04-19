@@ -208,58 +208,21 @@ export default function Dashboard() {
         {/* Painel de Estoque */}
         <PainelEstoque stats={dashboardStats?.estoque} />
 
-        {/* Cards de Gastos Específicos */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 mt-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Alimentação</CardTitle>
-              <Utensils className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">R$ {alimentacao.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Gasolina</CardTitle>
-              <Fuel className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">R$ {gasolina.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Diárias</CardTitle>
-              <Users className="h-4 w-4 text-gray-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">R$ {diarias.toFixed(2)}</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid lg:grid-cols-1 gap-6 mt-6">
+          <div className="lg:col-span-1">
             <ResumoLucro 
-              compras={transacoes.recentes?.compras || []}
-              vendas={transacoes.recentes?.vendas || []}
-              gastos={transacoes.recentes?.gastos || []}
-              vendasRevenda={vendasRevenda}
-            />
-          </div>
-          <div>
-            <UltimasTransacoes 
-              compras={transacoes.recentes?.compras || []}
-              vendas={transacoes.recentes?.vendas || []}
-              gastos={transacoes.recentes?.gastos || []}
-              vendasRevenda={vendasRevenda}
+              vendasTotal={transacoes.totalVendas || 0}
+              comprasTotal={transacoes.totalCompras || 0}
+              gastosTotal={transacoes.totalGastos || 0}
+              comissoesTotal={dashboardStats?.comissoes?.comissoesDoMes || 0}
             />
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+>
     </div>
   );
 }
