@@ -1,9 +1,10 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.5 - Adaptive Engine)
- * Arredondamento Competitivo, Detecção de Regime e Previsão de Equilíbrio.
+ * Assistente de Precificação Lucro Certo (v1.6 - Elite Control)
+ * Cap de Variação, Histerese de Regime e Ciclos de Ajuste.
  */
 
-const FORMULA_VERSION = "v1.5";
+const FORMULA_VERSION = "v1.6";
+const PRICE_CAP_PERCENT = 0.20; // Máximo 20% de alteração manual/gradual por vez
 
 const CANAIS_CONFIG = {
     balcao: { risk: 0.75, name: 'BALCÃO' },
@@ -12,41 +13,43 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Arredondamento Inteligente & Competitivo
- * Busca o MENOR preço que respeita a margem alvo.
+ * Arredondamento com Cap de Variação & Histerese
+ * Protege contra aumentos abusivos e mudanças de regime falsas.
  */
-function competitiveRounding(basePrice, cost, taxesDec, targetMarginDec) {
-    const points = [0.00, 0.50, 0.90, 0.99]; // Pontos psicológicos
-    let integerPart = Math.floor(basePrice);
+function secureEliteRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
+    const points = [0.00, 0.50, 0.90, 0.99];
+    const maxAllowed = currentPrice * (1 + PRICE_CAP_PERCENT);
+    const minAllowed = currentPrice * (1 - PRICE_CAP_PERCENT);
+
+    const baseMeta = Math.max(minAllowed, Math.min(maxAllowed, targetPrice));
     
-    // Testar pontos no real atual e no anterior (para ser agressivo se possível)
+    let integerPart = Math.floor(baseMeta);
     let candidates = [];
-    for (let offset of [-1, 0, 1]) {
+    for (let offset of [0, 1]) {
         for (let p of points) {
             candidates.push(integerPart + offset + p);
         }
     }
 
-    // Filtrar apenas os que respeitam a margem
-    let validCandidates = candidates.filter(c => {
+    // Filtrar válidos (que respeitem a margem mínima e o teto de variação)
+    let valid = candidates.filter(c => {
         if (c <= 0) return false;
         let profit = c - cost - (c * taxesDec);
         let margin = profit / c;
-        return margin >= targetMarginDec;
+        // Margem mínima aceitável com histerese de 2%
+        return margin >= (targetMarginDec - 0.02) && c <= maxAllowed;
     });
 
-    // Ordenar e pegar o menor válido que não seja absurdamente menor que o base
-    validCandidates.sort((a, b) => a - b);
+    valid.sort((a, b) => a - b);
     
-    // O menor válido que seja pelo menos próximo ao preço base necessário
-    const finalPrice = validCandidates.find(c => c >= (basePrice * 0.98)) || (integerPart + 1.10);
-    return finalPrice;
+    // Pegar o menor ponto psicológico que seja >= meta suavizada
+    return valid.find(c => c >= baseMeta) || baseMeta;
 }
 
 /**
- * Motor de Precificação Adaptativo v1.5
+ * Motor de Precificação Elite v1.6
  */
-export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
+export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
@@ -54,38 +57,37 @@ export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaR
     const { taxa_impostos = 0, taxa_cartao = 0 } = configs;
 
     const margemKey = canal === 'balcao' ? 'margem_balcao' : (canal === 'delivery' ? 'margem_delivery' : 'margem_marketplace');
-    const margemDesejada = (parseFloat(configs[margemKey]) || 30) + categoryOffset;
+    const margemAlvoBase = (parseFloat(configs[margemKey]) || 30) + categoryOffset;
     
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
-    const margemDesejadaDec = margemDesejada / 100;
+    const margemAlvoDec = margemAlvoBase / 100;
 
-    const somaCargos = taxasVariaveisDec + margemDesejadaDec;
-    const divisor = 1 - somaCargos;
-
+    const divisor = 1 - (taxasVariaveisDec + margemAlvoDec);
     if (divisor <= 0.05) return { error: "INSOLVENT_MARGIN", message: "Inviabilidade no canal " + canalInfo.name };
 
     const precoBase = parseFloat(cost) / divisor;
     
-    // Clamp de Delta (Ajuste Suave)
-    const maxDelta = precoBase * 0.05;
-    const deltaAplicado = Math.max(-maxDelta, Math.min(maxDelta, parseFloat(deltaRaw || 0)));
+    // Recuperação Escalonada (Clamp 5% por ciclo)
+    const clampDelta = precoBase * 0.05;
+    const deltaAplicado = Math.max(-clampDelta, Math.min(clampDelta, parseFloat(deltaRaw || 0)));
 
-    const precoMeta = precoBase + deltaAplicado;
-    const precoSugerido = competitiveRounding(precoMeta, cost, taxasVariaveisDec, margemDesejadaDec);
+    const precoSugerido = secureEliteRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
+
+    // Cálculo de Ciclos Restantes (Ajustes de 5% pendentes)
+    const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (clampDelta || 1));
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
-        deltaPendente: (parseFloat(deltaRaw || 0) - deltaAplicado).toFixed(2),
-        zona: somaCargos > canalInfo.risk ? "CRÍTICA" : (somaCargos > canalInfo.risk - 0.12 ? "ALERTA" : "SEGURA"),
-        color: somaCargos > canalInfo.risk ? "rose" : (somaCargos > canalInfo.risk - 0.12 ? "amber" : "emerald"),
+        ciclosRestantes,
+        zona: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "CRÍTICA" : "SEGURA",
+        color: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "rose" : "emerald",
         versao: FORMULA_VERSION,
-        lucroReal: (precoSugerido - cost - (precoSugerido * taxasVariaveisDec)).toFixed(2),
         margemReal: (((precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) / precoSugerido) * 100).toFixed(1),
         canal: canalInfo.name,
         detalhes: {
-            adaptiveRounding: true,
-            regimeAware: true
+            isElite: true,
+            hasPriceCap: true
         }
     };
 }
