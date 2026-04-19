@@ -26,61 +26,52 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         const user = await prisma.user.findUnique({ 
             where: { id: userId }, 
-            select: { 
-                plan: true, 
-                margem_balcao: true, 
-                margem_delivery: true, 
-                margem_marketplace: true,
-                taxa_impostos: true,
-                taxa_cartao: true,
-                custo_fixo_mensal: true
-            } 
+            select: { plan: true, margem_balcao: true, margem_delivery: true, margem_marketplace: true, taxa_impostos: true, taxa_cartao: true, custo_fixo_mensal: true }
         })
 
         if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
 
-        // 0. ANÁLISE DE BANDA COM ESCALONAMENTO
         const todasVendas = await prisma.venda.findMany({
             where: { userId, data_venda: { gte: from30d } },
             include: { itens: true }
         })
 
-        const volumesDiarios: Record<string, number> = {}
+        // 0. ANÁLISE DE VOLUMES E MÉTRICAS ESTATÍSTICAS
+        const ldiarios: Record<string, { vol: number, lucro: number }> = {}
         todasVendas.forEach(v => {
             const d = format(v.data_venda, 'yyyy-MM-dd')
-            volumesDiarios[d] = (volumesDiarios[d] || 0) + v.itens.reduce((acc, i) => acc + Number(i.quantidade), 0)
+            if (!ldiarios[d]) ldiarios[d] = { vol: 0, lucro: 0 }
+            const v_lucro = v.itens.reduce((acc, i) => acc + (Number(i.lucro_unitario || 0) * Number(i.quantidade)), 0)
+            const v_vol = v.itens.reduce((acc, i) => acc + Number(i.quantidade), 0)
+            ldiarios[d].vol += v_vol
+            ldiarios[d].lucro += v_lucro
         })
 
-        const serieSorted = Object.values(volumesDiarios).sort((a, b) => a - b)
-        const p25 = serieSorted[Math.floor(serieSorted.length * 0.25)] || 0
-        const p75 = serieSorted[Math.floor(serieSorted.length * 0.75)] || 1
+        const lucrosArray = Object.values(ldiarios).map(d => d.lucro)
+        const mediaLucro = lucrosArray.length > 0 ? (lucrosArray.reduce((a, b) => a + b, 0) / lucrosArray.length) : 0
         
-        // Histerese Adaptativa: 10% (Formação) vs 15% (Confirmado)
-        const upper10 = p75 * 1.10
-        const upper15 = p75 * 1.15
+        // Coeficiente de Variação (CV) = Desvio Padrão / Média
+        const variancia = lucrosArray.length > 0 ? lucrosArray.reduce((acc, val) => acc + Math.pow(val - mediaLucro, 2), 0) / lucrosArray.length : 0
+        const desvioPadrao = Math.sqrt(variancia)
+        const CV = mediaLucro > 0 ? desvioPadrao / mediaLucro : 1
 
-        const ultimos5Dias = Array.from({ length: 5 }).map((_, i) => format(subDays(new Date(), i), 'yyyy-MM-dd'))
-        const freq10 = ultimos5Dias.filter(d => (volumesDiarios[d] || 0) > upper10).length
-        const freq15 = ultimos5Dias.filter(d => (volumesDiarios[d] || 0) > upper15).length
-
-        let regimeStatus = "ESTÁVEL"
-        if (freq15 >= 4) regimeStatus = "CONFIRMADO"
-        else if (freq10 >= 3) regimeStatus = "EM_FORMAÇÃO"
-
-        // 1. D-DAY ROBUSTO (LUCRO BASE + FATOR 0.7)
-        const [gastos14d, itens14d] = await Promise.all([
-            prisma.gastoOperacional.aggregate({ _sum: { valor: true }, where: { userId, data: { gte: from14d } } }),
-            prisma.itemVenda.aggregate({ _sum: { lucro_unitario: true }, where: { venda: { userId, data_venda: { gte: from14d } } } })
-        ])
-
-        const desvioTotal = Math.max(0, Number(gastos14d._sum.valor || 0) - ((Number(user.custo_fixo_mensal || 0) / 30) * 14))
-        const lucroDiarioBase = Number(itens14d._sum.lucro_unitario || 0) / 14
+        // 1. D-DAY ADAPTATIVO POR VOLATILIDADE
+        const desvioTotal = Math.max(0, Number(await prisma.gastoOperacional.aggregate({ _sum: { valor: true }, where: { userId, data: { gte: from14d } } }).then(r => r._sum.valor || 0)) - ((Number(user.custo_fixo_mensal || 0) / 30) * 14))
         
-        // Fator conservador agressivo (0.7) para evitar promessas
-        const dDayMin = lucroDiarioBase > 0 ? Math.ceil(desvioTotal / (lucroDiarioBase * 0.9)) : null
-        const dDayMax = lucroDiarioBase > 0 ? Math.ceil(desvioTotal / (lucroDiarioBase * 0.7)) : null
+        // Fator adaptativo: CV baixo (estável) -> fator 0.9. CV alto (volátil) -> fator 0.5
+        const fatorSeguranca = Math.max(0.5, Math.min(0.9, 1 - CV))
+        const dDayMin = mediaLucro > 0 ? Math.ceil(desvioTotal / (mediaLucro * (fatorSeguranca + 0.1))) : null
+        const dDayMax = mediaLucro > 0 ? Math.ceil(desvioTotal / (mediaLucro * (fatorSeguranca - 0.1))) : null
 
-        // 2. PROCESSAMENTO DE RANKING PREDITIVO
+        // 2. DETECÇÃO DE REGIME COM MASSA CRÍTICA
+        const volumesArray = Object.values(ldiarios).map(d => d.vol).sort((a, b) => a - b)
+        const p75 = volumesArray[Math.floor(volumesArray.length * 0.75)] || 1
+        const ultimos5 = Object.values(ldiarios).slice(-5).filter(d => d.vol > (p75 * 1.15)).length
+        
+        const totalAmostraNoMes = Object.values(ldiarios).reduce((acc, d) => acc + d.vol, 0)
+        const regimeStatus = (totalAmostraNoMes >= 15 && ultimos5 >= 4) ? "CONFIRMADO" : (totalAmostraNoMes >= 15 && ultimos5 >= 2 ? "FORMAÇÃO" : "ESTÁVEL")
+
+        // 3. RANKING HIGH PRECISION
         const performance = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
             where: { venda: { userId, data_venda: { gte: from, lte: to } } },
@@ -99,18 +90,18 @@ export async function reportsRoutes(app: FastifyInstance) {
                 margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1)),
                 precoAtual: Number(prod?.preco || 0),
                 custoBase: Number(prod?.custo || 0),
-                deltaRaw: desvioTotal / (Number(serieSorted.reduce((a, b) => a + b, 0) / 30) || 1)
+                deltaRaw: desvioTotal / (Number(totalAmostraNoMes / 30) || 1)
             }
         }))
 
         return {
-            periodo: { from, to, engine: "Predictive Intelligence v1.7" },
+            periodo: { from, to, motor: "High Precision v1.8" },
             resumo: {
-                volumeReferencia: Math.round((serieSorted.reduce((a, b) => a + b, 0) / (serieSorted.length || 1)) * 30),
+                volumeReferencia: Math.round(totalAmostraNoMes),
                 desvioTotal: Number(desvioTotal.toFixed(2)),
                 dDayRange: dDayMin !== null ? `${dDayMin}-${dDayMax} dias` : "Equilibrado",
                 regime: regimeStatus,
-                precisao: "Alta Confiança (70%)"
+                estatisticas: { CV: CV.toFixed(2), fator: fatorSeguranca.toFixed(2), amostraSuficiente: totalAmostraNoMes >= 15 }
             },
             rankings: { detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal) }
         }

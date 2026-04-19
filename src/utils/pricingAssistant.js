@@ -1,11 +1,12 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.7 - Predictive Intelligence)
- * Cap Inteligente (Min 20%/R$10), Regime Escalonado e Impacto Total.
+ * Assistente de Precificação Lucro Certo (v1.8 - High Precision)
+ * Cap Triplo (20% / R$10 / Tick R$5), Ganhos Projetados e Amostra Crítica.
  */
 
-const FORMULA_VERSION = "v1.7";
-const ABSOLUTE_CAP = 10.00; // Teto absoluto de variação por ciclo
-const PERCENT_CAP = 0.20;   // Teto percentual por ciclo
+const FORMULA_VERSION = "v1.8";
+const ABSOLUTE_CAP = 10.00; 
+const PERCENT_CAP = 0.20;   
+const MAX_TICK_STEP = 5.00; // Teto de variação bruto por ciclo (Tick)
 
 const CANAIS_CONFIG = {
     balcao: { risk: 0.75, name: 'BALCÃO' },
@@ -14,13 +15,13 @@ const CANAIS_CONFIG = {
 };
 
 /**
- * Arredondamento com Cap Inteligente Híbrido
+ * Arredondamento com Cap Triplo
  */
-function securePredictiveRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
+function secureHighPrecisionRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
     const points = [0.00, 0.50, 0.90, 0.99];
     
-    // Teto Inteligente: O menor entre 20% ou R$ 10,00
-    const capValue = Math.min(currentPrice * PERCENT_CAP, ABSOLUTE_CAP);
+    // Teto Triplo: Min (20%, R$ 10, R$ 5 fixo)
+    const capValue = Math.min(currentPrice * PERCENT_CAP, ABSOLUTE_CAP, MAX_TICK_STEP);
     const maxAllowed = currentPrice + capValue;
     const minAllowed = currentPrice - capValue;
 
@@ -34,12 +35,11 @@ function securePredictiveRounding(targetPrice, currentPrice, cost, taxesDec, tar
         }
     }
 
-    // Filtragem com Histerese Proativa (1.5%)
     let valid = candidates.filter(c => {
         if (c <= 0) return false;
         let profit = c - cost - (c * taxesDec);
         let margin = profit / c;
-        return margin >= (targetMarginDec - 0.015) && c <= maxAllowed;
+        return margin >= (targetMarginDec - 0.01) && c <= maxAllowed;
     });
 
     valid.sort((a, b) => a - b);
@@ -47,7 +47,7 @@ function securePredictiveRounding(targetPrice, currentPrice, cost, taxesDec, tar
 }
 
 /**
- * Motor de Precificação Preditivo v1.7
+ * Motor de Precificação High Precision v1.8
  */
 export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, categoryOffset = 0) {
     if (!cost || cost <= 0) return null;
@@ -67,27 +67,28 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
 
     const precoBase = parseFloat(cost) / divisor;
     
-    // Recuperação Escalonada (Clamp 5% por ciclo)
-    const clampDelta = precoBase * 0.05;
-    const deltaAplicado = Math.max(-clampDelta, Math.min(clampDelta, parseFloat(deltaRaw || 0)));
+    // Recuperação Gradual (Passos de 5%)
+    const stepDelta = precoBase * 0.05;
+    const deltaAplicado = Math.max(-stepDelta, Math.min(stepDelta, parseFloat(deltaRaw || 0)));
 
-    const precoSugerido = securePredictiveRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
+    const precoSugerido = secureHighPrecisionRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
 
-    const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (clampDelta || 1));
+    const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (stepDelta || 1));
     const lucroReal = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec));
+    const ganhoUnitario = lucroReal - (precoBase * margemAlvoDec);
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
         deltaAplicado: deltaAplicado.toFixed(2),
         ciclosRestantes,
-        impactoFinanceiroUnitario: (lucroReal - (precoBase * margemAlvoDec)).toFixed(2),
+        ganhoUnitario: ganhoUnitario.toFixed(2),
         zona: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "CRÍTICA" : "SEGURA",
         color: (taxasVariaveisDec + margemAlvoDec) > canalInfo.risk ? "rose" : "emerald",
         versao: FORMULA_VERSION,
         margemReal: ((lucroReal / precoSugerido) * 100).toFixed(1),
         detalhes: {
-            isPredictive: true,
-            smartCap: true
+            isPrecision: true,
+            tripleCapActive: true
         }
     };
 }

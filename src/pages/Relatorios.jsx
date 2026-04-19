@@ -175,52 +175,69 @@ export default function Relatorios() {
                         </div>
                     </Card>
 
-                    {/* Inteligência Preditiva v1.7 */}
+                    {/* Inteligência High Precision v1.8 */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 overflow-hidden relative group">
                         <div className="flex justify-between items-start mb-4">
-                            <Zap className="w-8 h-8 text-indigo-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Inteligência v1.7</span>
+                            <Target className="w-8 h-8 text-indigo-600 opacity-40" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">High Precision v1.8</span>
                         </div>
-                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vol/Projetado</span></h3>
+                        <h3 className="text-3xl font-black text-gray-900">{resumo?.volumeReferencia} <span className="text-sm text-gray-400 font-bold">Vendas/30d</span></h3>
                         
-                        {resumo?.regime === 'CONFIRMADO' ? (
+                        {!resumo?.estatisticas?.amostraSuficiente ? (
+                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-slate-100 rounded-2xl w-fit">
+                                <Search className="w-4 h-4 text-slate-400" />
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Aguardando Massa Crítica</p>
+                            </div>
+                        ) : resumo?.regime === 'CONFIRMADO' ? (
                             <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-indigo-600 rounded-2xl w-fit shadow-lg shadow-indigo-200">
                                 <ShieldCheck className="w-4 h-4 text-white animate-pulse" />
-                                <p className="text-[10px] font-black text-white uppercase tracking-wider">REGIME CONFIRMADO</p>
-                            </div>
-                        ) : resumo?.regime === 'EM_FORMAÇÃO' ? (
-                            <div className="flex items-center gap-2 mt-4 py-2 px-4 bg-amber-500 rounded-2xl w-fit shadow-lg shadow-amber-200">
-                                <Activity className="w-4 h-4 text-white animate-bounce" />
-                                <p className="text-[10px] font-black text-white uppercase tracking-wider">REGIME EM FORMAÇÃO</p>
+                                <p className="text-[10px] font-black text-white uppercase tracking-wider">REGIME CONSOLIDADO</p>
                             </div>
                         ) : (
                             <div className="flex items-center gap-2 mt-4 py-1.5 px-3 bg-emerald-50 rounded-xl border border-emerald-100 w-fit">
-                                <CheckCircle className="w-3 h-3 text-emerald-600" />
-                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight italic">Operação em Equilíbrio</p>
+                                <Activity className="w-3 h-3 text-emerald-600" />
+                                <p className="text-[9px] font-black text-emerald-600 uppercase tracking-tight italic">Dados de Alta Confiança</p>
                             </div>
                         )}
                     </Card>
 
-                    {/* D-Day Alta Confiança */}
+                    {/* Ganho Mensal Projetado */}
+                    <Card className="rounded-[2rem] border-none shadow-lg shadow-emerald-100/20 bg-emerald-600 p-8 group relative overflow-hidden">
+                        <div className="flex justify-between items-start mb-4">
+                            <TrendingUp className="w-8 h-8 text-white opacity-40" />
+                            <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Impacto Mensal Estimado</span>
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-3xl font-black text-white">
+                                + R$ {rankings?.detalhado?.reduce((acc, p) => acc + (Number(p.ganhoUnitario) * p.quantidade), 0).toFixed(2)}
+                            </h3>
+                            <p className="text-[10px] font-black text-emerald-200 uppercase tracking-tighter italic">Se aplicar todas as correções</p>
+                        </div>
+                        <div className="absolute -right-4 -bottom-4 opacity-[0.1] group-hover:scale-110 transition-transform">
+                            <DollarSign className="w-32 h-32 text-white" />
+                        </div>
+                    </Card>
+
+                    {/* D-Day Adaptativo (CV) */}
                     <Card className="rounded-[2rem] border-none shadow-lg shadow-indigo-100/20 bg-white p-8 group relative overflow-hidden">
                         <div className="flex justify-between items-start mb-4">
-                            <Shield className="w-8 h-8 text-indigo-600 opacity-40" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Robusta (70%)</span>
+                            <div className="flex items-center gap-2">
+                                <Shield className="w-8 h-8 text-indigo-600 opacity-40" />
+                                <div className={`text-[8px] font-black px-1.5 py-0.5 rounded-full border ${Number(resumo?.estatisticas?.CV) > 0.4 ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-emerald-50 border-emerald-200 text-emerald-600'}`}>
+                                    CV {resumo?.estatisticas?.CV}
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Previsão Sincronizada</span>
                         </div>
                         <div className="space-y-1">
                             {resumo?.dDayRange !== "Equilibrado" ? (
                                 <>
                                     <h3 className="text-3xl font-black text-gray-900">{resumo.dDayRange}</h3>
-                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Cenário estatístico conservador</p>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter italic">Intervalo sintonizado ao fluxo</p>
                                 </>
                             ) : (
-                                <h3 className="text-2xl font-black text-emerald-600 uppercase">Caixa Protegido</h3>
+                                <h3 className="text-2xl font-black text-emerald-600 uppercase">Fluxo em Dia</h3>
                             )}
-                        </div>
-                        <div className="flex items-center gap-2 mt-4">
-                            <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden border border-gray-50">
-                                <div className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full animate-progress" style={{ width: '100%' }}></div>
-                            </div>
                         </div>
                     </Card>
                 </div>
@@ -324,8 +341,8 @@ export default function Relatorios() {
                                                                     <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
                                                                         Δ {suggestion?.deltaAplicado > 0 ? '+' : ''}{suggestion?.deltaAplicado} ajustado
                                                                     </div>
-                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600">
-                                                                        + R$ {suggestion?.impactoFinanceiroUnitario}/unid
+                                                                    <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                                                        + R$ {suggestion?.ganhoUnitario}/unid
                                                                     </div>
                                                                 </div>
                                                                 {suggestion?.ciclosRestantes > 0 && (
