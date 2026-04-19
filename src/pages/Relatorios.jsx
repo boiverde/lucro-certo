@@ -58,7 +58,12 @@ export default function Relatorios() {
         try {
             await httpClient(`/produtos/${selectedProduct.id}`, {
                 method: 'PUT',
-                body: JSON.stringify({ preco: selectedProduct.precoSugerido })
+                body: JSON.stringify({ 
+                    preco: selectedProduct.precoSugerido,
+                    margem_prevista: selectedProduct.margemAlvo,
+                    margem_realizada: selectedProduct.margemMedia,
+                    canal: canal 
+                })
             });
             setSelectedProduct(null);
             refetch();
@@ -177,7 +182,10 @@ export default function Relatorios() {
                             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Lucro Líquido Real</span>
                         </div>
                         <h3 className="text-3xl font-black text-gray-900">R$ {resumo?.lucroLiquidoReal?.toFixed(2)}</h3>
-                        <p className="text-xs font-bold text-gray-400 mt-1">Estimativa real do que sobrou no caixa.</p>
+                        <div className="flex items-center gap-2 mt-2 py-1.5 px-3 bg-gray-50 rounded-xl border border-gray-100 w-fit">
+                            <Calendar className="w-3 h-3 text-gray-400" />
+                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-tight italic">Ancoragem: {resumo?.volumeReferencia} unid/{resumo?.periodoReferencia || '30d'}</p>
+                        </div>
                     </Card>
                 </div>
 
@@ -243,43 +251,62 @@ export default function Relatorios() {
                         </CardContent>
                     </Card>
 
+                    {/* Fuga de Capital com RADAR DE ZONAS */}
                     <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm border border-white">
                         <CardHeader className="border-b border-gray-100 py-6 px-8">
                             <div className="flex items-center gap-4">
-                                <div className="p-3 bg-amber-100 text-amber-600 rounded-2xl">
+                                <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl">
                                     <AlertTriangle className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-xl">Fuga de Capital</CardTitle>
-                                    <p className="text-xs text-gray-400 font-medium">Preços desalinhados com a meta de {margemAlvo}%</p>
+                                    <CardTitle className="text-xl">Radar de Margem</CardTitle>
+                                    <p className="text-xs text-gray-400 font-medium tracking-tight">Variação de risco no canal {canal?.toUpperCase()}</p>
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent className="p-8">
                             <div className="space-y-6">
-                                {rankings?.alertaCritico?.map((item) => (
-                                    <div key={item.id} className="p-5 rounded-3xl bg-rose-50/20 border border-rose-100/50 space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <h3 className="font-black text-rose-900 text-base">{item.nome}</h3>
-                                                <p className="text-xs text-rose-700/80 font-bold">Ganhe <span className="underline">+R${item.ganhoPotencial.toFixed(2)}</span>/mês</p>
+                                {rankings?.alertaCritico?.map((item) => {
+                                    const isCritical = item.margemMedia < 15 || item.deltaRecuperacao > 0.30;
+                                    
+                                    return (
+                                        <div key={item.id} className="p-6 rounded-[2rem] bg-gray-50/50 border border-gray-100 space-y-4 relative overflow-hidden group hover:bg-white transition-all">
+                                            <div className={`absolute top-0 right-0 w-2 h-full ${isCritical ? 'bg-rose-500' : 'bg-amber-400'}`} />
+
+                                            <div className="flex items-center justify-between relative z-10">
+                                                <div>
+                                                    <h3 className="font-black text-gray-900 text-base leading-none mb-2">{item.nome}</h3>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${isCritical ? 'bg-rose-50 border-rose-200 text-rose-600' : 'bg-amber-50 border-amber-200 text-amber-600'}`}>
+                                                            ZONA {isCritical ? 'CRÍTICA' : 'ALERTA'}
+                                                        </span>
+                                                        {item.deltaRecuperacao > 0 && (
+                                                            <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100 animate-pulse">
+                                                                <TrendingUp className="w-2 h-2" />
+                                                                Δ +R$ {item.deltaRecuperacao.toFixed(2)} (Ajuste Fixo)
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-sm font-bold text-gray-400 line-through tracking-tighter">R$ {item.precoAtual.toFixed(2)}</p>
+                                                    <p className="text-2xl font-black text-emerald-600 tracking-tighter">R$ {item.precoSugerido.toFixed(2)}</p>
+                                                </div>
                                             </div>
-                                            <div className="text-right">
-                                                <p className="text-xl font-black text-emerald-600">R$ {item.precoSugerido.toFixed(2)}</p>
-                                            </div>
+
+                                            <Button 
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (!isPartial) setSelectedProduct(item);
+                                                    else openUpgrade("Recupere sua margem agora.");
+                                                }}
+                                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-2xl group-hover:shadow-lg group-hover:shadow-indigo-600/20 transition-all"
+                                            >
+                                                Corrigir Preço
+                                            </Button>
                                         </div>
-                                        <Button 
-                                            size="sm"
-                                            onClick={() => {
-                                                if (!isPartial) setSelectedProduct(item);
-                                                else openUpgrade("Corrija o preço agora.");
-                                            }}
-                                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl"
-                                        >
-                                            Aplicar Sugestão
-                                        </Button>
-                                    </div>
-                                ))}
+                                    )
+                                })}
                             </div>
                         </CardContent>
                     </Card>

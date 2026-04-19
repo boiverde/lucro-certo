@@ -78,12 +78,15 @@ export async function produtosRoutes(app: FastifyInstance) {
                 unidade: z.string().optional(),
                 controla_estoque: z.boolean().optional(),
                 ativo: z.boolean().optional(),
+                margem_prevista: z.number().optional(),
+                margem_realizada: z.number().optional(),
+                canal: z.string().optional()
             }),
         },
     }, async (request, reply) => {
         const { id } = request.params
         const userId = request.user.sub
-        const body = request.body
+        const { margem_prevista, margem_realizada, canal, ...body } = request.body as any
 
         const oldProduto = await prisma.produto.findFirst({ 
             where: { id, userId },
@@ -114,7 +117,11 @@ export async function produtosRoutes(app: FastifyInstance) {
                     precoNovo: produto.preco,
                     custoMomento: produto.custo || 0,
                     margemMomento: margemNova || 0,
-                    origem: "manual" // Pode ser 'automatico' em ações de lote futuras
+                    margemPrevista: margem_prevista || 0,
+                    margemRealizada: margem_realizada || 0,
+                    canal: canal || "balcao",
+                    versaoFormula: "v1.2",
+                    origem: "manual"
                 }
             })
         }

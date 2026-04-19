@@ -1,61 +1,65 @@
 /**
- * Assistente de Precificação Lucro Certo (v1.1 - Stability & Hardening)
- * Implementa o Markup Divisor com alertas de risco operacional.
+ * Assistente de Precificação Lucro Certo (v1.2 - High Stability)
+ * Zonas de risco parametrizadas e Fator Delta (Δ).
  */
 
-const FORMULA_VERSION = "v1.1";
-const RISK_THRESHOLD = 0.70; // Alerta se taxas + margem > 70%
+const FORMULA_VERSION = "v1.2";
 
-const CANAIS_DEFAULT = {
-    balcao: 'margem_balcao',
-    delivery: 'margem_delivery',
-    marketplace: 'margem_marketplace'
+const CANAIS_CONFIG = {
+    balcao: { field: 'margem_balcao', risk: 0.75, name: 'BALCÃO' },
+    delivery: { field: 'margem_delivery', risk: 0.70, name: 'DELIVERY' },
+    marketplace: { field: 'margem_marketplace', risk: 0.65, name: 'MARKETPLACE' }
 };
 
 /**
- * Calcula a sugestão de preço baseada no markup divisor
+ * Calcula a sugestão de preço com análise de zonas de risco
  */
-export function calculatePriceSuggestion(cost, configs, canal = 'balcao') {
+export function calculatePriceSuggestion(cost, configs, canal = 'balcao', deltaRecuperacao = 0) {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
-    const {
-        taxa_impostos = 0,
-        taxa_cartao = 0
-    } = configs;
+    const canalInfo = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
+    const { taxa_impostos = 0, taxa_cartao = 0 } = configs;
 
-    // Selecionar margem baseada no canal
-    const margemKey = CANAIS_DEFAULT[canal] || 'margem_balcao';
-    const margemDesejada = parseFloat(configs[margemKey]) || 30;
-
+    const margemDesejada = parseFloat(configs[canalInfo.field]) || 30;
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
     const margemDesejadaDec = margemDesejada / 100;
 
     const somaCargos = taxasVariaveisDec + margemDesejadaDec;
     
-    // Alerta de Risco Operacional (v1.1)
+    // Análise de Zonas de Risco
+    let zona = "SEGURA";
     let warning = null;
-    if (somaCargos > RISK_THRESHOLD && somaCargos < 0.95) {
-        warning = "RISCO_OPERACIONAL: A soma das taxas e lucro ultrapassa 70%. O preço pode ficar acima do mercado.";
+    let color = "emerald";
+
+    if (somaCargos > canalInfo.risk) {
+        zona = "CRÍTICA";
+        warning = `ZONA CRÍTICA: Os custos + lucro excedem ${canalInfo.risk * 100}% do preço no canal ${canalInfo.name}.`;
+        color = "red";
+    } else if (somaCargos > (canalInfo.risk - 0.15)) {
+        zona = "ALERTA";
+        warning = `ZONA DE ATENÇÃO: Margem de erro reduzida para este canal.`;
+        color = "amber";
     }
 
     if (somaCargos >= 0.95) {
-        return {
-            error: "INSOLVENT_MARGIN",
-            message: "A soma das taxas e lucro desejado é muito alta (>= 95%). Operação inviável."
-        };
+        return { error: "INSOLVENT_MARGIN", message: "Inviabilidade matemática no canal " + canalInfo.name };
     }
 
     const divisor = 1 - somaCargos;
-    const precoSugerido = parseFloat(cost) / divisor;
+    const precoBase = parseFloat(cost) / divisor;
+    const precoSugeridoFinal = precoBase + parseFloat(deltaRecuperacao || 0);
 
     return {
-        precoSugerido: precoSugerido.toFixed(2),
+        precoSugerido: precoSugeridoFinal.toFixed(2),
+        delta: parseFloat(deltaRecuperacao || 0).toFixed(2),
+        zona,
+        color,
         warning,
         versao: FORMULA_VERSION,
-        lucroUnitario: (precoSugerido * margemDesejadaDec).toFixed(2),
+        lucroUnitario: (precoSugeridoFinal * margemDesejadaDec).toFixed(2),
         margemLiquida: margemDesejada.toFixed(1),
-        canal: canal.toUpperCase(),
+        canal: canalInfo.name,
         detalhes: {
             markupEquivalente: (1 / divisor).toFixed(2),
             divisor: divisor.toFixed(4)

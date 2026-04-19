@@ -539,9 +539,13 @@ model HistoricoPreco {
   custoMomento    Decimal  @db.Decimal(10, 2)
   margemMomento   Decimal  @db.Decimal(10, 2)
   
+  // DNA de Precificação v1.2
+  margemPrevista  Decimal  @db.Decimal(10, 2)
+  margemRealizada Decimal  @db.Decimal(10, 2) // Janela de 7d
+  
   canal           String   @default("balcao")
   versaoFormula   String   @default("v1.0")
-  origem          String   @default("manual") // manual, automatico, lote
+  origem          String   @default("manual") 
   createdAt       DateTime @default(now())
 
   @@map("historico_precos")

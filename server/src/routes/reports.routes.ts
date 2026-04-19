@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify'
 import { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
-import { startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns'
+import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays } from 'date-fns'
 
 export async function reportsRoutes(app: FastifyInstance) {
     app.addHook('onRequest', app.authenticate)
@@ -20,6 +20,9 @@ export async function reportsRoutes(app: FastifyInstance) {
         const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
         const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
         const canal = request.query.canal || 'balcao'
+        
+        // Âncora de 30 dias para estabilidade operacional
+        const from30d = subDays(new Date(), 30)
 
         const user = await prisma.user.findUnique({ 
             where: { id: userId }, 
@@ -36,33 +39,34 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
 
-        // 0. RATEIO DE CUSTO FIXO (PROJETADO VS REAL)
-        const totalVendasPeriodo = await prisma.itemVenda.aggregate({
-            _sum: { quantidade: true },
-            where: {
-                venda: {
-                    userId,
-                    data_venda: { gte: from, lte: to }
-                }
-            }
-        })
+        // 0. VOLUME OPERACIONAL (JANELA 30D VS PERÍODO ATUAL)
+        const [aggPeriodo, agg30d] = await Promise.all([
+            prisma.itemVenda.aggregate({
+                _sum: { quantidade: true },
+                where: { venda: { userId, data_venda: { gte: from, lte: to } } }
+            }),
+            prisma.itemVenda.aggregate({
+                _sum: { quantidade: true },
+                where: { venda: { userId, data_venda: { gte: from30d, lte: new Date() } } }
+            })
+        ])
 
-        const volumeTotal = Number(totalVendasPeriodo._sum.quantidade || 0)
+        const volumePeriodo = Number(aggPeriodo._sum.quantidade || 0)
+        const volumeMedio30d = Number(agg30d._sum.quantidade || 0)
+        const volumeReferencia = volumeMedio30d > 0 ? volumeMedio30d : (volumePeriodo > 0 ? volumePeriodo : 1)
         
+        // GASTOS REAIS DO PERÍODO
         const totalGastosReaisAgg = await prisma.gastoOperacional.aggregate({
             _sum: { valor: true },
-            where: {
-                userId,
-                data: { gte: from, lte: to }
-            }
+            where: { userId, data: { gte: from, lte: to } }
         })
 
         const custoFixoMensalProjetado = Number(user.custo_fixo_mensal || 0)
         const gastoFixoRealTotal = Number(totalGastosReaisAgg._sum.valor || 0)
 
-        // Preço Sugerido sempre usa o PROJETADO para estabilidade
-        const custoFixoUnidProjetado = volumeTotal > 0 ? (custoFixoMensalProjetado / volumeTotal) : 0
-        const custoFixoUnidReal = volumeTotal > 0 ? (gastoFixoRealTotal / volumeTotal) : 0
+        // Rateios: Sugestão sempre usa a média de 30d (Estabilidade)
+        const custoFixoUnidProjetado = volumeReferencia > 0 ? (custoFixoMensalProjetado / volumeReferencia) : 0
+        const custoFixoUnidReal = volumePeriodo > 0 ? (gastoFixoRealTotal / volumePeriodo) : custoFixoUnidProjetado
 
         // Sintonizar a margem alvo pelo canal escolhido
         const margemMap: Record<string, any> = {
@@ -76,25 +80,10 @@ export async function reportsRoutes(app: FastifyInstance) {
         // 1. TOP PRODUTOS POR LUCRO E VOLUME
         const performanceProdutos = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
-            where: {
-                venda: {
-                    userId,
-                    data_venda: { gte: from, lte: to }
-                }
-            },
-            _sum: {
-                quantidade: true,
-                lucro_unitario: true,
-                subtotal: true
-            },
-            _avg: {
-                margem_liquida: true
-            },
-            orderBy: {
-                _sum: {
-                    lucro_unitario: true
-                }
-            }
+            where: { venda: { userId, data_venda: { gte: from, lte: to } } },
+            _sum: { quantidade: true, lucro_unitario: true, subtotal: true },
+            _avg: { margem_liquida: true },
+            orderBy: { _sum: { lucro_unitario: true } }
         })
 
         // Ranking Detalhado com Cálculos de Ação Implícitos
@@ -108,28 +97,29 @@ export async function reportsRoutes(app: FastifyInstance) {
             const precoAtual = Number(produtoMeta?.preco || 0)
             const taxas = (Number(user.taxa_impostos || 0) + Number(user.taxa_cartao || 0)) / 100
             
-            // Sugestão baseada no Projetado (Hardening)
+            // Markup Divisor (Sugestão de Estabilidade 30d)
             const custoTotalProjetado = custoMateriaPrima + custoFixoUnidProjetado
             const divisor = 1 - (taxas + margemAlvo)
             const precoSugerido = divisor > 0.05 ? Number((custoTotalProjetado / divisor).toFixed(2)) : precoAtual * 1.3
             
-            // Cálculo de Lucro Real (O que sobrou DE FATO no período)
-            const custoTotalReal = custoMateriaPrima + custoFixoUnidReal
-            const lucroTotalEfetivo = Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2))
+            // Delta de Recuperação (Δ): Quanto custa o estouro do fixo neste produto
+            const desvioFixo = Math.max(0, custoFixoUnidReal - custoFixoUnidProjetado)
+            const deltaPrecoRecuperacao = divisor > 0 ? Number((desvioFixo / divisor).toFixed(2)) : 0
             
-            // Perda Potencial (Baseada no Preço Sugerido)
-            const lucroAlvoUnitario = precoSugerido - custoTotalProjetado - (precoSugerido * taxas)
-            const ganhoSeCorrigido = Number(((lucroAlvoUnitario * (p._sum.quantidade || 0)) - lucroTotalEfetivo).toFixed(2))
+            const lucroTotalEfetivo = Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2))
+            const margemRealizada7d = Number((p._avg.margem_liquida || 0).toFixed(1))
 
             return {
                 id: p.produtoId,
                 nome: p.nome_produto,
                 quantidade: p._sum.quantidade || 0,
                 lucroTotal: lucroTotalEfetivo,
-                margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1)),
+                margemMedia: margemRealizada7d,
+                margemAlvo: margemAlvoRaw,
                 precoAtual,
                 precoSugerido,
-                ganhoPotencial: Math.max(0, ganhoSeCorrigido)
+                deltaRecuperacao: deltaPrecoRecuperacao,
+                ganhoPotencial: Math.max(0, precoSugerido - precoAtual) * (p._sum.quantidade || 0)
             }
         }))
 
@@ -138,13 +128,12 @@ export async function reportsRoutes(app: FastifyInstance) {
         const isFree = user.plan === 'free'
         const topLucro = isFree ? ranking.slice(0, 3) : ranking.slice(0, 10)
         const alertaCritico = [...ranking]
-            .filter(p => p.margemMedia < 20 || p.lucroTotal < 0)
-            .sort((a, b) => b.ganhoPotencial - a.ganhoPotencial)
+            .filter(p => p.margemMedia < 20 || p.lucroTotal < 0 || p.deltaRecuperacao > 0)
+            .sort((a, b) => b.deltaRecuperacao - a.deltaRecuperacao)
             .slice(0, isFree ? 2 : 10)
 
         const totalPerdaOportunidade = ranking.reduce((acc, p) => acc + p.ganhoPotencial, 0)
 
-        // 2. RESUMO POR PERÍODO (Agregações atômicas)
         const [vendasAgg, comprasAgg] = await Promise.all([
             prisma.venda.aggregate({
                 _sum: { valor_total: true },
@@ -161,26 +150,22 @@ export async function reportsRoutes(app: FastifyInstance) {
         const lucroLiquidoReal = totalVendas - totalCompras - gastoFixoRealTotal
 
         return {
-            periodo: { from, to },
-            isPartial: isFree,
+            periodo: { from, to, referencia: '30 dias (Média)' },
             resumo: {
                 faturamento: totalVendas,
-                compras: totalCompras,
                 gastosOperacionaisReais: gastoFixoRealTotal,
                 gastosOperacionaisProjetados: custoFixoMensalProjetado,
                 lucroLiquidoReal: Number(lucroLiquidoReal.toFixed(2)),
-                impactoFinanceiro: Number(totalPerdaOportunidade.toFixed(2))
+                impactoFinanceiro: Number(totalPerdaOportunidade.toFixed(2)),
+                volumeReferencia
             },
             rankings: {
                 maisLucrativos: topLucro,
                 alertaCritico: alertaCritico
             },
             insights: ranking.length > 0 ? {
-                melhorProduto: ranking[0]?.nome,
-                piorProduto: ranking[ranking.length - 1]?.nome,
-                sugestao: totalPerdaOportunidade > 100 
-                    ? `Perda de oportunidade de R$ ${totalPerdaOportunidade.toFixed(2)}. Corrija seus preços agora.`
-                    : (lucroLiquidoReal < 0 ? "Atenção: Gastos REAIS superaram o faturamento." : "Tudo sob controle!")
+                estabilidade: "Sugestões de preço ancoradas na média móvel de 30 dias.",
+                alertaDelta: ranking.some(p => p.deltaRecuperacao > 0) ? "Alguns itens precisam de micro-ajustes (Δ) para cobrir o estouro de custo fixo." : "Custos fixos dentro da meta projetada."
             } : null
         }
     })
