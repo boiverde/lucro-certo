@@ -18,15 +18,21 @@ model User {
   planExpiresAt DateTime?
   
   // Unit Economics
+  // Unit Economics & Presets
   taxa_impostos          Decimal @default(0) @db.Decimal(10, 2)
   taxa_cartao            Decimal @default(0) @db.Decimal(10, 2)
-  custo_fixo_por_unidade Decimal @default(0) @db.Decimal(10, 2)
-  margem_lucro_padrao    Decimal @default(30) @db.Decimal(10, 2)
+  custo_fixo_mensal      Decimal @default(0) @db.Decimal(10, 2)
+  
+  // Margens por Canal
+  margem_balcao          Decimal @default(30) @db.Decimal(10, 2)
+  margem_delivery        Decimal @default(40) @db.Decimal(10, 2)
+  margem_marketplace     Decimal @default(50) @db.Decimal(10, 2)
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   // Relacionamentos
+  historicoPrecos    HistoricoPreco[]
   analyticsEvents    AnalyticsEvent[]
   clientes           Cliente[]
   produtos           Produto[]
@@ -106,6 +112,7 @@ model Produto {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  historicoPrecos HistoricoPreco[]
   movimentacoes   MovimentacaoEstoque[]
   itensVenda      ItemVenda[]
   itensCompra     ItemCompra[]
@@ -517,4 +524,23 @@ model AnalyticsEvent {
   metadata  Json?
 
   @@map("analytics_events")
+}
+
+model HistoricoPreco {
+  id              String   @id @default(uuid())
+  produtoId       String
+  produto         Produto  @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  
+  precoAnterior   Decimal  @db.Decimal(10, 2)
+  precoNovo       Decimal  @db.Decimal(10, 2)
+  custoMomento    Decimal  @db.Decimal(10, 2)
+  margemMomento   Decimal  @db.Decimal(10, 2)
+  
+  origem          String   @default("manual") // manual, automatico, lote
+  createdAt       DateTime @default(now())
+
+  @@map("historico_precos")
 }

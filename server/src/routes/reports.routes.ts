@@ -18,16 +18,32 @@ export async function reportsRoutes(app: FastifyInstance) {
         const userId = request.user.sub
         const user = await prisma.user.findUnique({ 
             where: { id: userId }, 
-            select: { plan: true, margem_lucro_padrao: true } 
+            select: { 
+                plan: true, 
+                margem_balcao: true, 
+                margem_delivery: true, 
+                margem_marketplace: true,
+                taxa_impostos: true,
+                taxa_cartao: true,
+                custo_fixo_mensal: true
+            } 
         })
         
         const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
         const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
+        const canal = (request.query as any).canal || 'balcao'
 
-        // Margem Alvo dinâmica do usuário (Fallback para 30% se não houver)
-        const margemAlvo = Number(user?.margem_lucro_padrao || 30) / 100
+        // Sintonizar a margem alvo pelo canal escolhido
+        const margemMap = {
+            balcao: user?.margem_balcao,
+            delivery: user?.margem_delivery,
+            marketplace: user?.margem_marketplace
+        }
+        const margemAlvoRaw = Number(margemMap[canal] || 30)
+        const margemAlvo = margemAlvoRaw / 100
 
-        // 1. TOP PRODUTOS POR LUCRO E VOLUME (Uso do groupBy do Prisma para máxima performance)
+        // 1. TOP PRODUTOS POR LUCRO E VOLUME
+// ... resto do código ...
         const performanceProdutos = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
             where: {
@@ -56,16 +72,22 @@ export async function reportsRoutes(app: FastifyInstance) {
             // Buscar custo atual do produto para sugerir novo preço
             const produtoMeta = await prisma.produto.findUnique({
                 where: { id: p.produtoId },
-                select: { custo: true, preco: true, user: { select: { taxa_impostos: true, taxa_cartao: true } } }
+                select: { custo: true, preco: true }
             })
 
-            const custo = Number(produtoMeta?.custo || 0)
-            const precoAtual = Number(produtoMeta?.preco || 0)
-            const taxas = (Number(produtoMeta?.user?.taxa_impostos || 0) + Number(produtoMeta?.user?.taxa_cartao || 0)) / 100
+            const custoMateriaPrima = Number(produtoMeta?.custo || 0)
+            const custoTotalUnitario = custoMateriaPrima + custoFixoPorUnidade
             
-            // Cálculo do Preço Sugerido: Custo / (1 - (Taxas + Margem Alvo))
+            const precoAtual = Number(produtoMeta?.preco || 0)
+            const taxas = (Number(user?.taxa_impostos || 0) + Number(user?.taxa_cartao || 0)) / 100
+            
+            // Markup Divisor (HARDENING): Preço = CustoTotal / (1 - (Taxas + Margem))
             const divisor = 1 - (taxas + margemAlvo)
-            const precoSugerido = divisor > 0 ? Number((custo / divisor).toFixed(2)) : precoAtual * 1.3
+            const precoSugerido = divisor > 0.05 ? Number((custoTotalUnitario / divisor).toFixed(2)) : precoAtual * 1.3
+            
+            // Média Móvel / Intervalo de Ganho (2% de variação aceitável)
+            const precoMin = Number((precoSugerido * 0.98).toFixed(2))
+            const precoMax = Number((precoSugerido * 1.02).toFixed(2))
 
             const lucroTotalReal = Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2))
             

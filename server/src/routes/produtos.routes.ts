@@ -66,7 +66,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         return produto
     })
 
-    // Atualizar Produto
+    // Atualizar Produto (Com Auditoria de Preço)
     app.withTypeProvider<ZodTypeProvider>().put('/:id', {
         schema: {
             params: z.object({ id: z.string().uuid() }),
@@ -83,14 +83,42 @@ export async function produtosRoutes(app: FastifyInstance) {
     }, async (request, reply) => {
         const { id } = request.params
         const userId = request.user.sub
+        const body = request.body
 
-        const check = await prisma.produto.findFirst({ where: { id, userId } })
-        if (!check) return reply.status(404).send()
+        const oldProduto = await prisma.produto.findFirst({ 
+            where: { id, userId },
+            include: { user: { select: { taxa_impostos: true, taxa_cartao: true } } }
+        })
+
+        if (!oldProduto) return reply.status(404).send()
 
         const produto = await prisma.produto.update({
             where: { id },
-            data: request.body,
+            data: body,
         })
+
+        // Auditoria: Registar se o preço de venda mudou
+        if (body.preco !== undefined && Number(body.preco) !== Number(oldProduto.preco)) {
+            const taxas = (Number(oldProduto.user?.taxa_impostos || 0) + Number(oldProduto.user?.taxa_cartao || 0)) / 100
+            const custo = Number(produto.custo || 0)
+            const novoPreco = Number(produto.preco)
+            
+            const lucroNovo = novoPreco - custo - (novoPreco * taxas)
+            const margemNova = (lucroNovo / novoPreco) * 100
+
+            await prisma.historicoPreco.create({
+                data: {
+                    produtoId: id,
+                    userId,
+                    precoAnterior: oldProduto.preco,
+                    precoNovo: produto.preco,
+                    custoMomento: produto.custo || 0,
+                    margemMomento: margemNova || 0,
+                    origem: "manual" // Pode ser 'automatico' em ações de lote futuras
+                }
+            })
+        }
+
         return produto
     })
 

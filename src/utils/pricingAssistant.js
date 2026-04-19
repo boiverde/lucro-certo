@@ -1,66 +1,79 @@
 /**
- * Assistente de Precificação Lucro Certo
- * Padronizado: Fórmulas financeiras consistentes em todo o sistema.
+ * Assistente de Precificação Lucro Certo (Refined Hardening)
+ * Implementa o Markup Divisor com validações de sanidade matemática.
  */
 
+const CANAIS_DEFAULT = {
+    balcao: 'margem_balcao',
+    delivery: 'margem_delivery',
+    marketplace: 'margem_marketplace'
+};
+
 /**
- * Calcula a sugestão de preço baseada no markup divisor (Margem de Contribuição)
- * CT = Custo Mercadoria + Custo Fixo Unitário
- * Preço = CT / (1 - Taxas - Margem Desejada)
+ * Calcula a sugestão de preço baseada no markup divisor
+ * Validação Crítica: Taxas + Margem deve ser < 1 (100%)
  */
-export function calculatePriceSuggestion(cost, configs) {
+export function calculatePriceSuggestion(cost, configs, canal = 'balcao') {
     if (!cost || cost <= 0) return null;
     if (!configs) return null;
 
     const {
         taxa_impostos = 0,
         taxa_cartao = 0,
-        custo_fixo_por_unidade = 0,
-        margem_lucro_padrao = 30
+        custo_fixo_mensal = 0
     } = configs;
+
+    // Selecionar margem baseada no canal
+    const margemKey = CANAIS_DEFAULT[canal] || 'margem_balcao';
+    const margemDesejada = parseFloat(configs[margemKey]) || 30;
 
     // 1. Converter taxas para decimal
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
-    const margemDesejadaDec = parseFloat(margem_lucro_padrao) / 100;
-    const custoFixoUnid = parseFloat(custo_fixo_por_unidade) || 0;
+    const margemDesejadaDec = margemDesejada / 100;
 
-    // 2. Divisor de Preço (1 - somatório das taxas e margem)
-    const divisor = 1 - (taxasVariaveisDec + margemDesejadaDec);
-
-    // Validação matemática: Se divisor <= 0, a margem é impossível
-    if (divisor <= 0) {
+    // 2. Validação T+M < 1 (HARDENING)
+    // Se a soma das taxas e lucro for > 95%, bloqueamos para evitar preços infinitos
+    const somaCargos = taxasVariaveisDec + margemDesejadaDec;
+    
+    if (somaCargos >= 0.95) {
         return {
-            error: "IMPOSSIBLE_MARGIN",
-            message: "A soma das taxas e lucro desejado atinge 100%. Impossível calcular."
+            error: "INSOLVENT_MARGIN",
+            message: "A soma das taxas e lucro desejado é muito alta (>= 95%). O negócio é inviável nestas condições."
         };
     }
 
-    // 3. Custo Total (Mercadoria + Custo Fixo Rateado)
-    const custoTotalUnitarioBase = parseFloat(cost) + custoFixoUnid;
+    const divisor = 1 - somaCargos;
+
+    // 3. Custo Fixo Médio (Considerando Rateio Mensal Simplificado)
+    // No frontend, se não temos volume de vendas, usamos o custo fixo base ou zero
+    const custoFixoUnid = 0; // O rateio real será feito no backend com volume real
 
     // 4. Preço Sugerido
+    const custoTotalUnitarioBase = parseFloat(cost);
     const precoSugerido = custoTotalUnitarioBase / divisor;
 
-    // 5. Lucro Real Unitário = Preço - CustoTotal - (Preço * Taxas)
-    const lucroReal = precoSugerido - custoTotalUnitarioBase - (precoSugerido * taxasVariaveisDec);
-    const margemReal = (lucroReal / precoSugerido) * 100;
+    // 5. Analise de Ganho (Intervalo de Confiança 2%)
+    const precoMinimo = precoSugerido * 0.98;
+    const precoMaximo = precoSugerido * 1.02;
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
-        lucroUnitario: lucroReal.toFixed(2),
-        margemLiquida: margemReal.toFixed(1),
+        intervalo: {
+            min: precoMinimo.toFixed(2),
+            max: precoMaximo.toFixed(2)
+        },
+        lucroUnitario: (precoSugerido * margemDesejadaDec).toFixed(2),
+        margemLiquida: margemDesejada.toFixed(1),
+        canal: canal.toUpperCase(),
         detalhes: {
             markupEquivalente: (1 / divisor).toFixed(2),
-            custoMateriaPrima: parseFloat(cost).toFixed(2),
-            custoFixoRateado: custoFixoUnid.toFixed(2),
             divisor: divisor.toFixed(4)
         }
     };
 }
 
 /**
- * Analisa a saúde financeira de um preço atual informado
- * Lucro = Preço - (Custo + CustoFixo) - (Preço * Taxas)
+ * Analisa a saúde financeira e registra variação (Filtro de Lote)
  */
 export function analyzeCurrentPrice(cost, currentPrice, configs) {
     if (!cost || !currentPrice || cost <= 0 || currentPrice <= 0) return null;
@@ -68,31 +81,28 @@ export function analyzeCurrentPrice(cost, currentPrice, configs) {
 
     const {
         taxa_impostos = 0,
-        taxa_cartao = 0,
-        custo_fixo_por_unidade = 0
+        taxa_cartao = 0
     } = configs;
 
     const taxasVariaveisDec = (parseFloat(taxa_impostos) + parseFloat(taxa_cartao)) / 100;
-    const custoFixoUnid = parseFloat(custo_fixo_por_unidade) || 0;
-    
-    const custoTotalUnitarioBase = parseFloat(cost) + custoFixoUnid;
     const precoVenda = parseFloat(currentPrice);
+    const custo = parseFloat(cost);
 
-    // Fórmula Padronizada: Lucro = Preço - CustoTotal - (Preço * Taxas)
-    const lucroLiquidoUnitario = precoVenda - custoTotalUnitarioBase - (precoVenda * taxasVariaveisDec);
+    // Margem Líquida Real = (Preço - Custo - (Preço * Taxas)) / Preço
+    const lucroLiquidoUnitario = precoVenda - custo - (precoVenda * taxasVariaveisDec);
     const margemLiquidaReal = (lucroLiquidoUnitario / precoVenda) * 100;
 
     let status = "OK";
-    let message = "Sua margem está saudável.";
+    let message = "Operação saudável.";
     let color = "emerald";
 
     if (margemLiquidaReal < 0) {
         status = "DANGER";
-        message = "Você está vendendo no PREJUÍZO! O preço não cobre os custos e taxas.";
+        message = "Preço abaixo do ponto de equilíbrio (Prejuízo!).";
         color = "red";
-    } else if (margemLiquidaReal < 10) {
+    } else if (margemLiquidaReal < 15) {
         status = "WARNING";
-        message = "Sua margem está muito BAIXA. Você pode estar pagando para trabalhar.";
+        message = "Margem de segurança crítica.";
         color = "amber";
     }
 

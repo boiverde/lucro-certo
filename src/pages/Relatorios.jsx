@@ -30,27 +30,24 @@ export default function Relatorios() {
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [isUpdating, setIsUpdating] = useState(false);
 
-    const handleApplySuggestion = async (product) => {
-        setIsUpdating(true);
-        try {
-            await httpClient(`/produtos/${product.id}`, {
-                method: 'PUT',
-                body: JSON.stringify({ preco: product.precoSugerido })
-            });
-            setSelectedProduct(null);
     const from = periodo === '7d' ? format(subDays(new Date(), 7), 'yyyy-MM-dd') : format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd');
     const to = format(new Date(), 'yyyy-MM-dd');
 
     const { data, isLoading, refetch } = useQuery({
-        queryKey: ['reports-performance', periodo, margemAlvo],
-        queryFn: async () => await httpClient(`/reports/performance?from=${from}&to=${to}`),
+        queryKey: ['reports-performance', periodo, margemAlvo, canal],
+        queryFn: async () => await httpClient(`/reports/performance?from=${from}&to=${to}&canal=${canal}`),
     });
 
     const updateMargem = async (novaMargem) => {
         setMargemAlvo(novaMargem);
+        const fieldMap = {
+            balcao: 'margem_balcao',
+            delivery: 'margem_delivery',
+            marketplace: 'margem_marketplace'
+        };
         await httpClient('/auth/me', {
             method: 'PATCH',
-            body: JSON.stringify({ margem_lucro_padrao: novaMargem })
+            body: JSON.stringify({ [fieldMap[canal]]: novaMargem })
         });
         refetch();
     };
@@ -91,35 +88,50 @@ export default function Relatorios() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
                         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">Métricas de Margem</h1>
-                        <p className="text-gray-500 mt-1">Defina sua meta e veja o potencial do seu negócio.</p>
+                        <p className="text-gray-500 mt-1">Sintonize sua meta por canal e recupere seu lucro.</p>
                     </div>
                     
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                            {[20, 30, 40, 50].map(m => (
+                    <div className="flex flex-col gap-3">
+                        {/* Seletor de Canal */}
+                        <div className="flex bg-gray-200/50 p-1 rounded-xl border border-gray-200 self-end">
+                            {['balcao', 'delivery', 'marketplace'].map(c => (
                                 <button 
-                                    key={m}
-                                    onClick={() => updateMargem(m)}
-                                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${margemAlvo === m ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                                    key={c}
+                                    onClick={() => setCanal(c)}
+                                    className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${canal === c ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:bg-white/50'}`}
                                 >
-                                    {m}%
+                                    {c}
                                 </button>
                             ))}
                         </div>
 
-                        <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
-                            <button 
-                                onClick={() => setPeriodo('7d')}
-                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${periodo === '7d' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-400 hover:bg-gray-50'}`}
-                            >
-                                7 DIAS
-                            </button>
-                            <button 
-                                onClick={() => setPeriodo('mes')}
-                                className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${periodo === 'mes' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-400 hover:bg-gray-50'}`}
-                            >
-                                MÊS ATUAL
-                            </button>
+                        <div className="flex flex-col md:flex-row gap-4 items-center">
+                            <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                                {[20, 30, 40, 50].map(m => (
+                                    <button 
+                                        key={m}
+                                        onClick={() => updateMargem(m)}
+                                        className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${margemAlvo === m ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}
+                                    >
+                                        {m}%
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
+                                <button 
+                                    onClick={() => setPeriodo('7d')}
+                                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${periodo === '7d' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-400 hover:bg-gray-50'}`}
+                                >
+                                    7 DIAS
+                                </button>
+                                <button 
+                                    onClick={() => setPeriodo('mes')}
+                                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-all ${periodo === 'mes' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-400 hover:bg-gray-50'}`}
+                                >
+                                    MÊS ATUAL
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
