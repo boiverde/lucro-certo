@@ -29,54 +29,56 @@ export async function reportsRoutes(app: FastifyInstance) {
 
         if (!user) return reply.status(404).send({ message: "Usuário não encontrado" })
 
-        // 0. ANÁLISE DE VOLUMES E MÉTRICAS ESTATÍSTICAS v2.0
+        // 0. ANÁLISE DE VOLUMES v2.1 (ANTI-CONCENTRAÇÃO)
         const todasVendas14d = await prisma.venda.findMany({
             where: { userId, data_venda: { gte: from14d } },
             include: { itens: true }
         })
 
-        const ldiarios: Record<string, { vol: number, lucro: number, skus: Set<string> }> = {}
-        const totalSKUsNoPeriodo = new Set<string>()
+        const ldiarios: Record<string, { vol: number, lucro: number, skus: Record<string, number> }> = {}
+        const globalSKUs: Record<string, number> = {}
 
         todasVendas14d.forEach(v => {
             const d = format(v.data_venda, 'yyyy-MM-dd')
-            if (!ldiarios[d]) ldiarios[d] = { vol: 0, lucro: 0, skus: new Set() }
+            if (!ldiarios[d]) ldiarios[d] = { vol: 0, lucro: 0, skus: {} }
             
             v.itens.forEach(i => {
                 ldiarios[d].vol += Number(i.quantidade)
                 ldiarios[d].lucro += (Number(i.lucro_unitario || 0) * Number(i.quantidade))
-                ldiarios[d].skus.add(i.produtoId as string)
-                totalSKUsNoPeriodo.add(i.produtoId as string)
+                ldiarios[d].skus[i.produtoId as string] = (ldiarios[d].skus[i.produtoId as string] || 0) + Number(i.quantidade)
+                globalSKUs[i.produtoId as string] = (globalSKUs[i.produtoId as string] || 0) + Number(i.quantidade)
             })
         })
 
+        const totalAmostra = Object.values(ldiarios).reduce((acc, d) => acc + d.vol, 0)
+        const skuDominanteVolume = Math.max(...Object.values(globalSKUs), 0)
+        const fatorConcentracao = totalAmostra > 0 ? skuDominanteVolume / totalAmostra : 0
+        const hasDiversidade = fatorConcentracao <= 0.70 && Object.keys(globalSKUs).length >= 3
+
         const lucrosArray = Object.values(ldiarios).map(d => d.lucro)
         const mediaLucro = lucrosArray.length > 0 ? (lucrosArray.reduce((a, b) => a + b, 0) / lucrosArray.length) : 0
-        const totalAmostra = Object.values(ldiarios).reduce((acc, d) => acc + d.vol, 0)
+        const hasRelevancia = mediaLucro >= 50.0 && totalAmostra >= 15
 
-        // Piso Tau (τ) - Relevância Estatística (Ex: Mínimo R$ 50/dia de lucro para projetar)
-        const TAU_PISO = 50.0;
-        const hasRelevancia = mediaLucro >= TAU_PISO && totalAmostra >= 10
+        // Diagnóstico de "O que falta"
+        const diagnostico = {
+            vendasFaltantes: Math.max(0, 15 - totalAmostra),
+            skusFaltantes: Math.max(0, 3 - Object.keys(globalSKUs).length),
+            concentracaoAlta: fatorConcentracao > 0.70
+        }
 
-        // Coeficiente de Variação (CV)
         const variancia = lucrosArray.length > 0 ? lucrosArray.reduce((acc, val) => acc + Math.pow(val - mediaLucro, 2), 0) / lucrosArray.length : 0
         const CV = mediaLucro > 0 ? Math.max(0.1, Math.min(1.0, Math.sqrt(variancia) / mediaLucro)) : 1
 
-        // 1. D-DAY ADAPTATIVO v2.0
         const desvioTotal = Math.max(0, Number(await prisma.gastoOperacional.aggregate({ _sum: { valor: true }, where: { userId, data: { gte: from14d } } }).then(r => r._sum.valor || 0)) - ((Number(user.custo_fixo_mensal || 0) / 30) * 14))
-        const fatorSeguranca = 1 - CV
-        const dDayMin = (hasRelevancia && mediaLucro > 0) ? Math.ceil(desvioTotal / (mediaLucro * (fatorSeguranca + 0.1))) : null
-        const dDayMax = (hasRelevancia && mediaLucro > 0) ? Math.ceil(desvioTotal / (mediaLucro * (fatorSeguranca - 0.1))) : null
-
-        // 2. DETECÇÃO DE REGIME v2.0 (REQUISITO: 3 SKUs DISTINTOS)
+        
+        // REGIME v2.1 (REQUISITO: MASSA + DIVERSIDADE + ANTI-BALEIA)
         const volumesArray = Object.values(ldiarios).map(d => d.vol).sort((a, b) => a - b)
         const p75 = volumesArray[Math.floor(volumesArray.length * 0.75)] || 1
         const ultimos5Ruptrura = Object.values(ldiarios).slice(-5).filter(d => d.vol > (p75 * 1.15)).length
         
-        const regimeStatus = (totalAmostra >= 15 && totalSKUsNoPeriodo.size >= 3 && ultimos5Ruptrura >= 4) ? "CONFIRMADO" : 
-                           (totalAmostra >= 10 && totalSKUsNoPeriodo.size >= 2 && ultimos5Ruptrura >= 2 ? "FORMAÇÃO" : "ESTÁVEL")
+        const regimeStatus = (hasRelevancia && hasDiversidade && ultimos5Ruptrura >= 4) ? "CONFIRMADO" : 
+                           (totalAmostra >= 10 && Object.keys(globalSKUs).length >= 2 && ultimos5Ruptrura >= 2 ? "FORMAÇÃO" : "ESTÁVEL")
 
-        // 3. RANKING AUTO-CALIBRADO
         const performance = await prisma.itemVenda.groupBy({
             by: ['produtoId', 'nome_produto'],
             where: { venda: { userId, data_venda: { gte: from, lte: to } } },
@@ -101,14 +103,16 @@ export async function reportsRoutes(app: FastifyInstance) {
         }))
 
         return {
-            periodo: { from, to, calibração: "Adaptive v2.0" },
+            periodo: { from, to, engine: "Decision Transparency v2.1" },
             resumo: {
                 hasRelevancia,
+                hasDiversidade,
+                diagnostico,
                 volumeReferencia: Math.round(totalAmostra),
                 desvioTotal: Number(desvioTotal.toFixed(2)),
-                dDayRange: dDayMin !== null ? `${dDayMin}-${dDayMax} dias` : "Estágio de Observação",
+                dDayRange: (hasRelevancia && hasDiversidade) ? `${Math.ceil(desvioTotal / (mediaLucro * (1.1 - CV)))} - ${Math.ceil(desvioTotal / (mediaLucro * (0.9 - CV)))} dias` : "Aguardando Amostra Robusta",
                 regime: regimeStatus,
-                calibragem: { cv: CV.toFixed(2), skus: totalSKUsNoPeriodo.size, tau: hasRelevancia ? "OK" : "PISO_BAIXO" }
+                transparencia: { cv: CV.toFixed(2), skus: Object.keys(globalSKUs).length, concentracao: (fatorConcentracao * 100).toFixed(0) + "%" }
             },
             rankings: { detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal) }
         }

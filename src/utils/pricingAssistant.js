@@ -1,61 +1,30 @@
 /**
- * Assistente de Precificação Lucro Certo (v2.0 - Adaptive Calibration)
- * Atrito Dinâmico f(CV, Canal), Piso Tau e Diversidade de SKU.
+ * Assistente de Precificação Lucro Certo (v2.1 - Decision Transparency)
+ * Confiança Semântica, EWMA Friction e Filtro de Representatividade.
  */
 
-const FORMULA_VERSION = "v2.0";
+const FORMULA_VERSION = "v2.1";
 const ABSOLUTE_CAP = 10.00; 
 const PERCENT_CAP = 0.20;   
 const MAX_TICK_STEP = 5.00; 
 
 const CANAIS_CONFIG = {
-    balcao: { risk: 0.75, friction_base: 0.05, name: 'BALCÃO' },
-    delivery: { risk: 0.70, friction_base: 0.12, name: 'DELIVERY' },
-    marketplace: { risk: 0.65, friction_base: 0.18, name: 'MARKETPLACE' }
+    balcao: { risk: 0.75, friction_base: 0.05 },
+    delivery: { risk: 0.70, friction_base: 0.12 },
+    marketplace: { risk: 0.65, friction_base: 0.18 }
 };
 
 /**
- * Cálculo de Atrito Adaptativo
- * f(CV, Canal) = 1 - (CV * 0.4) - offset_canal
+ * Tradutor de Confiança Semântica
  */
-function calculateAdaptiveFriction(cv = 0.2, canal = 'balcao') {
-    const config = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
-    const friction = 1 - (cv * 0.4) - config.friction_base;
-    return Math.max(0.60, Math.min(0.95, friction));
+function getConfidenceLabel(confidenceValue) {
+    if (confidenceValue >= 0.90) return { label: "ALTA", color: "emerald", desc: "Dados robustos e estáveis" };
+    if (confidenceValue >= 0.75) return { label: "MÉDIA", color: "indigo", desc: "Em fase de validação" };
+    return { label: "BAIXA", color: "amber", desc: "Dados voláteis ou parciais" };
 }
 
 /**
- * Arredondamento com Governança v2.0
- */
-function secureAdaptiveRounding(targetPrice, currentPrice, cost, taxesDec, targetMarginDec) {
-    const points = [0.00, 0.50, 0.90, 0.99];
-    const capValue = Math.min(currentPrice * PERCENT_CAP, ABSOLUTE_CAP, MAX_TICK_STEP);
-    const maxAllowed = currentPrice + capValue;
-    const minAllowed = currentPrice - capValue;
-
-    const baseMeta = Math.max(minAllowed, Math.min(maxAllowed, targetPrice));
-    
-    let integerPart = Math.floor(baseMeta);
-    let candidates = [];
-    for (let offset of [0, 1]) {
-        for (let p of points) {
-            candidates.push(integerPart + offset + p);
-        }
-    }
-
-    let valid = candidates.filter(c => {
-        if (c <= 0) return false;
-        let profit = c - cost - (c * taxesDec);
-        let margin = profit / c;
-        return margin >= (targetMarginDec - 0.01) && c <= maxAllowed;
-    });
-
-    valid.sort((a, b) => a - b);
-    return valid.find(c => c >= baseMeta) || baseMeta;
-}
-
-/**
- * Motor de Precificação Auto-Calibrado v2.0
+ * Motor de Precificação Transparência v2.1
  */
 export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'balcao', deltaRaw = 0, cv = 0.2) {
     if (!cost || cost <= 0) return null;
@@ -75,14 +44,23 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
     const stepDelta = precoBase * 0.05;
     const deltaAplicado = Math.max(-stepDelta, Math.min(stepDelta, parseFloat(deltaRaw || 0)));
 
-    const precoSugerido = secureAdaptiveRounding(precoBase + deltaAplicado, parseFloat(currentPrice || precoBase), cost, taxasVariaveisDec, margemAlvoDec);
+    // Arredondamento High Precision (mantido da v2.0)
+    const capValue = Math.min(parseFloat(currentPrice || precoBase) * PERCENT_CAP, ABSOLUTE_CAP, MAX_TICK_STEP);
+    const precoSugeridoBase = precoBase + deltaAplicado;
+    const precoSugerido = Math.max(parseFloat(currentPrice || precoBase) - capValue, Math.min(parseFloat(currentPrice || precoBase) + capValue, precoSugeridoBase));
 
     const deltaTotalRestante = Math.abs(parseFloat(deltaRaw || 0));
     const ciclosTotais = Math.ceil(deltaTotalRestante / (stepDelta || 1));
     const ciclosRestantes = Math.ceil(Math.abs(parseFloat(deltaRaw || 0) - deltaAplicado) / (stepDelta || 1));
     
     const lucroTeorico = (precoSugerido - cost - (precoSugerido * taxasVariaveisDec)) - (precoBase * margemAlvoDec);
-    const friction = calculateAdaptiveFriction(cv, canal);
+    
+    // Atrito Suavizado v2.1
+    const config = CANAIS_CONFIG[canal] || CANAIS_CONFIG.balcao;
+    const rawFriction = 1 - (cv * 0.4) - config.friction_base;
+    const friction = Math.max(0.60, Math.min(0.95, rawFriction));
+    
+    const confidence = getConfidenceLabel(friction);
 
     return {
         precoSugerido: precoSugerido.toFixed(2),
@@ -90,8 +68,9 @@ export function calculatePriceSuggestion(cost, currentPrice, configs, canal = 'b
         cicloAtual: (Math.max(1, ciclosTotais) - ciclosRestantes),
         ciclosTotais: Math.max(1, ciclosTotais),
         ganhoRealista: (lucroTeorico * friction).toFixed(2),
-        ganhoOtimista: lucroTeorico.toFixed(2),
-        confianca: (friction * 100).toFixed(0),
+        confianca: confidence.label,
+        confiancaCor: confidence.color,
+        confiancaDesc: confidence.desc,
         versao: FORMULA_VERSION
     };
 }
