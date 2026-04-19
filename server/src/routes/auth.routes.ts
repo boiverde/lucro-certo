@@ -138,49 +138,42 @@ export async function authRoutes(app: FastifyInstance) {
         return reply.send({ token: localToken, email: userLocal.email });
     })
 
-    // Me
-    app.withTypeProvider<ZodTypeProvider>().get('/me', {
-        onRequest: [(app as any).authenticate]
+    // Atualizar Perfil / Configurações Financeiras (Hardening de Precisão)
+    app.withTypeProvider<ZodTypeProvider>().patch('/me', {
+        onRequest: [(app as any).authenticate],
+        schema: {
+            body: z.object({
+                name: z.string().optional(),
+                taxa_impostos: z.number().optional(),
+                taxa_cartao: z.number().optional(),
+                custo_fixo_por_unidade: z.number().optional(),
+                margem_lucro_padrao: z.number().optional(),
+            })
+        }
     }, async (request) => {
         const userId = (request.user as any).sub
-        let user = await prisma.user.findUnique({
+        const data = request.body
+
+        const user = await prisma.user.update({
             where: { id: userId },
+            data: {
+                name: data.name,
+                taxa_impostos: data.taxa_impostos,
+                taxa_cartao: data.taxa_cartao,
+                custo_fixo_por_unidade: data.custo_fixo_por_unidade,
+                margem_lucro_padrao: data.margem_lucro_padrao
+            },
             select: {
                 id: true,
                 name: true,
                 email: true,
                 plan: true,
-                planExpiresAt: true,
-                createdAt: true,
                 taxa_impostos: true,
                 taxa_cartao: true,
                 custo_fixo_por_unidade: true,
                 margem_lucro_padrao: true
             }
         })
-
-        if (!user) return null
-
-        // Verificar expiração do plano
-        if (user.plan === 'pro' && user.planExpiresAt && user.planExpiresAt < new Date()) {
-            // Plano expirou!
-            user = await prisma.user.update({
-                where: { id: userId },
-                data: { plan: 'free' },
-                select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    plan: true,
-                    planExpiresAt: true,
-                    createdAt: true,
-                    taxa_impostos: true,
-                    taxa_cartao: true,
-                    custo_fixo_por_unidade: true,
-                    margem_lucro_padrao: true
-                }
-            })
-        }
 
         return user
     })

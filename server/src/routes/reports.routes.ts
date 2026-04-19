@@ -16,10 +16,16 @@ export async function reportsRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const userId = request.user.sub
-        const user = await prisma.user.findUnique({ where: { id: userId }, select: { plan: true } })
+        const user = await prisma.user.findUnique({ 
+            where: { id: userId }, 
+            select: { plan: true, margem_lucro_padrao: true } 
+        })
         
         const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
         const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
+
+        // Margem Alvo dinâmica do usuário (Fallback para 30% se não houver)
+        const margemAlvo = Number(user?.margem_lucro_padrao || 30) / 100
 
         // 1. TOP PRODUTOS POR LUCRO E VOLUME (Uso do groupBy do Prisma para máxima performance)
         const performanceProdutos = await prisma.itemVenda.groupBy({
@@ -40,7 +46,7 @@ export async function reportsRoutes(app: FastifyInstance) {
             },
             orderBy: {
                 _sum: {
-                    lucro_unitario: true // Ordenar pelo lucro unitário somado (aproximação do lucro total)
+                    lucro_unitario: true
                 }
             }
         })
@@ -50,14 +56,13 @@ export async function reportsRoutes(app: FastifyInstance) {
             // Buscar custo atual do produto para sugerir novo preço
             const produtoMeta = await prisma.produto.findUnique({
                 where: { id: p.produtoId },
-                select: { custo_total: true, preco_venda: true, taxas_adicionais: true }
+                select: { custo: true, preco: true, user: { select: { taxa_impostos: true, taxa_cartao: true } } }
             })
 
-            const custo = Number(produtoMeta?.custo_total || 0)
-            const precoAtual = Number(produtoMeta?.preco_venda || 0)
-            const taxas = Number(produtoMeta?.taxas_adicionais || 0) / 100
-            const margemAlvo = 0.30 // 30% de lucro alvo
-
+            const custo = Number(produtoMeta?.custo || 0)
+            const precoAtual = Number(produtoMeta?.preco || 0)
+            const taxas = (Number(produtoMeta?.user?.taxa_impostos || 0) + Number(produtoMeta?.user?.taxa_cartao || 0)) / 100
+            
             // Cálculo do Preço Sugerido: Custo / (1 - (Taxas + Margem Alvo))
             const divisor = 1 - (taxas + margemAlvo)
             const precoSugerido = divisor > 0 ? Number((custo / divisor).toFixed(2)) : precoAtual * 1.3
