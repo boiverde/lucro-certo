@@ -156,5 +156,22 @@ app.register(analyticsRoutes, { prefix: '/analytics' })
 app.register(reportsRoutes, { prefix: '/reports' })
 
 app.get('/health', async () => {
-    return { status: 'ok', server: 'fastify', db: 'postgres' }
+    try {
+        // Teste de pulsação do banco de dados
+        await prisma.$queryRaw`SELECT 1`
+        return { 
+            status: 'ok', 
+            server: 'fastify', 
+            db: 'connected',
+            timestamp: new Date().toISOString()
+        }
+    } catch (error: any) {
+        return { 
+            status: 'degraded', 
+            server: 'fastify', 
+            db: 'failed',
+            error: error.message,
+            timestamp: new Date().toISOString() 
+        }
+    }
 })

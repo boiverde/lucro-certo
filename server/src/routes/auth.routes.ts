@@ -103,39 +103,46 @@ export async function authRoutes(app: FastifyInstance) {
         const { createClient } = require('@supabase/supabase-js');
         const supabase = createClient(supabaseUrl, supabaseKey);
 
-        const { data: { user: sbUser }, error } = await supabase.auth.getUser(token);
+        try {
+            const { data: { user: sbUser }, error } = await supabase.auth.getUser(token);
 
-        if (error || !sbUser) {
-            return reply.status(401).send({ message: 'Token Google inválido ou expirado.' });
+            if (error || !sbUser) {
+                console.error('[Auth] Supabase Auth Error:', error);
+                return reply.status(401).send({ message: 'Token Google inválido ou expirado.' });
+            }
+
+            // Buscar usuário local ou criar
+            let userLocal = await prisma.user.findUnique({
+                where: { email: sbUser.email },
+            })
+
+            if (!userLocal) {
+                console.log('[Auth] Criando novo usuário via Google:', sbUser.email);
+                const crypto = require('crypto');
+                const randomPassword = crypto.randomUUID();
+                const password_hash = await bcrypt.hash(randomPassword, 6);
+                
+                userLocal = await prisma.user.create({
+                    data: {
+                        name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Nome não informado',
+                        email: sbUser.email!,
+                        password_hash,
+                    },
+                });
+            }
+
+            // Emitir o JWT próprio e inquebrável da aplicação
+            const localToken = app.jwt.sign(
+                { name: userLocal.name, email: userLocal.email },
+                { sub: userLocal.id, expiresIn: '7d' }
+            )
+
+            console.log('[Auth] Login Google bem-sucedido para:', userLocal.email);
+            return reply.send({ token: localToken, email: userLocal.email });
+        } catch (err: any) {
+            console.error('[Auth] Erro crítico no Login Google:', err.message);
+            return reply.status(500).send({ message: 'Erro ao processar login com Google.', details: err.message });
         }
-
-        // Buscar usuário local ou criar
-        let userLocal = await prisma.user.findUnique({
-            where: { email: sbUser.email },
-        })
-
-        if (!userLocal) {
-            // Conta associada pelo Google, sem senha
-            const crypto = require('crypto');
-            const randomPassword = crypto.randomUUID();
-            const password_hash = await bcrypt.hash(randomPassword, 6);
-            
-            userLocal = await prisma.user.create({
-                data: {
-                    name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Nome não informado',
-                    email: sbUser.email!,
-                    password_hash,
-                },
-            });
-        }
-
-        // Emitir o JWT próprio e inquebrável da aplicação
-        const localToken = app.jwt.sign(
-            { name: userLocal.name, email: userLocal.email },
-            { sub: userLocal.id, expiresIn: '7d' }
-        )
-
-        return reply.send({ token: localToken, email: userLocal.email });
     })
 
     // Atualizar Perfil / Configurações Financeiras (Hardening de Precisão)

@@ -18,9 +18,9 @@ export async function httpClient(endpoint, options = {}) {
         headers,
     };
 
-    // Hardening: Adicionar timeout de 15 segundos para evitar spinners infinitos
+    // Hardening: Adicionar timeout de 30 segundos para suportar Cold Starts na Render
     const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), 15000);
+    const id = setTimeout(() => controller.abort(), 30000);
     config.signal = controller.signal;
 
     let response;
