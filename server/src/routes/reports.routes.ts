@@ -45,19 +45,53 @@ export async function reportsRoutes(app: FastifyInstance) {
             }
         })
 
-        // Processar os dados em memória (apenas do Top 10) para calcular lucro total real
-        const ranking = performanceProdutos.map(p => ({
-            id: p.produtoId,
-            nome: p.nome_produto,
-            quantidade: p._sum.quantidade || 0,
-            lucroTotal: Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2)),
-            margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1))
-        })).sort((a, b) => b.lucroTotal - a.lucroTotal)
+        // Ranking Detalhado com Cálculos de Ação Implícitos
+        const ranking = await Promise.all(performanceProdutos.map(async p => {
+            // Buscar custo atual do produto para sugerir novo preço
+            const produtoMeta = await prisma.produto.findUnique({
+                where: { id: p.produtoId },
+                select: { custo_total: true, preco_venda: true, taxas_adicionais: true }
+            })
 
-        // Limite Freemium (Parte 4)
+            const custo = Number(produtoMeta?.custo_total || 0)
+            const precoAtual = Number(produtoMeta?.preco_venda || 0)
+            const taxas = Number(produtoMeta?.taxas_adicionais || 0) / 100
+            const margemAlvo = 0.30 // 30% de lucro alvo
+
+            // Cálculo do Preço Sugerido: Custo / (1 - (Taxas + Margem Alvo))
+            const divisor = 1 - (taxas + margemAlvo)
+            const precoSugerido = divisor > 0 ? Number((custo / divisor).toFixed(2)) : precoAtual * 1.3
+
+            const lucroTotalReal = Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2))
+            
+            // Perda Potencial: O que ele ganharia se estivesse com o preço sugerido
+            const lucroAlvoUnitario = precoSugerido - custo - (precoSugerido * taxas)
+            const ganhoSeCorrigido = Number(((lucroAlvoUnitario * (p._sum.quantidade || 0)) - lucroTotalReal).toFixed(2))
+
+            return {
+                id: p.produtoId,
+                nome: p.nome_produto,
+                quantidade: p._sum.quantidade || 0,
+                lucroTotal: lucroTotalReal,
+                margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1)),
+                precoAtual,
+                precoSugerido,
+                ganhoPotencial: Math.max(0, ganhoSeCorrigido)
+            }
+        }))
+
+        ranking.sort((a, b) => b.lucroTotal - a.lucroTotal)
+
         const isFree = user?.plan === 'free'
         const topLucro = isFree ? ranking.slice(0, 3) : ranking.slice(0, 10)
-        const topPrejuizo = [...ranking].reverse().filter(p => p.lucroTotal <= 0 || p.margemMedia < 15).slice(0, isFree ? 2 : 10)
+        
+        // Alerta Crítico: Onde ele MAIS perde dinheiro ou margem
+        const alertaCritico = [...ranking]
+            .filter(p => p.margemMedia < 20 || p.lucroTotal < 0)
+            .sort((a, b) => b.ganhoPotencial - a.ganhoPotencial) // Ordenar por quem tem maior potencial de recuperação
+            .slice(0, isFree ? 2 : 10)
+
+        const totalPerdaOportunidade = ranking.reduce((acc, p) => acc + p.ganhoPotencial, 0)
 
         // 2. RESUMO POR PERÍODO (Agregações atômicas)
         const [vendasAgg, comprasAgg, gastosAgg] = await Promise.all([
@@ -87,18 +121,19 @@ export async function reportsRoutes(app: FastifyInstance) {
                 faturamento: totalVendas,
                 compras: totalCompras,
                 gastosOperacionais: totalGastos,
-                lucroLiquido: Number(lucroLiquidoEstimado.toFixed(2))
+                lucroLiquido: Number(lucroLiquidoEstimado.toFixed(2)),
+                impactoFinanceiro: Number(totalPerdaOportunidade.toFixed(2))
             },
             rankings: {
                 maisLucrativos: topLucro,
-                alertaCritico: topPrejuizo
+                alertaCritico: alertaCritico
             },
             insights: ranking.length > 0 ? {
                 melhorProduto: ranking[0]?.nome,
                 piorProduto: ranking[ranking.length - 1]?.nome,
-                sugestao: lucroLiquidoEstimado < 0 
-                    ? "Seus gastos superaram as vendas. Revise custos fixos."
-                    : (ranking[0]?.margemMedia < 20 ? "Suas margens estao baixas. Tente reduzir o custo dos insumos." : "Operação saudável. Foque em aumentar o volume de vendas.")
+                sugestao: totalPerdaOportunidade > 100 
+                    ? `Você pode ganhar R$ ${totalPerdaOportunidade.toFixed(2)} extras este mês corrigindo os produtos em alerta.`
+                    : (lucroLiquidoEstimado < 0 ? "Seus gastos superaram as vendas. Revise custos fixos." : "Operação saudável. Continue monitorando as margens.")
             } : null
         }
     })

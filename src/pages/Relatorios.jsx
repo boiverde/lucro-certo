@@ -66,126 +66,138 @@ export default function Relatorios() {
                     </div>
                 </div>
 
-                {/* Bloco de Insight Rápido */}
-                {insights && (
-                    <div className="mb-8 bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-3xl text-white shadow-xl shadow-green-600/20 relative overflow-hidden">
-                        <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
-                            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
-                                <Lightbulb className="w-8 h-8 text-white" />
+                {/* Bloco de Impacto Financeiro (O Tesouro Escondido) */}
+                {resumo?.impactoFinanceiro > 0 && (
+                    <div className="mb-8 bg-white border-2 border-indigo-100 p-8 rounded-[2rem] shadow-xl shadow-indigo-100/20 relative animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <div className="flex flex-col md:flex-row items-center gap-8">
+                            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/30">
+                                <TrendingUp className="w-10 h-10 text-white" />
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold mb-1">Insight do Lucro Certo</h2>
-                                <p className="text-green-50/90 text-sm leading-relaxed">{insights.sugestao}</p>
+                            <div className="flex-1 text-center md:text-left">
+                                <h2 className="text-2xl font-black text-gray-900 mb-2">Impacto Financeiro Detectado</h2>
+                                <p className="text-gray-500 text-lg">
+                                    Você pode recuperar <span className="text-indigo-600 font-black">R$ {resumo.impactoFinanceiro.toFixed(2)}</span> este mês apenas corrigindo a precificação dos seus produtos.
+                                </p>
                             </div>
+                            <Button 
+                                onClick={() => openUpgrade("Aumente seu lucro instantaneamente com a precificação automática.")}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-6 rounded-2xl font-bold text-lg h-auto shadow-lg shadow-indigo-600/20"
+                            >
+                                Recuperar Lucro Agora
+                            </Button>
                         </div>
-                        <div className="absolute top-[-20px] right-[-20px] w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
                     </div>
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     
                     {/* Ranking de Lucro - O que está gerando DINHEIRO */}
-                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-white border-b border-gray-100 py-5">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                                    <TrendingUp className="w-5 h-5" />
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
+                        <CardHeader className="border-b border-gray-100 py-6 px-8">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
+                                    <TrendingUp className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg">Top Produtos (Lucro)</CardTitle>
-                                    <p className="text-[10px] text-gray-400 font-medium">O que realmente paga as suas contas</p>
+                                    <CardTitle className="text-xl">Melhores Margens</CardTitle>
+                                    <p className="text-xs text-gray-400 font-medium">Os produtos que mais contribuem com seu caixa</p>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="space-y-4">
+                        <CardContent className="p-8">
+                            <div className="space-y-6">
                                 {rankings?.maisLucrativos?.map((item, index) => (
-                                    <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl hover:bg-gray-50 transition-colors">
+                                    <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl hover:bg-white transition-all hover:shadow-md border border-transparent hover:border-emerald-50">
                                         <div className="flex items-center gap-4">
-                                            <span className="w-6 h-6 flex items-center justify-center bg-gray-100 rounded-full text-[10px] font-bold text-gray-500">{index + 1}</span>
+                                            <span className="w-8 h-8 flex items-center justify-center bg-gray-50 rounded-xl text-xs font-black text-gray-400 border border-gray-100">{index + 1}</span>
                                             <div>
-                                                <p className="text-sm font-bold text-gray-800">{item.nome}</p>
-                                                <p className="text-[10px] text-gray-400">{item.quantidade} unidades vendidas</p>
+                                                <p className="text-base font-black text-gray-900 leading-tight">{item.nome}</p>
+                                                <p className="text-xs text-emerald-600 font-bold">{item.margemMedia}% de margem real</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-sm font-black text-green-600">R$ {item.lucroTotal.toFixed(2)}</p>
-                                            <p className="text-[10px] font-bold text-gray-300">{item.margemMedia}% margem</p>
+                                            <p className="text-lg font-black text-gray-900">R$ {item.lucroTotal.toFixed(2)}</p>
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{item.quantidade} vendidos</p>
                                         </div>
                                     </div>
                                 ))}
 
                                 {isPartial && (
-                                    <div className="mt-4 p-4 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center gap-3 text-center">
-                                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gray-400">
-                                            <Lock className="w-5 h-5" />
+                                    <div className="mt-8 p-6 bg-gray-50/50 border-2 border-dashed border-gray-200 rounded-[2rem] flex flex-col items-center gap-4 text-center">
+                                        <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gray-300 shadow-sm">
+                                            <Lock className="w-6 h-6" />
                                         </div>
                                         <div>
-                                            <p className="text-sm font-bold text-gray-700">Acesso Parcial (Plano Free)</p>
-                                            <p className="text-xs text-gray-400">Você está vendo apenas os 3 primeiros.</p>
+                                            <p className="font-black text-gray-800">Desbloqueie o Sucesso</p>
+                                            <p className="text-xs text-gray-500">Apenas o Top 3 está visível no plano gratuito.</p>
                                         </div>
                                         <Button 
-                                            onClick={() => openUpgrade("Desbloqueie o ranking completo de performance.")}
-                                            variant="outline" 
-                                            className="w-full text-xs font-bold gap-2 rounded-xl"
+                                            onClick={() => openUpgrade("Acesse os relatórios completos de performance.")}
+                                            variant="secondary" 
+                                            className="w-full font-bold h-12 rounded-xl bg-white shadow-sm border-gray-200"
                                         >
-                                            Ver Ranking Completo <ArrowRight className="w-4 h-4" />
+                                            Upgrade para visão completa
                                         </Button>
                                     </div>
                                 )}
                             </div>
-                            <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100">
-                                <p className="text-[11px] text-blue-700 leading-relaxed italic">
-                                    <strong>Estratégia:</strong> Foque o marketing e promoções nestes produtos. Eles têm a melhor saúde financeira do seu estoque.
-                                </p>
-                            </div>
                         </CardContent>
                     </Card>
 
-                    {/* Ranking de Alerta - O que está QUEIMANDO caixa */}
-                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-white border-b border-gray-100 py-5">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-red-100 text-red-600 rounded-lg">
-                                    <AlertTriangle className="w-5 h-5" />
+                    {/* Ranking de Alerta Crítico (Onde a Ação Acontece) */}
+                    <Card className="border-none shadow-sm rounded-3xl overflow-hidden bg-white/80 backdrop-blur-sm">
+                        <CardHeader className="border-b border-gray-100 py-6 px-8">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-rose-100 text-rose-600 rounded-2xl">
+                                    <AlertTriangle className="w-6 h-6" />
                                 </div>
                                 <div>
-                                    <CardTitle className="text-lg">Alerta de Prejuízo/Margem</CardTitle>
-                                    <p className="text-[10px] text-gray-400 font-medium">Produtos que precisam de revisão urgente</p>
+                                    <CardTitle className="text-xl">Ação Necessária</CardTitle>
+                                    <p className="text-xs text-gray-400 font-medium">Produtos perdendo lucro ou com margem baixa</p>
                                 </div>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-6">
-                            <div className="space-y-4">
-                                {rankings?.alertaCritico?.length > 0 ? rankings.alertaCritico.map((item, index) => (
-                                    <div key={item.id} className="flex items-center justify-between p-3 rounded-2xl bg-red-50/30 border border-red-100/50">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
+                        <CardContent className="p-8">
+                            <div className="space-y-6">
+                                {rankings?.alertaCritico?.length > 0 ? rankings.alertaCritico.map((item) => (
+                                    <div key={item.id} className="p-5 rounded-3xl bg-rose-50/20 border border-rose-100/50 space-y-4">
+                                        <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-sm font-bold text-red-900">{item.nome}</p>
-                                                <p className="text-[10px] text-red-700 font-medium">
-                                                    {item.lucroTotal < 0 ? 'Dando Prejuízo Real' : 'Margem muito baixa'}
-                                                </p>
+                                                <h3 className="font-black text-rose-900 text-base">{item.nome}</h3>
+                                                <p className="text-xs text-rose-700/80 font-bold">Perda de lucro detectada</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold text-gray-400 line-through">R$ {item.precoAtual.toFixed(2)}</p>
+                                                <p className="text-xl font-black text-rose-600">R$ {item.precoSugerido.toFixed(2)}</p>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <p className="text-sm font-black text-red-600">
-                                                {item.lucroTotal < 0 ? `- R$ ${Math.abs(item.lucroTotal).toFixed(2)}` : `${item.margemMedia}% margem`}
-                                            </p>
+
+                                        <div className="flex items-center justify-between p-3 bg-white rounded-2xl shadow-sm border border-rose-100/30">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                                                    <TrendingUp className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-gray-400 font-bold uppercase">Ganho Potencial</p>
+                                                    <p className="text-sm font-black text-emerald-600">+ R$ {item.ganhoPotencial.toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                            <Button 
+                                                size="sm"
+                                                onClick={() => openUpgrade(`Aplique o preço sugerido de R$ ${item.precoSugerido.toFixed(2)} automaticamente com o Plano PRO.`)}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-9 rounded-xl shadow-sm shadow-emerald-600/20"
+                                            >
+                                                Aplicar Sugestão
+                                            </Button>
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="h-40 flex flex-col items-center justify-center text-center opacity-40 grayscale">
-                                        <TrendingUp className="w-12 h-12 mb-3" />
-                                        <p className="text-xs font-bold">Nenhum produto em zona de alerta!</p>
-                                        <p className="text-[10px]">Parabéns, sua precificação está saudável.</p>
+                                    <div className="h-48 flex flex-col items-center justify-center text-center opacity-40">
+                                        <TrendingUp className="w-16 h-16 mb-4 text-emerald-600" />
+                                        <p className="font-black text-gray-900">Operação Perfeita!</p>
+                                        <p className="text-xs">Não detectamos produtos com margens críticas.</p>
                                     </div>
                                 )}
-                            </div>
-                            <div className="mt-6 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                                <p className="text-[11px] text-amber-700 leading-relaxed italic">
-                                    <strong>Estratégia:</strong> Aumente o preço destes produtos ou reduza o custo de produção. Eles estão "vampirando" o seu lucro total.
-                                </p>
                             </div>
                         </CardContent>
                     </Card>
