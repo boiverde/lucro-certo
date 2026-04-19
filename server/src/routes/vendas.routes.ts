@@ -79,7 +79,7 @@ export async function vendasRoutes(app: FastifyInstance) {
                 plan: true,
                 taxa_impostos: true,
                 taxa_cartao: true,
-                custo_fixo_por_unidade: true,
+                custo_fixo_mensal: true,
                 margem_lucro_padrao: true 
             }
         })
@@ -107,15 +107,31 @@ export async function vendasRoutes(app: FastifyInstance) {
             if (item.produtoId) {
                 const prod = await prisma.produto.findUnique({ 
                     where: { id: item.produtoId },
-                    select: { custo: true }
+                    select: { custo: true, nome: true }
                 })
-                custoBase = Number(prod?.custo) || 0
+                
+                // CÉREBRO DE LOJISTA: Se o produto tem receita, o custo é a soma dos ingredientes corrigidos
+                const receita = await prisma.receitaProduto.findFirst({
+                    where: { nome_produto: prod?.nome, userId },
+                    include: { ingredientes: { include: { ingrediente: true } } }
+                })
+
+                if (receita && receita.ingredientes.length > 0) {
+                    console.log(`[Finance] Calculando custo real via Receita para: ${prod?.nome}`);
+                    custoBase = receita.ingredientes.reduce((acc, ing) => {
+                        // Usamos o preco_corrigido_kg (Fator de Bacon/Rendimento)
+                        return acc + (Number(ing.ingrediente.preco_corrigido_kg) * ing.quantidade_kg)
+                    }, 0)
+                } else {
+                    custoBase = Number(prod?.custo) || 0
+                }
             }
 
             const finance = calculateFinancials(custoBase, item.preco_unitario, {
                 taxa_impostos: Number(user.taxa_impostos) || 0,
                 taxa_cartao: Number(user.taxa_cartao) || 0,
-                custo_fixo_por_unidade: Number(user.custo_fixo_por_unidade) || 0,
+                // Rateio adaptativo: Custo Mensal / Limite de referência do plano
+                custo_fixo_por_unidade: (Number(user.custo_fixo_mensal) / 150) || 0,
                 margem_lucro_padrao: Number(user.margem_lucro_padrao) || 30,
             })
 
@@ -154,26 +170,49 @@ export async function vendasRoutes(app: FastifyInstance) {
                 include: { itens: true }
             })
 
-            // Atualizar estoque se tiver produtoId
+            // 3. ATUALIZAÇÃO DE ESTOQUE INTELIGENTE (CÉREBRO DE LOJISTA)
             for (const item of itens) {
                 if (item.produtoId) {
                     const produtoInfo = await tx.produto.findUnique({ where: { id: item.produtoId } })
                     if (!produtoInfo) throw { statusCode: 404, message: `Produto não encontrado`, code: 'NOT_FOUND' }
                     
-                    if (produtoInfo.controla_estoque && produtoInfo.estoque_atual < item.quantidade) {
-                        throw { 
-                            statusCode: 400, 
-                            message: `Estoque insuficiente para o produto "${produtoInfo.nome}". Disponível: ${produtoInfo.estoque_atual}`,
-                            code: 'BUSINESS_RULE_ERROR'
+                    // 3.1. Baixa no estoque do Produto Final (se controlado)
+                    if (produtoInfo.controla_estoque) {
+                        if (produtoInfo.estoque_atual < item.quantidade) {
+                             throw { 
+                                statusCode: 400, 
+                                message: `Estoque insuficiente para o produto "${produtoInfo.nome}". Disponível: ${produtoInfo.estoque_atual}`,
+                                code: 'BUSINESS_RULE_ERROR'
+                             }
+                        }
+                        await tx.produto.update({
+                            where: { id: item.produtoId },
+                            data: { estoque_atual: { decrement: item.quantidade } }
+                        })
+                    }
+
+                    // 3.2. BAIXA AUTOMÁTICA EM CASCATA (Ficha Técnica / Receita)
+                    // Verificamos se este produto tem uma receita (ingredientes que devem ser descontados)
+                    const receita = await tx.receitaProduto.findFirst({
+                        where: { nome_produto: produtoInfo.nome, userId },
+                        include: { ingredientes: true }
+                    })
+
+                    if (receita) {
+                        for (const ingredienteItem of receita.ingredientes) {
+                            // Calculamos o gasto total do ingrediente: Qtd na Receita (kg) * Qtd Vendida
+                            const baixaGrama = ingredienteItem.quantidade_kg * item.quantidade;
+                            
+                            await tx.ingrediente.update({
+                                where: { id: ingredienteItem.ingredienteId },
+                                data: { estoque_atual: { decrement: baixaGrama } }
+                            })
+
+                            console.log(`[Venda] Baixa automática no Insumo: ID ${ingredienteItem.ingredienteId} | Qtd: ${baixaGrama}kg`);
                         }
                     }
 
-                    await tx.produto.update({
-                        where: { id: item.produtoId },
-                        data: { estoque_atual: { decrement: item.quantidade } }
-                    })
-
-                    // Registrar movimentação de saída
+                    // Registrar movimentação de saída do item mestre
                     await tx.movimentacaoEstoque.create({
                         data: {
                             userId,
@@ -181,7 +220,7 @@ export async function vendasRoutes(app: FastifyInstance) {
                             quantidade: item.quantidade,
                             tipo: 'saida',
                             origem: 'venda',
-                            observacoes: `Venda #${venda.id.slice(0, 8)}`,
+                            observacoes: `Venda #${venda.id.slice(0, 8)} - Baixa em cascata realizada`,
                             data: new Date(vendaData.data_venda)
                         }
                     })

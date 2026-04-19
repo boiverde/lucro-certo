@@ -41,7 +41,6 @@ export async function produtosRoutes(app: FastifyInstance) {
         }
     })
 
-    // Criar Produto
     app.withTypeProvider<ZodTypeProvider>().post('/', {
         schema: {
             body: z.object({
@@ -49,8 +48,13 @@ export async function produtosRoutes(app: FastifyInstance) {
                 preco: z.number(),
                 custo: z.number().optional(),
                 estoque_atual: z.number().optional(),
+                estoque_minimo: z.number().optional(),
                 unidade: z.string().default('un'),
-                controla_estoque: z.boolean().default(false),
+                codigo_barras: z.string().optional(),
+                controla_estoque: z.boolean().default(true),
+                notificar_estoque_baixo: z.boolean().default(true),
+                ativo: z.boolean().default(true),
+                observacoes: z.string().optional(),
             }),
         },
     }, async (request) => {

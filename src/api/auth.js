@@ -45,6 +45,14 @@ export const auth = {
         return httpClient('/auth/me');
     },
 
+    // Atualizar Configurações do Usuário (Custo Fixo, Impostos, etc)
+    updateMe: async (dados) => {
+        return httpClient('/auth/me', {
+            method: 'PATCH',
+            body: JSON.stringify(dados),
+        });
+    },
+
     // Logout
     logout: async () => {
         localStorage.removeItem('auth_token');
