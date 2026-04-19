@@ -110,9 +110,12 @@ export async function reportsRoutes(app: FastifyInstance) {
                 volumeReferencia: totalVolume,
                 dDayRange: hasRelevancia ? `${Math.ceil(desvioTotal / (mediaLucro * 1.1))} - ${Math.ceil(desvioTotal / (mediaLucro * 0.9))} dias` : "Coleta de dados ativa",
                 regime: hasRelevancia ? "CONFIRMADO" : (totalVolume >= 10 ? "FORMAÇÃO" : "ESTÁVEL"),
-                seguranca: { cv: CV.toFixed(2), concentracao: (concentracao * 100).toFixed(0) + "%" }
+                seguranca: { cv: CV.toFixed(2), concentracao: (concentracao * 100).toFixed(0) + "%" },
+                adaptabilidade: { cv: CV.toFixed(2), concentracao: (concentracao * 100).toFixed(0) + "%" }
             },
-            detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal)
+            rankings: { 
+                detalhado: ranking.sort((a, b) => b.lucroTotal - a.lucroTotal) 
+            }
         })
     })
 }

@@ -11,11 +11,8 @@ import {
     Calendar,
     ChevronRight,
     Lock,
-    Search,
-    BrainCircuit,
-    Lightbulb,
-    ShieldCheck,
-    CheckCircle,
+    Activity,
+    AlertCircle,
     Box,
     Cpu,
     Eye,
@@ -23,15 +20,22 @@ import {
     DollarSign,
     PieChart,
     ShieldAlert,
-    Activity,
-    AlertCircle
+    BrainCircuit,
+    Lightbulb,
+    ShieldCheck,
+    CheckCircle,
+    ShieldCheck as ShieldIcon,
+    Search
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { motion } from 'framer-motion';
 import { useUpgrade } from '@/context/UpgradeContext';
+import { calculatePriceSuggestion } from '@/utils/pricingAssistant';
 
 export default function Relatorios() {
     const [periodo, setPeriodo] = useState('mes'); // '7d', 'mes'
+    const [canal, setCanal] = useState('balcao'); // 'balcao', 'delivery', 'marketplace'
     const { openUpgrade } = useUpgrade();
     const { data: userData } = useQuery({
         queryKey: ['user-me'],
@@ -329,9 +333,8 @@ export default function Relatorios() {
                         <CardContent className="p-8">
                             <div className="space-y-6">
                                 {rankings?.detalhado?.filter(p => p.margemMedia < 25).slice(0, isPartial ? 2 : 10).map((item) => {
-                                    // Executar o Motor v1.3 no Frontend
-                                    const suggestion = calculatePriceSuggestion(item.custoBase, userData, canal, item.deltaRaw);
-                                    const isCritical = suggestion?.zona === 'CRÍTICA';
+                                    const suggestion = calculatePriceSuggestion(item.custoBase, item.precoAtual, userData, canal, item.deltaRaw, item.cv, item.concentracao);
+                                    const isCritical = item.margemMedia < 15;
 
                                     return (
                                         <div key={item.id} className="p-6 rounded-[2rem] bg-gray-50/50 border border-gray-100 space-y-4 relative overflow-hidden group hover:bg-white transition-all">
