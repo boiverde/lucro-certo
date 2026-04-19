@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { base44 } from "@/api/base44Client";
 import { httpClient } from "@/api/httpClient";
 import { useQuery } from "@tanstack/react-query";
@@ -9,220 +9,156 @@ import {
   TrendingUp, 
   Receipt, 
   DollarSign,
-  Package,
-  Users,
-  Fuel,
-  Utensils,
-  Store,
   Wallet,
-  Globe,
-  Smartphone
+  Store,
+  CreditCard,
+  ArrowRight
 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, addMonths } from "date-fns";
-import { ptBR } from "date-fns/locale";
 
 import ResumoLucro from "../components/dashboard/ResumoLucro";
-import UltimasTransacoes from "../components/dashboard/UltimasTransacoes";
 import WelcomeMessage from "../components/dashboard/WelcomeMessage";
-import BannerAcessoWeb from "../components/dashboard/BannerAcessoWeb";
+import RenewalNotice from "../components/dashboard/RenewalNotice";
 import PainelEstoque from "../components/dashboard/PainelEstoque";
 import UsageTracker from "../components/dashboard/UsageTracker";
 import LucratividadeBanner from "../components/dashboard/LucratividadeBanner";
-import RenewalNotice from "../components/dashboard/RenewalNotice";
 import { useUpgrade } from "@/context/UpgradeContext";
-import { CreditCard, ArrowRight } from "lucide-react";
-
-const hoje = new Date();
-const inicioMesObj = startOfMonth(hoje);
-const fimMesObj = endOfMonth(hoje);
-const inicioMesStr = format(inicioMesObj, "yyyy-MM-dd");
-const fimMesStr = format(fimMesObj, "yyyy-MM-dd");
 
 export default function Dashboard() {
   const { pendingPix, openUpgrade } = useUpgrade();
 
-  // Usar o hook centralizado de plano/usuário (mais rápido e com cache)
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user-me'],
     queryFn: async () => await base44.auth.me(),
-    staleTime: 1000 * 60 * 30, // 30 minutos de cache
+    staleTime: 1000 * 60 * 30,
   });
 
   const { data: dashboardStats, isLoading: statsLoading } = useQuery({
     queryKey: ['dashboard-stats', user?.email],
-    queryFn: async () => {
-      return await httpClient('/dashboard/stats');
-    },
-    enabled: !!user?.email,
-    staleTime: 1000 * 60 * 5,
-    cacheTime: 1000 * 60 * 30,
-  });
-
-  const { data: vendasRevenda = [] } = useQuery({
-    queryKey: ['vendas-revenda-dashboard', user?.email],
-    queryFn: async () => {
-      return await base44.entities.VendaRevenda.filter({ created_by: user.email, limit: 10 }, '-data_primeira_parcela');
-    },
+    queryFn: async () => await httpClient('/dashboard/stats'),
     enabled: !!user?.email,
     staleTime: 1000 * 60 * 5,
   });
 
-  // Dados unificados do backend otimizado
   const transacoes = dashboardStats?.transacoes || {};
   const totalVendasMes = transacoes.totalVendas || 0;
   const totalComprasMes = transacoes.totalCompras || 0;
   const totalGastosMes = transacoes.totalGastos || 0;
   
-  const lucroBrutoMes = totalVendasMes + (dashboardStats?.comissoes?.comissoesDoMes || 0) - totalComprasMes - totalGastosMes;
-  const { alimentacao, gasolina, diarias } = transacoes.detalhesGastos || { alimentacao: 0, gasolina: 0, diarias: 0 };
-  const hasData = (transacoes.contagens?.vendas > 0) || (transacoes.contagens?.compras > 0) || (transacoes.contagens?.gastos > 0);
+  const comissoesMes = dashboardStats?.comissoes?.comissoesDoMes || 0;
+  const lucroBrutoMes = totalVendasMes + comissoesMes - totalComprasMes - totalGastosMes;
+  const hasData = (transacoes.contagens?.vendas > 0) || (transacoes.contagens?.compras > 0);
 
-  // Removido o Skeleton total da página para melhorar percepção inicial
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm md:text-base text-gray-500 mt-1">
-            {userLoading ? <span className="inline-block w-32 h-4 bg-gray-200 animate-pulse rounded"></span> : `Bem-vindo, ${user?.full_name || 'Usuário'}!`}
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">Painel de Controle</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {userLoading ? "Carregando perfil..." : `Olá, ${user?.full_name || 'Usuário'}! Acompanhe seu desempenho hoje.`}
           </p>
         </div>
 
-        {/* Componentes principais aparecem assim que o usuário é carregado */}
         {!userLoading && (
-          <>
+          <div className="space-y-6">
             <WelcomeMessage user={user} hasData={hasData} />
             <RenewalNotice user={user} stats={dashboardStats} />
             
-            {pendingPix && new Date(pendingPix.expiresAt) > new Date() && (
-              <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top duration-500">
+            {pendingPix && (
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-3xl flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-600 shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
                     <CreditCard className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-amber-900">Você tem um pagamento pendente</p>
-                    <p className="text-[10px] text-amber-700 font-medium">Finalize sua assinatura PRO para liberar todos os recursos.</p>
+                    <p className="text-sm font-bold text-amber-900 tracking-tight">Pagamento Pendente</p>
+                    <p className="text-[10px] text-amber-700 font-medium">Libere os recursos PRO agora.</p>
                   </div>
                 </div>
                 <Button 
-                  onClick={() => openUpgrade("Retome o pagamento da sua assinatura PRO.")}
-                  className="h-9 px-4 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl gap-2 shadow-lg shadow-amber-600/20"
+                  onClick={() => openUpgrade("Retome o pagamento PRO.")}
+                  variant="ghost"
+                  className="text-amber-700 hover:bg-amber-100 font-black text-[10px] uppercase gap-2"
                 >
-                  Concluir Pagamento <ArrowRight className="w-3.5 h-3.5" />
+                  Concluir <ArrowRight className="w-3 h-3" />
                 </Button>
               </div>
             )}
 
             <LucratividadeBanner stats={dashboardStats} isLoading={statsLoading} />
             <UsageTracker usage={dashboardStats?.usage} isLoading={statsLoading} />
-            <BannerAcessoWeb />
-          </>
-        )}
 
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl md:text-2xl font-bold">R$ {totalVendasMes.toFixed(2)}</div>
-              <p className="text-xs opacity-90 mt-1">
-                {transacoes.contagens?.vendas || 0} vendas
-              </p>
-            </CardContent>
-          </Card>
+            {/* Grid de Métricas Rápidas */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="bg-indigo-600 text-white border-none rounded-[2rem] shadow-lg shadow-indigo-100/50">
+                <CardHeader className="pb-2 pt-6 px-6 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-70">Vendas</span>
+                  <TrendingUp className="h-4 w-4 opacity-70" />
+                </CardHeader>
+                <CardContent className="px-6 pb-6">
+                  <div className="text-xl font-black">R$ {totalVendasMes.toFixed(2)}</div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-gradient-to-r from-red-500 to-red-600 text-white">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xs md:text-sm font-medium opacity-90">Compras</CardTitle>
-                <ShoppingCart className="h-4 w-4 opacity-90" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl md:text-2xl font-bold">R$ {totalComprasMes.toFixed(2)}</div>
-              <p className="text-xs opacity-90 mt-1">
-                {transacoes.contagens?.compras || 0} compras
-              </p>
-            </CardContent>
-          </Card>
+              <Card className="bg-rose-500 text-white border-none rounded-[2rem] shadow-lg shadow-rose-100/50">
+                <CardHeader className="pb-2 pt-6 px-6 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-70">Compras</span>
+                  <ShoppingCart className="h-4 w-4 opacity-70" />
+                </CardHeader>
+                <CardContent className="px-6 pb-6">
+                  <div className="text-xl font-black">R$ {totalComprasMes.toFixed(2)}</div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-gradient-to-r from-orange-500 to-orange-600 text-white">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xs md:text-sm font-medium opacity-90">Gastos</CardTitle>
-                <Receipt className="h-4 w-4 opacity-90" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl md:text-2xl font-bold">R$ {totalGastosMes.toFixed(2)}</div>
-              <p className="text-xs opacity-90 mt-1">
-                {transacoes.contagens?.gastos || 0} gastos
-              </p>
-            </CardContent>
-          </Card>
+              <Card className="bg-amber-500 text-white border-none rounded-[2rem] shadow-lg shadow-amber-100/50">
+                <CardHeader className="pb-2 pt-6 px-6 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-70">Gastos</span>
+                  <Receipt className="h-4 w-4 opacity-70" />
+                </CardHeader>
+                <CardContent className="px-6 pb-6">
+                  <div className="text-xl font-black">R$ {totalGastosMes.toFixed(2)}</div>
+                </CardContent>
+              </Card>
 
-          <Card className={`${lucroBrutoMes >= 0 ? 'bg-gradient-to-r from-blue-500 to-blue-600' : 'bg-gradient-to-r from-purple-500 to-purple-600'} text-white`}>
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xs md:text-sm font-medium opacity-90">
-                  {lucroBrutoMes >= 0 ? 'Lucro' : 'Prejuízo'}
-                </CardTitle>
-                <DollarSign className="h-4 w-4 opacity-90" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-xl md:text-2xl font-bold">R$ {Math.abs(lucroBrutoMes).toFixed(2)}</div>
-              <p className="text-xs opacity-90 mt-1">
-                {lucroBrutoMes >= 0 ? 'Positivo' : 'Negativo'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              <Card className={`${lucroBrutoMes >= 0 ? 'bg-emerald-500' : 'bg-rose-600'} text-white border-none rounded-[2rem] shadow-lg`}>
+                <CardHeader className="pb-2 pt-6 px-6 flex flex-row items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-70">{lucroBrutoMes >= 0 ? 'Lucro' : 'Prejuízo'}</span>
+                  <DollarSign className="h-4 w-4 opacity-70" />
+                </CardHeader>
+                <CardContent className="px-6 pb-6">
+                  <div className="text-xl font-black">R$ {Math.abs(lucroBrutoMes).toFixed(2)}</div>
+                </CardContent>
+              </Card>
+            </div>
 
-        {/* Cards de Comissões */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <Card className="bg-gradient-to-r from-pink-500 to-pink-600 text-white">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm md:text-base font-medium opacity-90">Comissões do Mês</CardTitle>
-                <Wallet className="h-5 w-5 opacity-90" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-2xl md:text-3xl font-bold">R$ {(dashboardStats?.comissoes?.comissoesDoMes || 0).toFixed(2)}</div>
-              <p className="text-xs opacity-90 mt-1">Parcelas pagas este mês</p>
-            </CardContent>
-          </Card>
+            {/* Painel de Comissões e Estoque */}
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card className="border-none shadow-sm rounded-3xl bg-white p-6">
+                <CardHeader className="p-0 mb-4 flex flex-row justify-between items-center">
+                  <CardTitle className="text-sm font-black text-gray-400 uppercase tracking-widest">Caixa e Comissões</CardTitle>
+                </CardHeader>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 p-4 rounded-2xl">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Este Mês</p>
+                    <p className="text-lg font-black text-slate-700">R$ {comissoesMes.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-slate-50 p-4 rounded-2xl">
+                    <p className="text-[10px] font-black text-gray-400 uppercase mb-1">A Receber</p>
+                    <p className="text-lg font-black text-slate-700">R$ {(dashboardStats?.comissoes?.comissoesAReceber || 0).toFixed(2)}</p>
+                  </div>
+                </div>
+              </Card>
+              <PainelEstoque stats={dashboardStats?.estoque} />
+            </div>
 
-          <Card className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm md:text-base font-medium opacity-90">Comissões a Receber</CardTitle>
-                <Store className="h-5 w-5 opacity-90" />
-              </div>
-            </CardHeader>
-            <CardContent className="px-4 pb-4">
-              <div className="text-2xl md:text-3xl font-bold">R$ {(dashboardStats?.comissoes?.comissoesAReceber || 0).toFixed(2)}</div>
-              <p className="text-xs opacity-90 mt-1">Total de parcelas pendentes</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Painel de Estoque */}
-        <PainelEstoque stats={dashboardStats?.estoque} />
-
-        <div className="grid lg:grid-cols-1 gap-6 mt-6">
-          <div className="lg:col-span-1">
             <ResumoLucro 
-              vendasTotal={transacoes.totalVendas || 0}
-              comprasTotal={transacoes.totalCompras || 0}
-              gastosTotal={transacoes.totalGastos || 0}
-              comissoesTotal={dashboardStats?.comissoes?.comissoesDoMes || 0}
+              vendasTotal={totalVendasMes}
+              comprasTotal={totalComprasMes}
+              gastosTotal={totalGastosMes}
+              comissoesTotal={comissoesMes}
             />
           </div>
-        </div>
+        )}
       </div>
-    </div>
-  );
-}
->
     </div>
   );
 }
