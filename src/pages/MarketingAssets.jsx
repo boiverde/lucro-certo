@@ -769,7 +769,7 @@ Mostra: app em ação
 
           - **Tipo:** PWA (Progressive Web App)
           - **Frontend:** React, Tailwind CSS
-          - **Backend:** Base44 (BaaS)
+          - **Backend:** Lucro Certo (API)
           - **Funciona:** Em qualquer celular, tablet ou computador
           - **Instalação:** Direto do navegador (Chrome, Safari, etc)
           - **Tamanho:** Leve, carrega rápido

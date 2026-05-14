@@ -52,7 +52,7 @@ export default function GuiaPublicacao() {
           titulo: "Preparar domínio",
           descricao: "Seu app precisa estar em um domínio HTTPS",
           detalhes: [
-            "Base44 já fornece domínio HTTPS automático",
+            "Lucro Certo já fornece domínio HTTPS automático",
             "Domínio padrão: localhost:3333",
             "Você pode usar domínio próprio (opcional)"
           ]

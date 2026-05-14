@@ -74,7 +74,7 @@ export default function CorrigirDNSPage() {
 
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <p className="text-sm text-yellow-900">
-                <strong>⚠️ Atenção:</strong> Se você configurou um domínio personalizado (tipo www.seudominio.com), use esse domínio ao invés da URL do Base44.
+                <strong>⚠️ Atenção:</strong> Se você configurou um domínio personalizado (tipo www.seudominio.com), use esse domínio ao invés da URL do Lucro Certo.
               </p>
             </div>
           </CardContent>

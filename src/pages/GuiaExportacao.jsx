@@ -35,14 +35,14 @@ export default function GuiaExportacaoPage() {
       titulo: "Assinar Plano Builder",
       icone: DollarSign,
       cor: "blue",
-      descricao: "Faça upgrade para o plano Builder da Base44",
+      descricao: "Faça upgrade para o plano Builder do Lucro Certo",
       passos: [
-        "Acesse o dashboard da Base44",
+        "Acesse o dashboard do Lucro Certo",
         "Vá em Settings → Billing",
         "Selecione o plano Builder ($50/mês)",
         "Complete o pagamento"
       ],
-      link: "https://base44.com/pricing",
+      link: "https://lucro-certolucro-certo-web.onrender.com/pricing",
       linkTexto: "Ver Planos"
     },
     {
@@ -52,7 +52,7 @@ export default function GuiaExportacaoPage() {
       cor: "purple",
       descricao: "Baixe o código-fonte do seu app",
       passos: [
-        "No dashboard da Base44, vá no seu app",
+        "No dashboard do Lucro Certo, vá no seu app",
         "Clique em Settings → Export",
         "Baixe o arquivo ZIP com o código",
         "Extraia o ZIP em uma pasta no seu computador"

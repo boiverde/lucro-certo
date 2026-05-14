@@ -239,7 +239,7 @@ export async function revendasRoutes(app: FastifyInstance) {
         // Vamos confiar que frontend manda clienteId se criou, OU vamos tentar achar cliente pelo nome?
         // O código do frontend (lin 153 de Revendas.jsx): cria o cliente antes, mas no payload da venda manda 'cliente' (nome) e não Id? Ver FormVendaRevenda.
         // O FormVendaRevenda usa dados.cliente (string).
-        // Mas o createVendaMutation do Revendas.jsx faz: base44.entities.Cliente.create(...), mas depois chama VendaRevenda.create(data).
+        // Mas o createVendaMutation do Revendas.jsx faz o create do Cliente, mas depois chama VendaRevenda.create(data).
         // Ele NÃO injeta o ID do cliente criado no payload 'data' antes de chamar create(data) explicitamente no código que vi.
         // Espere, vamos rever o código do frontend cuidadosamente.
         // mutationFn: async (data) => { ... await Cliente.create ... return VendaRevenda.create(data) }

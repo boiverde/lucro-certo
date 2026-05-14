@@ -30,7 +30,7 @@ const RealIntegration = {
     UploadFile: async (file) => {
         // file pode vir como File object ou Blob
         const result = await uploadToBackend('/uploads/public', file);
-        // Base44 retornava { url, fileId, ... }
+        // Lucro Certo retornava { url, fileId, ... }
         // Backend retorna { url, key }
         return {
             url: result.url,

@@ -39,12 +39,17 @@ app.setSerializerCompiler(serializerCompiler)
 app.register(fastifyMultipart)
 app.register(formbody) // Suporte para Webhook do PagSeguro (x-www-form-urlencoded)
 
+const jwtSecret = process.env.JWT_SECRET
+if (!jwtSecret) {
+    throw new Error('FATAL: JWT_SECRET não definido. Defina a variável de ambiente antes de iniciar o servidor.')
+}
+
 app.register(cors, {
-    origin: '*',
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
 })
 
 app.register(jwt, {
-    secret: process.env.JWT_SECRET || 'supersecret',
+    secret: jwtSecret,
 })
 
 // Decorator de Auth

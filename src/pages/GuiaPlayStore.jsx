@@ -39,7 +39,7 @@ export default function GuiaPlayStore() {
       comandos: [
         { id: "init", texto: "# Criar pasta para o projeto\nmkdir lucro-certo-apk\ncd lucro-certo-apk\n\n# Inicializar Bubblewrap\nbubblewrap init --manifest https://seu-dominio.com.br/manifest.json" }
       ],
-      descricao: "Substitua 'seu-dominio.com.br' pela URL real do seu app Base44."
+      descricao: "Substitua 'seu-dominio.com.br' pela URL real do seu app Lucro Certo."
     },
     {
       numero: 3,
@@ -48,7 +48,7 @@ export default function GuiaPlayStore() {
         "Durante o init, você será perguntado sobre:",
         "• Nome do aplicativo: Lucro Certo",
         "• Package name: com.lucrocerto.app (ou seu domínio)",
-        "• Host do app: URL do seu app na Base44",
+        "• Host do app: URL do seu app no Lucro Certo",
         "• Nome para exibição: Lucro Certo",
         "• Cor do tema: #16a34a (verde)",
         "• Ícone: baixar de /icon-512.png",
@@ -149,7 +149,7 @@ export default function GuiaPlayStore() {
     "✅ PWA funcionando corretamente (já temos!)",
     "✅ manifest.json configurado (já temos!)",
     "✅ Ícones 192x192 e 512x512 (já temos!)",
-    "✅ HTTPS ativo (Base44 já fornece)",
+    "✅ HTTPS ativo (Lucro Certo já fornece)",
     "✅ Service Worker opcional",
     "🔧 Node.js instalado no seu computador",
     "🔧 JDK 8+ instalado",
@@ -398,7 +398,7 @@ export default function GuiaPlayStore() {
           <CardContent>
             <ul className="space-y-2 text-sm text-gray-700">
               <li>• <strong>Guarde a keystore:</strong> Sem ela, você não consegue atualizar o app!</li>
-              <li>• <strong>URL fixa:</strong> Use um domínio personalizado na Base44 se possível</li>
+              <li>• <strong>URL fixa:</strong> Use um domínio personalizado no Lucro Certo se possível</li>
               <li>• <strong>Política de privacidade:</strong> É obrigatória na Play Store</li>
               <li>• <strong>Atualizações:</strong> Use o mesmo comando de build para novas versões</li>
               <li>• <strong>Teste primeiro:</strong> Instale o APK no seu celular antes de enviar</li>
