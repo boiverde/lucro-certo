@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import BarcodeScanner from "../mobile/BarcodeScanner";
 import PricingAssistant from "../configuracoes/PricingAssistant";
 import { usePlan } from "@/api/usePlan";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 
 export default function FormProduto({ produto, onSubmit, onCancel }) {
   const [configuracoes, setConfiguracoes] = useState(null);
@@ -20,7 +20,7 @@ export default function FormProduto({ produto, onSubmit, onCancel }) {
   useEffect(() => {
     const loadConfigs = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await httpClient('/auth/me');
         setConfiguracoes(user);
       } catch (e) {
         console.error('Erro ao carregar configurações');
@@ -48,11 +48,15 @@ export default function FormProduto({ produto, onSubmit, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit({
-      ...dados,
+      nome: dados.nome || "",
+      preco: parseFloat(dados.preco) || 0,
+      custo: parseFloat(dados.custo) || 0,
       estoque_atual: parseFloat(dados.estoque_atual) || 0,
       estoque_minimo: parseFloat(dados.estoque_minimo) || 0,
-      preco: parseFloat(dados.preco) || 0,
-      custo: parseFloat(dados.custo) || 0
+      unidade: dados.unidade || "unidades",
+      descricao: dados.observacoes || "",
+      ativo: !!dados.ativo,
+      controla_estoque: !!dados.controla_estoque
     });
   };
 

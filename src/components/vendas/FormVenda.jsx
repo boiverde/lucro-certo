@@ -89,12 +89,24 @@ export default function FormVenda({ venda, produtos = [], onSubmit, onCancel }) 
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    const quantidadeVal = parseFloat(dados.quantidade) || 0;
+    const precoVal = parseFloat(dados.preco_por_unidade) || 0;
+    const totalVal = parseFloat(dados.valor_total) || 0;
+    const prodId = (modoManual || !dados.produto_estoque_id) ? undefined : dados.produto_estoque_id;
+
     onSubmit({
-      ...dados,
-      quantidade: parseFloat(dados.quantidade),
-      preco_por_unidade: parseFloat(dados.preco_por_unidade),
-      valor_total: parseFloat(dados.valor_total),
-      produto_estoque_id: modoManual ? "" : dados.produto_estoque_id
+      cliente_nome: dados.cliente || "Consumidor",
+      data_venda: dados.data_venda || new Date().toISOString().split('T')[0],
+      valor_total: totalVal,
+      pago: !!dados.pago,
+      forma_pagamento: dados.forma_pagamento || "dinheiro",
+      itens: [{
+        produto_estoque_id: prodId,
+        nome_produto: dados.produto || "Produto",
+        quantidade: quantidadeVal,
+        preco_unitario: precoVal,
+        unidade: dados.unidade_venda || "unidades"
+      }]
     });
   };
 

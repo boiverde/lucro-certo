@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { toast } from 'sonner';
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Package, AlertTriangle } from "lucide-react";
@@ -21,47 +21,23 @@ export default function EstoquePage() {
   const [showFormMovimentacao, setShowFormMovimentacao] = useState(false);
   const [editandoProduto, setEditandoProduto] = useState(null);
   const [produtoSelecionado, setProdutoSelecionado] = useState(null);
-  const [user, setUser] = useState(null);
   const [page, setPage] = useState(1);
 
   const queryClient = useQueryClient();
   const { isOnline, addToQueue } = useOffline();
 
-  useEffect(() => {
-    const loadUser = async () => {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-    };
-    loadUser();
-  }, []);
-
   const { data: produtosData = { data: [], meta: null }, isLoading: loadingProdutos } = useQuery({
     queryKey: ['produtos', page],
-    queryFn: async () => {
-      const result = await base44.entities.Produto.filterPaginated(
-        { created_by: user?.email },
-        '-created_date',
-        page,
-        50
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient(`/produtos?page=${page}&limit=50`),
     placeholderData: keepPreviousData,
   });
 
-  const produtos = produtosData.data;
+  const produtos = Array.isArray(produtosData) ? produtosData : (produtosData.data || []);
+  const meta = Array.isArray(produtosData) ? null : produtosData.meta;
 
   const { data: movimentacoes = [], isLoading: loadingMovimentacoes } = useQuery({
     queryKey: ['movimentacoes-estoque'],
-    queryFn: async () => {
-      const result = await base44.entities.MovimentacaoEstoque.filter(
-        { created_by: user?.email },
-        '-data'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/movimentacoes-estoque'),
   });
 
   const createProdutoMutation = useMutation({
@@ -70,7 +46,7 @@ export default function EstoquePage() {
         addToQueue('create_produto', data);
         throw new Error('offline');
       }
-      return base44.entities.Produto.create(data);
+      return httpClient('/produtos', { method: 'POST', body: JSON.stringify(data) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['produtos'] });
@@ -79,7 +55,7 @@ export default function EstoquePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        toast.success('Produto salvo! Será sincronizado quando voltar online.', { id: 'Produto salvo! Será sincronizado quando voltar online.' })
+        toast.success('Produto salvo! Será sincronizado quando voltar online.', { id: 'produto-offline' });
         setShowFormProduto(false);
         setEditandoProduto(null);
       }
@@ -87,7 +63,7 @@ export default function EstoquePage() {
   });
 
   const updateProdutoMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Produto.update(id, data),
+    mutationFn: ({ id, data }) => httpClient(`/produtos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['produtos'] });
       setShowFormProduto(false);
@@ -103,13 +79,13 @@ export default function EstoquePage() {
       }
 
       // Criar a movimentação
-      await base44.entities.MovimentacaoEstoque.create(data);
-      
+      await httpClient('/movimentacoes-estoque', { method: 'POST', body: JSON.stringify(data) });
+
       // Atualizar o estoque do produto
       const produto = produtos.find(p => p.id === data.produto_id);
       if (produto) {
         let novoEstoque = produto.estoque_atual;
-        
+
         if (data.tipo === 'entrada') {
           novoEstoque += data.quantidade;
         } else if (data.tipo === 'saida' || data.tipo === 'perda') {
@@ -117,9 +93,10 @@ export default function EstoquePage() {
         } else if (data.tipo === 'ajuste') {
           novoEstoque = data.quantidade;
         }
-        
-        await base44.entities.Produto.update(produto.id, {
-          estoque_atual: Math.max(0, novoEstoque)
+
+        await httpClient(`/produtos/${produto.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ estoque_atual: Math.max(0, novoEstoque) })
         });
       }
     },
@@ -131,7 +108,7 @@ export default function EstoquePage() {
     },
     onError: (error) => {
       if (error.message === 'offline') {
-        toast.success('Movimentação salva! Será sincronizada quando voltar online.', { id: 'Movimentação salva! Será sincronizada quando voltar online.' })
+        toast.success('Movimentação salva! Será sincronizada quando voltar online.', { id: 'mov-offline' });
         setShowFormMovimentacao(false);
         setProdutoSelecionado(null);
       }
@@ -162,15 +139,15 @@ export default function EstoquePage() {
 
   const handleSync = async (item) => {
     if (item.type === 'create_produto') {
-      await base44.entities.Produto.create(item.data);
+      await httpClient('/produtos', { method: 'POST', body: JSON.stringify(item.data) });
       queryClient.invalidateQueries({ queryKey: ['produtos'] });
     } else if (item.type === 'create_movimentacao') {
-      await base44.entities.MovimentacaoEstoque.create(item.data);
-      
+      await httpClient('/movimentacoes-estoque', { method: 'POST', body: JSON.stringify(item.data) });
+
       const produto = produtos.find(p => p.id === item.data.produto_id);
       if (produto) {
         let novoEstoque = produto.estoque_atual;
-        
+
         if (item.data.tipo === 'entrada') {
           novoEstoque += item.data.quantidade;
         } else if (item.data.tipo === 'saida' || item.data.tipo === 'perda') {
@@ -178,18 +155,18 @@ export default function EstoquePage() {
         } else if (item.data.tipo === 'ajuste') {
           novoEstoque = item.data.quantidade;
         }
-        
-        await base44.entities.Produto.update(produto.id, {
-          estoque_atual: Math.max(0, novoEstoque)
+
+        await httpClient(`/produtos/${produto.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ estoque_atual: Math.max(0, novoEstoque) })
         });
       }
-      
+
       queryClient.invalidateQueries({ queryKey: ['produtos'] });
       queryClient.invalidateQueries({ queryKey: ['movimentacoes-estoque'] });
     }
   };
 
-  // Calcular produtos com estoque baixo
   const produtosComEstoqueBaixo = produtos.filter(
     p => p.ativo && p.estoque_atual <= p.estoque_minimo && p.estoque_minimo > 0
   );
@@ -197,7 +174,7 @@ export default function EstoquePage() {
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
       <OfflineManager onSync={handleSync} />
-      
+
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Estoque</h1>
@@ -208,7 +185,6 @@ export default function EstoquePage() {
 
         <NotificationManager produtos={produtos} />
 
-        {/* Alerta de Estoque Baixo */}
         {produtosComEstoqueBaixo.length > 0 && (
           <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
             <div className="flex items-start gap-3">
@@ -233,12 +209,8 @@ export default function EstoquePage() {
 
         <Tabs defaultValue="produtos" className="space-y-6">
           <TabsList className="grid w-full grid-cols-2 h-auto">
-            <TabsTrigger value="produtos" className="text-xs md:text-sm py-2">
-              Produtos
-            </TabsTrigger>
-            <TabsTrigger value="historico" className="text-xs md:text-sm py-2">
-              Histórico
-            </TabsTrigger>
+            <TabsTrigger value="produtos" className="text-xs md:text-sm py-2">Produtos</TabsTrigger>
+            <TabsTrigger value="historico" className="text-xs md:text-sm py-2">Histórico</TabsTrigger>
           </TabsList>
 
           <TabsContent value="produtos" className="space-y-6">
@@ -292,10 +264,7 @@ export default function EstoquePage() {
               onAdicionarSaida={(p) => handleAdicionarMovimentacao(p, 'saida')}
             />
 
-            <Pagination 
-              meta={produtosData.meta} 
-              onPageChange={(p) => setPage(p)} 
-            />
+            <Pagination meta={meta} onPageChange={(p) => setPage(p)} />
           </TabsContent>
 
           <TabsContent value="historico" className="space-y-6">

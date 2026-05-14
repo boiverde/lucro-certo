@@ -6,7 +6,7 @@ import { Pencil, ShoppingBag, Check, Trash2 } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -39,9 +39,12 @@ export default function ListaVendasRevenda({ vendas, loading, onEditar, onDeleta
     mutationFn: ({ id, parcelasPagas, numeroParcelas }) => {
       const novasParcelasPagas = parcelasPagas + 1;
       const novoStatus = novasParcelasPagas >= numeroParcelas ? 'paga' : 'ativa';
-      return base44.entities.VendaRevenda.update(id, {
+      return httpClient(`/revendas/vendas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
         parcelas_pagas: novasParcelasPagas,
         status: novoStatus
+      })
       });
     },
     onSuccess: () => {

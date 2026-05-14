@@ -50,10 +50,10 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
   }
 
   const diariasFiltradas = filtroStatus === "todos" 
-    ? diarias 
-    : diarias.filter(d => filtroStatus === "pagas" ? d.pago : !d.pago);
+    ? (diarias || []) 
+    : (diarias || []).filter(d => filtroStatus === "pagas" ? d.pago : !d.pago);
 
-  if (diarias.length === 0) {
+  if (!diarias || (Array.isArray(diarias) && diarias.length === 0)) {
     return (
       <Card>
         <CardContent className="p-8 text-center">
@@ -64,8 +64,8 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
     );
   }
 
-  const totalPendente = diarias.filter(d => !d.pago).reduce((sum, d) => sum + d.valor_total, 0);
-  const totalPago = diarias.filter(d => d.pago).reduce((sum, d) => sum + d.valor_total, 0);
+  const totalPendente = (diarias || []).filter(d => !d.pago).reduce((sum, d) => sum + (d.valor_total || 0), 0);
+  const totalPago = (diarias || []).filter(d => d.pago).reduce((sum, d) => sum + (d.valor_total || 0), 0);
 
   return (
     <>
@@ -76,7 +76,7 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
             <p className="text-sm text-orange-800 font-medium">A Pagar</p>
             <p className="text-2xl font-bold text-orange-600">R$ {totalPendente.toFixed(2)}</p>
             <p className="text-xs text-orange-700 mt-1">
-              {diarias.filter(d => !d.pago).length} diária(s)
+              {(diarias || []).filter(d => !d.pago).length} diária(s)
             </p>
           </CardContent>
         </Card>
@@ -85,7 +85,7 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
             <p className="text-sm text-green-800 font-medium">Pago</p>
             <p className="text-2xl font-bold text-green-600">R$ {totalPago.toFixed(2)}</p>
             <p className="text-xs text-green-700 mt-1">
-              {diarias.filter(d => d.pago).length} diária(s)
+              {(diarias || []).filter(d => d.pago).length} diária(s)
             </p>
           </CardContent>
         </Card>
@@ -110,7 +110,7 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5" />
-            Diárias ({diariasFiltradas.length})
+            Diárias ({diariasFiltradas?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -132,7 +132,7 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
                 {diariasFiltradas.map((diaria) => (
                   <tr key={diaria.id} className="border-b hover:bg-gray-50">
                     <td className="p-3 text-sm">
-                      {format(new Date(diaria.data), "d 'de' MMM yyyy", { locale: ptBR })}
+                      {diaria.data ? format(new Date(diaria.data), "d 'de' MMM yyyy", { locale: ptBR }) : '-'}
                     </td>
                     <td className="p-3">
                       <p className="font-medium">{diaria.funcionario_nome}</p>
@@ -140,11 +140,11 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
                         <p className="text-xs text-gray-500 truncate max-w-xs">{diaria.observacoes}</p>
                       )}
                     </td>
-                    <td className="p-3">R$ {diaria.valor_diaria.toFixed(2)}</td>
-                    <td className="p-3">R$ {diaria.valor_passagem.toFixed(2)}</td>
-                    <td className="p-3">R$ {diaria.valor_alimentacao.toFixed(2)}</td>
+                    <td className="p-3">R$ {(diaria.valor_diaria || 0).toFixed(2)}</td>
+                    <td className="p-3">R$ {(diaria.valor_passagem || 0).toFixed(2)}</td>
+                    <td className="p-3">R$ {(diaria.valor_alimentacao || 0).toFixed(2)}</td>
                     <td className="p-3 font-bold text-green-600">
-                      R$ {diaria.valor_total.toFixed(2)}
+                      R$ {(diaria.valor_total || 0).toFixed(2)}
                     </td>
                     <td className="p-3">
                       <Badge className={diaria.pago ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
@@ -205,7 +205,7 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
       <div className="md:hidden space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <DollarSign className="w-5 h-5" />
-          <h3 className="font-bold text-lg">Diárias ({diariasFiltradas.length})</h3>
+          <h3 className="font-bold text-lg">Diárias ({diariasFiltradas?.length || 0})</h3>
         </div>
         {diariasFiltradas.map((diaria) => (
           <Card key={diaria.id} className="shadow-md">
@@ -214,7 +214,7 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
                 <div className="flex-1">
                   <h4 className="font-bold text-lg">{diaria.funcionario_nome}</h4>
                   <p className="text-sm text-gray-500">
-                    {format(new Date(diaria.data), "d 'de' MMM yyyy", { locale: ptBR })}
+                    {diaria.data ? format(new Date(diaria.data), "d 'de' MMM yyyy", { locale: ptBR }) : '-'}
                   </p>
                 </div>
                 <Badge className={diaria.pago ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
@@ -225,23 +225,23 @@ export default function ListaDiarias({ diarias, loading, onEditar, onDeletar, on
               <div className="space-y-2 mb-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Diária:</span>
-                  <span className="font-medium">R$ {diaria.valor_diaria.toFixed(2)}</span>
+                  <span className="font-medium">R$ {(diaria.valor_diaria || 0).toFixed(2)}</span>
                 </div>
-                {diaria.valor_passagem > 0 && (
+                {(diaria.valor_passagem || 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Passagem:</span>
-                    <span className="font-medium">R$ {diaria.valor_passagem.toFixed(2)}</span>
+                    <span className="font-medium">R$ {(diaria.valor_passagem || 0).toFixed(2)}</span>
                   </div>
                 )}
-                {diaria.valor_alimentacao > 0 && (
+                {(diaria.valor_alimentacao || 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Alimentação:</span>
-                    <span className="font-medium">R$ {diaria.valor_alimentacao.toFixed(2)}</span>
+                    <span className="font-medium">R$ {(diaria.valor_alimentacao || 0).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="flex justify-between pt-2 border-t">
                   <span className="font-bold">Total:</span>
-                  <span className="font-bold text-green-600">R$ {diaria.valor_total.toFixed(2)}</span>
+                  <span className="font-bold text-green-600">R$ {(diaria.valor_total || 0).toFixed(2)}</span>
                 </div>
               </div>
 

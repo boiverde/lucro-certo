@@ -6,7 +6,7 @@ import { Pencil, Package, Trash2, Check } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -25,9 +25,12 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
 
   const marcarPagoMutation = useMutation({
     mutationFn: ({ id }) => {
-      return base44.entities.Compra.update(id, {
-        pago: true,
-        data_pagamento_efetivo: new Date().toISOString().split('T')[0]
+      return httpClient(`/compras/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          pago: true,
+          data_pagamento_efetivo: new Date().toISOString().split('T')[0]
+        })
       });
     },
     onSuccess: () => {
@@ -77,7 +80,7 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
     );
   }
 
-  if (compras.length === 0) {
+  if (!compras || (Array.isArray(compras) && compras.length === 0)) {
     return (
       <Card>
         <CardContent className="p-8 text-center">
@@ -95,7 +98,7 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="w-5 h-5" />
-            Suas Compras ({compras.length})
+            Suas Compras ({compras?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -114,30 +117,38 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
                 </tr>
               </thead>
               <tbody>
-                {compras.map((compra) => (
-                  <tr key={compra.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">
-                      <div>
-                        <p className="font-medium">{compra.produto}</p>
-                        {compra.fornecedor && (
-                          <p className="text-sm text-gray-500">{compra.fornecedor}</p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-3">
-                      <Badge variant="secondary">
-                        {compra.quantidade} {compra.unidade_compra}
-                      </Badge>
-                    </td>
-                    <td className="p-3 font-medium">
-                      R$ {compra.valor_por_unidade?.toFixed(2) || '0.00'}
-                    </td>
-                    <td className="p-3 font-bold text-red-600">
-                      R$ {compra.valor_total.toFixed(2)}
-                    </td>
-                    <td className="p-3">
-                      {formatarData(compra.data_compra)}
-                    </td>
+                {compras.map((compra) => {
+                  const itemPrincipal = (compra.itens && compra.itens.length > 0) ? compra.itens[0] : {};
+                  const nomeProduto = itemPrincipal.nome_produto || compra.produto || "-";
+                  const quantidade = itemPrincipal.quantidade || compra.quantidade || 0;
+                  const unidade = itemPrincipal.unidade || compra.unidade_compra || "-";
+                  const precoUnidade = Number(itemPrincipal.preco_unitario || compra.valor_por_unidade || 0);
+                  const fornecedor = compra.fornecedor_nome || compra.fornecedor || "-";
+                  
+                  return (
+                    <tr key={compra.id} className="border-b hover:bg-gray-50">
+                      <td className="p-3">
+                        <div>
+                          <p className="font-medium">{nomeProduto}</p>
+                          {fornecedor !== '-' && (
+                            <p className="text-sm text-gray-500">{fornecedor}</p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <Badge variant="secondary">
+                          {quantidade} {unidade}
+                        </Badge>
+                      </td>
+                      <td className="p-3 font-medium">
+                        R$ {precoUnidade.toFixed(2)}
+                      </td>
+                      <td className="p-3 font-bold text-red-600">
+                        R$ {Number(compra?.valor_total || 0).toFixed(2)}
+                      </td>
+                      <td className="p-3">
+                        {formatarData(compra.data_compra)}
+                      </td>
                     <td className="p-3">
                       {compra.data_pagamento ? (
                         <div className="text-sm">
@@ -185,7 +196,7 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
                       </div>
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>
@@ -196,51 +207,59 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
       <div className="md:hidden space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <Package className="w-5 h-5" />
-          <h3 className="font-bold text-lg">Suas Compras ({compras.length})</h3>
+          <h3 className="font-bold text-lg">Suas Compras ({compras?.length || 0})</h3>
         </div>
-        {compras.map((compra) => (
-          <Card key={compra.id} className="shadow-md">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex-1">
-                  <h4 className="font-bold text-lg">{compra.produto}</h4>
-                  <div className="flex gap-2 mt-1">
-                    <Badge variant="secondary">
-                      {compra.quantidade} {compra.unidade_compra}
-                    </Badge>
-                    <Badge className={compra.pago ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
-                      {compra.pago ? 'Pago' : 'Pendente'}
-                    </Badge>
+        {compras.map((compra) => {
+          const itemPrincipal = (compra.itens && compra.itens.length > 0) ? compra.itens[0] : {};
+          const nomeProduto = itemPrincipal.nome_produto || compra.produto || "-";
+          const quantidade = itemPrincipal.quantidade || compra.quantidade || 0;
+          const unidade = itemPrincipal.unidade || compra.unidade_compra || "-";
+          const precoUnidade = Number(itemPrincipal.preco_unitario || compra.valor_por_unidade || 0);
+          const fornecedor = compra.fornecedor_nome || compra.fornecedor || "-";
+          
+          return (
+            <Card key={compra.id} className="shadow-md">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex-1">
+                    <h4 className="font-bold text-lg">{nomeProduto}</h4>
+                    <div className="flex gap-2 mt-1">
+                      <Badge variant="secondary">
+                        {quantidade} {unidade}
+                      </Badge>
+                      <Badge className={compra.pago ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
+                        {compra.pago ? 'Pago' : 'Pendente'}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="space-y-2 mb-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Valor/Unidade:</span>
-                  <span className="font-medium">R$ {compra.valor_por_unidade?.toFixed(2) || '0.00'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Valor Total:</span>
-                  <span className="font-bold text-red-600">R$ {compra.valor_total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Data Compra:</span>
-                  <span className="text-sm">{formatarData(compra.data_compra)}</span>
-                </div>
-                {compra.data_pagamento && (
+                <div className="space-y-2 mb-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Data Pagamento:</span>
-                    <span className="text-sm">{formatarData(compra.data_pagamento)}</span>
+                    <span className="text-sm text-gray-600">Valor/Unidade:</span>
+                    <span className="font-medium">R$ {precoUnidade.toFixed(2)}</span>
                   </div>
-                )}
-                {compra.fornecedor && (
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Fornecedor:</span>
-                    <span className="text-sm">{compra.fornecedor}</span>
+                    <span className="text-sm text-gray-600">Valor Total:</span>
+                    <span className="font-bold text-red-600">R$ {Number(compra.valor_total || 0).toFixed(2)}</span>
                   </div>
-                )}
-              </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Data Compra:</span>
+                    <span className="text-sm">{formatarData(compra.data_compra)}</span>
+                  </div>
+                  {compra.data_pagamento && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Data Pagamento:</span>
+                      <span className="text-sm">{formatarData(compra.data_pagamento)}</span>
+                    </div>
+                  )}
+                  {fornecedor !== '-' && (
+                    <div className="flex justify-between">
+                      <span className="text-sm text-gray-600">Fornecedor:</span>
+                      <span className="text-sm">{fornecedor}</span>
+                    </div>
+                  )}
+                </div>
 
               {compra.observacoes && (
                 <p className="text-sm text-gray-500 italic pt-2 border-t mb-3">{compra.observacoes}</p>
@@ -275,9 +294,10 @@ export default function ListaCompras({ compras, loading, onEditar, onDeletar }) 
                   <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {/* Diálogo de Confirmação */}

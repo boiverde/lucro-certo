@@ -184,7 +184,7 @@ export default function CorrigirDNSPage() {
                 <p className="font-bold text-yellow-900 mb-3">📝 O que você vai ver e editar:</p>
                 <p className="text-sm text-yellow-900 mb-2">Procure esta linha no arquivo:</p>
                 <div className="bg-white p-3 rounded border border-yellow-300 mb-3">
-                  <code className="text-red-600">"host": "lucro-certo.base44.apphttps"</code>
+                  <code className="text-red-600">"host": "localhost:3333https"</code>
                   <p className="text-xs text-gray-600 mt-1">☝️ Este é o domínio ERRADO que está causando o problema!</p>
                 </div>
 

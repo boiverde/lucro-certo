@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { httpClient } from "@/api/httpClient";
 import { toast } from 'sonner';
 import { z } from 'zod';
 
@@ -38,7 +38,7 @@ export default function Register() {
                 ...utms
             });
 
-            const success = await base44.auth.register(validatedData);
+            const success = await httpClient('/auth/register', { method: 'POST', body: JSON.stringify(validatedData) });
 
             if (success) {
                 toast.success('Conta criada com sucesso! Faça login.');

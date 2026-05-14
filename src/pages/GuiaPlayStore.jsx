@@ -37,9 +37,9 @@ export default function GuiaPlayStore() {
       numero: 2,
       titulo: "Inicializar o Projeto TWA",
       comandos: [
-        { id: "init", texto: "# Criar pasta para o projeto\nmkdir lucro-certo-apk\ncd lucro-certo-apk\n\n# Inicializar Bubblewrap\nbubblewrap init --manifest https://seu-app.base44.app/manifest.json" }
+        { id: "init", texto: "# Criar pasta para o projeto\nmkdir lucro-certo-apk\ncd lucro-certo-apk\n\n# Inicializar Bubblewrap\nbubblewrap init --manifest https://seu-dominio.com.br/manifest.json" }
       ],
-      descricao: "Substitua 'seu-app.base44.app' pela URL real do seu app Base44."
+      descricao: "Substitua 'seu-dominio.com.br' pela URL real do seu app Base44."
     },
     {
       numero: 3,
@@ -159,7 +159,7 @@ export default function GuiaPlayStore() {
 
   const comandosRapidos = [
     { label: "Instalar Bubblewrap", cmd: "npm install -g @bubblewrap/cli" },
-    { label: "Inicializar Projeto", cmd: "bubblewrap init --manifest https://seu-app.base44.app/manifest.json" },
+    { label: "Inicializar Projeto", cmd: "bubblewrap init --manifest https://seu-dominio.com.br/manifest.json" },
     { label: "Gerar Keystore", cmd: "keytool -genkey -v -keystore lucro-certo.keystore -alias lucrocerto -keyalg RSA -keysize 2048 -validity 10000" },
     { label: "Build APK", cmd: "bubblewrap build" },
     { label: "Build AAB", cmd: "bubblewrap build --packageFormat=bundle" }

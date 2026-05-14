@@ -40,7 +40,7 @@ export default function GuiaGooglePlay() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => copiarTexto('https://lucro-certo.base44.app/PoliticaDePrivacidade', 'privacy-url')}
+                onClick={() => copiarTexto('https://localhost:3333/PoliticaDePrivacidade', 'privacy-url')}
               >
                 {copiado === 'privacy-url' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               </Button>
@@ -51,7 +51,7 @@ export default function GuiaGooglePlay() {
               <div>
                 <label className="font-semibold text-gray-700">URL da Política de Privacidade:</label>
                 <div className="bg-gray-100 p-3 rounded mt-2 font-mono text-sm break-all">
-                  https://lucro-certo.base44.app/PoliticaDePrivacidade
+                  https://localhost:3333/PoliticaDePrivacidade
                 </div>
                 <p className="text-sm text-gray-600 mt-2">
                   ✅ Já existe uma página de Política de Privacidade no app. Cole esta URL exata no Google Play Console.
@@ -553,12 +553,12 @@ Saiba exatamente quanto você está lucrando, controle seu estoque, gerencie cli
               <div>
                 <label className="font-semibold text-gray-700">🌐 Site (opcional):</label>
                 <div className="bg-gray-100 p-3 rounded mt-2 relative">
-                  <p className="text-sm">https://lucro-certo.base44.app</p>
+                  <p className="text-sm">https://localhost:3333</p>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="absolute top-2 right-2"
-                    onClick={() => copiarTexto("https://lucro-certo.base44.app", 'website')}
+                    onClick={() => copiarTexto("https://localhost:3333", 'website')}
                   >
                     {copiado === 'website' ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>

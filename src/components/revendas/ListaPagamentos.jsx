@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Clock, AlertCircle } from "lucide-react";
 import { format, addMonths, isBefore, startOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function ListaPagamentos({ vendas }) {
@@ -17,9 +17,12 @@ export default function ListaPagamentos({ vendas }) {
     mutationFn: ({ id, parcelasPagas, numeroParcelas }) => {
       const novasParcelasPagas = parcelasPagas + 1;
       const novoStatus = novasParcelasPagas >= numeroParcelas ? 'paga' : 'ativa';
-      return base44.entities.VendaRevenda.update(id, {
+      return httpClient(`/revendas/vendas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
         parcelas_pagas: novasParcelasPagas,
         status: novoStatus
+      })
       });
     },
     onSuccess: () => {

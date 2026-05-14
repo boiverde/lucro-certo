@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,61 +27,28 @@ export default function GerenciadorLotes() {
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me(),
-  });
-
   const { data: lotes = [], isLoading } = useQuery({
     queryKey: ['lotes'],
-    queryFn: async () => {
-      const result = await base44.entities.Lote.filter(
-        { created_by: user?.email },
-        '-data_validade'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/lotes'),
   });
 
   const { data: produtos = [] } = useQuery({
     queryKey: ['produtos'],
-    queryFn: async () => {
-      const result = await base44.entities.Produto.filter(
-        { created_by: user?.email },
-        'nome'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/produtos'),
   });
 
   const { data: ingredientes = [] } = useQuery({
     queryKey: ['ingredientes'],
-    queryFn: async () => {
-      const result = await base44.entities.Ingrediente.filter(
-        { created_by: user?.email },
-        'nome'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/ingredientes'),
   });
 
   const { data: fornecedores = [] } = useQuery({
     queryKey: ['fornecedores'],
-    queryFn: async () => {
-      const result = await base44.entities.Fornecedor.filter(
-        { created_by: user?.email },
-        'nome'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/fornecedores'),
   });
 
   const deleteLoteMutation = useMutation({
-    mutationFn: (id) => base44.entities.Lote.delete(id),
+    mutationFn: (id) => httpClient(`/lotes/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lotes'] });
     },
@@ -104,9 +71,8 @@ export default function GerenciadorLotes() {
     return tipoMatch && statusMatch;
   });
 
-  // Análise de validade
   const hoje = new Date();
-  const lotesVencidos = lotesFiltrados.filter(l => 
+  const lotesVencidos = lotesFiltrados.filter(l =>
     l.data_validade && isBefore(parseISO(l.data_validade), hoje)
   );
   const lotesVencendo = lotesFiltrados.filter(l => {
@@ -223,9 +189,7 @@ export default function GerenciadorLotes() {
         <CardContent>
           <div className="flex gap-3 mb-4">
             <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os tipos</SelectItem>
                 <SelectItem value="produto">Produtos</SelectItem>
@@ -234,9 +198,7 @@ export default function GerenciadorLotes() {
             </Select>
 
             <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os status</SelectItem>
                 <SelectItem value="disponivel">Disponível</SelectItem>
@@ -247,7 +209,6 @@ export default function GerenciadorLotes() {
             </Select>
           </div>
 
-          {/* Lista de lotes */}
           <div className="space-y-3">
             {lotesFiltrados.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
@@ -256,7 +217,7 @@ export default function GerenciadorLotes() {
             ) : (
               lotesFiltrados.map(lote => {
                 const diasValidade = lote.data_validade ? differenceInDays(parseISO(lote.data_validade), hoje) : null;
-                
+
                 return (
                   <Card key={lote.id} className="hover:shadow-md transition-shadow">
                     <CardContent className="p-4">
@@ -264,12 +225,10 @@ export default function GerenciadorLotes() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <h4 className="font-semibold">{lote.produto_nome}</h4>
-                            <Badge className={getStatusColor(lote.status)}>
-                              {getStatusLabel(lote.status)}
-                            </Badge>
+                            <Badge className={getStatusColor(lote.status)}>{getStatusLabel(lote.status)}</Badge>
                             <Badge variant="outline">{lote.tipo}</Badge>
                           </div>
-                          
+
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                             <div>
                               <p className="text-gray-500">Código</p>
@@ -315,7 +274,6 @@ export default function GerenciadorLotes() {
         </CardContent>
       </Card>
 
-      {/* Dialog de formulário */}
       <AnimatePresence>
         {showForm && (
           <FormLote
@@ -351,7 +309,7 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
   const queryClient = useQueryClient();
 
   const createLoteMutation = useMutation({
-    mutationFn: (data) => base44.entities.Lote.create(data),
+    mutationFn: (data) => httpClient('/lotes', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lotes'] });
       onClose();
@@ -359,7 +317,7 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
   });
 
   const updateLoteMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Lote.update(id, data),
+    mutationFn: ({ id, data }) => httpClient(`/lotes/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lotes'] });
       onClose();
@@ -368,12 +326,11 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Buscar nome do produto
-    const item = dados.tipo === "produto" 
+
+    const item = dados.tipo === "produto"
       ? produtos.find(p => p.id === dados.produto_id)
       : ingredientes.find(i => i.id === dados.produto_id);
-    
+
     const fornecedor = fornecedores.find(f => f.id === dados.fornecedor_id);
 
     const dadosCompletos = {
@@ -405,9 +362,7 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
             <div>
               <Label>Tipo *</Label>
               <Select value={dados.tipo} onValueChange={(v) => setDados({...dados, tipo: v, produto_id: ""})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="produto">Produto</SelectItem>
                   <SelectItem value="ingrediente">Ingrediente</SelectItem>
@@ -428,9 +383,7 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
           <div>
             <Label>{dados.tipo === "produto" ? "Produto" : "Ingrediente"} *</Label>
             <Select value={dados.produto_id} onValueChange={(v) => setDados({...dados, produto_id: v})}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
               <SelectContent>
                 {itensDisponiveis.map(item => (
                   <SelectItem key={item.id} value={item.id}>{item.nome}</SelectItem>
@@ -442,61 +395,34 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Quantidade *</Label>
-              <Input
-                type="number"
-                step="0.001"
-                value={dados.quantidade}
-                onChange={(e) => setDados({...dados, quantidade: e.target.value})}
-                required
-              />
+              <Input type="number" step="0.001" value={dados.quantidade} onChange={(e) => setDados({...dados, quantidade: e.target.value})} required />
             </div>
             <div>
               <Label>Unidade</Label>
-              <Input
-                value={dados.unidade}
-                onChange={(e) => setDados({...dados, unidade: e.target.value})}
-                placeholder="kg, unidades, etc"
-              />
+              <Input value={dados.unidade} onChange={(e) => setDados({...dados, unidade: e.target.value})} placeholder="kg, unidades, etc" />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Data de Fabricação</Label>
-              <Input
-                type="date"
-                value={dados.data_fabricacao}
-                onChange={(e) => setDados({...dados, data_fabricacao: e.target.value})}
-              />
+              <Input type="date" value={dados.data_fabricacao} onChange={(e) => setDados({...dados, data_fabricacao: e.target.value})} />
             </div>
             <div>
               <Label>Data de Validade *</Label>
-              <Input
-                type="date"
-                value={dados.data_validade}
-                onChange={(e) => setDados({...dados, data_validade: e.target.value})}
-                required
-              />
+              <Input type="date" value={dados.data_validade} onChange={(e) => setDados({...dados, data_validade: e.target.value})} required />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Valor Unitário</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={dados.valor_unitario}
-                onChange={(e) => setDados({...dados, valor_unitario: e.target.value})}
-                placeholder="0.00"
-              />
+              <Input type="number" step="0.01" value={dados.valor_unitario} onChange={(e) => setDados({...dados, valor_unitario: e.target.value})} placeholder="0.00" />
             </div>
             <div>
               <Label>Fornecedor</Label>
               <Select value={dados.fornecedor_id} onValueChange={(v) => setDados({...dados, fornecedor_id: v})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   {fornecedores.map(f => (
                     <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>
@@ -510,9 +436,7 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
             <div>
               <Label>Status</Label>
               <Select value={dados.status} onValueChange={(v) => setDados({...dados, status: v})}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="disponivel">Disponível</SelectItem>
                   <SelectItem value="parcial">Parcial</SelectItem>
@@ -523,27 +447,17 @@ function FormLote({ lote, produtos, ingredientes, fornecedores, onClose }) {
             </div>
             <div>
               <Label>Localização</Label>
-              <Input
-                value={dados.localizacao}
-                onChange={(e) => setDados({...dados, localizacao: e.target.value})}
-                placeholder="Ex: Geladeira 1, Prateleira A"
-              />
+              <Input value={dados.localizacao} onChange={(e) => setDados({...dados, localizacao: e.target.value})} placeholder="Ex: Geladeira 1, Prateleira A" />
             </div>
           </div>
 
           <div>
             <Label>Observações</Label>
-            <Textarea
-              value={dados.observacoes}
-              onChange={(e) => setDados({...dados, observacoes: e.target.value})}
-              rows={3}
-            />
+            <Textarea value={dados.observacoes} onChange={(e) => setDados({...dados, observacoes: e.target.value})} rows={3} />
           </div>
 
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancelar
-            </Button>
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
               {lote ? 'Atualizar' : 'Criar'} Lote
             </Button>

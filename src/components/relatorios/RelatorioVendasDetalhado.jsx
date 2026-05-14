@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, TrendingUp, Package, Users, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 
 export default function RelatorioVendasDetalhado({ vendas, pedidos, filteredData }) {
   const [receitas, setReceitas] = React.useState([]);
@@ -16,8 +16,8 @@ export default function RelatorioVendasDetalhado({ vendas, pedidos, filteredData
     const carregarDados = async () => {
       try {
         const [receitasData, user] = await Promise.all([
-          base44.entities.ReceitaProduto.list(),
-          base44.auth.me()
+          httpClient('/receitas'),
+          httpClient('/auth/me')
         ]);
         setReceitas(receitasData);
         setConfiguracoes(user);

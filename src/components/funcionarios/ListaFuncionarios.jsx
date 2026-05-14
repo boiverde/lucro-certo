@@ -26,9 +26,9 @@ export default function ListaFuncionarios({ funcionarios, loading, onEditar }) {
     );
   }
 
-  const funcionariosAtivos = funcionarios.filter(f => f.ativo);
+  const funcionariosAtivos = (funcionarios || []).filter(f => f?.ativo);
 
-  if (funcionariosAtivos.length === 0) {
+  if (!funcionariosAtivos || funcionariosAtivos.length === 0) {
     return (
       <Card>
         <CardContent className="p-8 text-center">

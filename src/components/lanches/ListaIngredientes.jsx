@@ -31,7 +31,7 @@ export default function ListaIngredientes({ ingredientes, loading, onEditar, onD
     );
   }
 
-  if (ingredientes.length === 0) {
+  if (!ingredientes || (Array.isArray(ingredientes) && ingredientes.length === 0)) {
     return (
       <Card>
         <CardContent className="p-12 text-center">
@@ -41,18 +41,18 @@ export default function ListaIngredientes({ ingredientes, loading, onEditar, onD
     );
   }
 
-  const ingredientesAtivos = ingredientes.filter(i => i.ativo);
+  const ingredientesAtivos = (ingredientes || []).filter(i => i?.ativo);
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Ingredientes Cadastrados ({ingredientesAtivos.length})</CardTitle>
+          <CardTitle className="text-lg">Ingredientes Cadastrados ({ingredientesAtivos?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {ingredientesAtivos.map(ingrediente => {
-              const estoqueAbaixoMinimo = ingrediente.estoque_atual <= ingrediente.estoque_minimo && ingrediente.estoque_minimo > 0;
+              const estoqueAbaixoMinimo = (ingrediente?.estoque_atual || 0) <= (ingrediente?.estoque_minimo || 0) && (ingrediente?.estoque_minimo || 0) > 0;
               
               return (
                 <div key={ingrediente.id} className={`border rounded-lg p-4 ${estoqueAbaixoMinimo ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
@@ -66,12 +66,12 @@ export default function ListaIngredientes({ ingredientes, loading, onEditar, onD
                       </div>
                       <div className="flex flex-wrap gap-2 text-sm">
                         <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                          R$ {ingrediente.preco_por_kg?.toFixed(2)}/{ingrediente.unidade === 'kg' ? 'kg' : ingrediente.unidade === 'litros' ? 'L' : 'un'}
+                          R$ {(ingrediente.preco_por_kg || 0).toFixed(2)}/{ingrediente.unidade === 'kg' ? 'kg' : ingrediente.unidade === 'litros' ? 'L' : 'un'}
                         </Badge>
                         <Badge variant="outline" className={estoqueAbaixoMinimo ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700'}>
-                          Estoque: {ingrediente.estoque_atual} {ingrediente.unidade === 'kg' ? 'kg' : ingrediente.unidade === 'litros' ? 'L' : 'un'}
+                          Estoque: {(ingrediente.estoque_atual || 0)} {ingrediente.unidade === 'kg' ? 'kg' : ingrediente.unidade === 'litros' ? 'L' : 'un'}
                         </Badge>
-                        {ingrediente.estoque_minimo > 0 && (
+                        {(ingrediente.estoque_minimo || 0) > 0 && (
                           <Badge variant="outline" className="bg-gray-50 text-gray-600">
                             Mín: {ingrediente.estoque_minimo}
                           </Badge>

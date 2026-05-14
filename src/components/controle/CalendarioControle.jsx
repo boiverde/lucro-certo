@@ -178,7 +178,7 @@ export default function CalendarioControle({ vendas, compras }) {
                   </div>
                   <div className="space-y-1">
                     {todosEventos.slice(0, 2).map((evento, idx) => {
-                      const nomeExibir = evento.item.cliente || evento.item.fornecedor || evento.item.produto;
+                      const nomeExibir = evento.item.cliente || evento.item.cliente_nome || evento.item.fornecedor || evento.item.fornecedor_nome || evento.item.produto || (evento.item.itens?.[0]?.nome_produto) || "Item";
                       
                       if (evento.tipo === 'vendaRealizada') {
                         return (
@@ -187,7 +187,7 @@ export default function CalendarioControle({ vendas, compras }) {
                             className="w-full text-left text-[10px] md:text-xs p-0.5 md:p-1 rounded bg-green-200 text-green-900 border border-green-300"
                           >
                             <div className="font-medium truncate">✓ {nomeExibir}</div>
-                            <div className="font-semibold">R$ {evento.item.valor_total.toFixed(0)}</div>
+                            <div className="font-semibold">R$ {Number(evento.item.valor_total || 0).toFixed(0)}</div>
                           </div>
                         );
                       }
@@ -198,7 +198,7 @@ export default function CalendarioControle({ vendas, compras }) {
                             className="w-full text-left text-[10px] md:text-xs p-0.5 md:p-1 rounded bg-red-200 text-red-900 border border-red-300"
                           >
                             <div className="font-medium truncate">✓ {nomeExibir}</div>
-                            <div className="font-semibold">R$ {evento.item.valor_total.toFixed(0)}</div>
+                            <div className="font-semibold">R$ {Number(evento.item.valor_total || 0).toFixed(0)}</div>
                           </div>
                         );
                       }
@@ -209,7 +209,7 @@ export default function CalendarioControle({ vendas, compras }) {
                             className="w-full text-left text-[10px] md:text-xs p-0.5 md:p-1 rounded bg-green-50 text-green-700 border border-green-200"
                           >
                             <div className="font-medium truncate">↑ {nomeExibir}</div>
-                            <div className="font-semibold">R$ {evento.item.valor_total.toFixed(0)}</div>
+                            <div className="font-semibold">R$ {Number(evento.item.valor_total || 0).toFixed(0)}</div>
                           </div>
                         );
                       }
@@ -220,7 +220,7 @@ export default function CalendarioControle({ vendas, compras }) {
                             className="w-full text-left text-[10px] md:text-xs p-0.5 md:p-1 rounded bg-red-50 text-red-700 border border-red-200"
                           >
                             <div className="font-medium truncate">↓ {nomeExibir}</div>
-                            <div className="font-semibold">R$ {evento.item.valor_total.toFixed(0)}</div>
+                            <div className="font-semibold">R$ {Number(evento.item.valor_total || 0).toFixed(0)}</div>
                           </div>
                         );
                       }
@@ -283,10 +283,10 @@ export default function CalendarioControle({ vendas, compras }) {
                       <div key={idx} className="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-semibold text-green-900">{venda.cliente || 'Sem cliente'}</p>
-                            <p className="text-sm text-green-700">{venda.produto}</p>
+                            <p className="font-semibold text-green-900">{venda.cliente || venda.cliente_nome || 'Sem cliente'}</p>
+                            <p className="text-sm text-green-700">{venda.produto || (venda.itens?.[0]?.nome_produto)}</p>
                           </div>
-                          <p className="font-bold text-green-700 text-lg">R$ {venda.valor_total.toFixed(2)}</p>
+                          <p className="font-bold text-green-700 text-lg">R$ {Number(venda.valor_total || 0).toFixed(2)}</p>
                         </div>
                         <div className="flex gap-2 text-xs text-green-600">
                           <Badge variant="secondary" className="bg-green-100">
@@ -316,11 +316,11 @@ export default function CalendarioControle({ vendas, compras }) {
                       <div key={idx} className="bg-green-50 border border-green-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-semibold text-green-900">{venda.cliente || 'Sem cliente'}</p>
-                            <p className="text-sm text-green-700">{venda.produto}</p>
+                            <p className="font-semibold text-green-900">{venda.cliente || venda.cliente_nome || 'Sem cliente'}</p>
+                            <p className="text-sm text-green-700">{venda.produto || (venda.itens?.[0]?.nome_produto)}</p>
                             <p className="text-xs text-gray-600">Vendido em: {formatarDataBR(venda.data_venda)}</p>
                           </div>
-                          <p className="font-bold text-green-700 text-lg">R$ {venda.valor_total.toFixed(2)}</p>
+                          <p className="font-bold text-green-700 text-lg">R$ {Number(venda.valor_total || 0).toFixed(2)}</p>
                         </div>
                         {venda.observacoes && (
                           <p className="text-xs text-gray-600 mt-2 italic">{venda.observacoes}</p>
@@ -342,10 +342,10 @@ export default function CalendarioControle({ vendas, compras }) {
                       <div key={idx} className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-semibold text-red-900">{compra.fornecedor || 'Sem fornecedor'}</p>
-                            <p className="text-sm text-red-700">{compra.produto}</p>
+                            <p className="font-semibold text-red-900">{compra.fornecedor || compra.fornecedor_nome || 'Sem fornecedor'}</p>
+                            <p className="text-sm text-red-700">{compra.produto || (compra.itens?.[0]?.nome_produto)}</p>
                           </div>
-                          <p className="font-bold text-red-700 text-lg">R$ {compra.valor_total.toFixed(2)}</p>
+                          <p className="font-bold text-red-700 text-lg">R$ {Number(compra.valor_total || 0).toFixed(2)}</p>
                         </div>
                         <div className="flex gap-2 text-xs text-red-600">
                           <Badge variant="secondary" className="bg-red-100">
@@ -375,11 +375,11 @@ export default function CalendarioControle({ vendas, compras }) {
                       <div key={idx} className="bg-red-50 border border-red-200 rounded-lg p-4">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-semibold text-red-900">{compra.fornecedor || 'Sem fornecedor'}</p>
-                            <p className="text-sm text-red-700">{compra.produto}</p>
+                            <p className="font-semibold text-red-900">{compra.fornecedor || compra.fornecedor_nome || 'Sem fornecedor'}</p>
+                            <p className="text-sm text-red-700">{compra.produto || (compra.itens?.[0]?.nome_produto)}</p>
                             <p className="text-xs text-gray-600">Comprado em: {formatarDataBR(compra.data_compra)}</p>
                           </div>
-                          <p className="font-bold text-red-700 text-lg">R$ {compra.valor_total.toFixed(2)}</p>
+                          <p className="font-bold text-red-700 text-lg">R$ {Number(compra.valor_total || 0).toFixed(2)}</p>
                         </div>
                         {compra.observacoes && (
                           <p className="text-xs text-gray-600 mt-2 italic">{compra.observacoes}</p>

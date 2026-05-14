@@ -80,7 +80,7 @@ export async function vendasRoutes(app: FastifyInstance) {
                 taxa_impostos: true,
                 taxa_cartao: true,
                 custo_fixo_mensal: true,
-                margem_lucro_padrao: true 
+                margem_balcao: true 
             }
         })
 
@@ -132,7 +132,7 @@ export async function vendasRoutes(app: FastifyInstance) {
                 taxa_cartao: Number(user.taxa_cartao) || 0,
                 // Rateio adaptativo: Custo Mensal / Limite de referência do plano
                 custo_fixo_por_unidade: (Number(user.custo_fixo_mensal) / 150) || 0,
-                margem_lucro_padrao: Number(user.margem_lucro_padrao) || 30,
+                margem_lucro_padrao: Number(user.margem_balcao) || 30,
             })
 
             return {

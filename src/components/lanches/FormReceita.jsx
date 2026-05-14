@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
+
 import CalculadoraCustoTotal, { useCustoTotal } from "../receitas/CalculadoraCustoTotal";
 import PricingAssistant from "../configuracoes/PricingAssistant";
 import { usePlan } from "@/api/usePlan";
@@ -45,7 +46,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
   useEffect(() => {
     const carregarConfiguracoes = async () => {
       try {
-        const user = await base44.auth.me();
+        const user = await httpClient('/auth/me');
         setConfiguracoes(user);
         if (user.margem_lucro_padrao) {
           setMargemPadrao(user.margem_lucro_padrao);

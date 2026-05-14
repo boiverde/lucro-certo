@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { handleApiError } from '@/api/errorHandler';
 import { toast } from 'sonner';
-import { base44 } from '@/api/base44Client';
+import { httpClient } from "@/api/httpClient";
 import { supabase } from '@/lib/supabase';
 
 export default function Login() {
@@ -22,9 +22,10 @@ export default function Login() {
                 setError('');
                 console.log('[Auth] Iniciando sincronização com backend...');
                 
-                const success = await base44.auth.loginWithGoogleToken(session.access_token);
-                if (success) {
-                    console.log('[Auth] Login validado. Redirecionando...');
+                const response = await httpClient('/auth/google', { method: 'POST', body: JSON.stringify({ token: session.access_token }) });
+                if (response?.token) {
+                    console.log('[Auth] Login validado. Salvando token...');
+                    localStorage.setItem('auth_token', response.token);
                     window.location.href = '/Dashboard';
                 } else {
                     setError('O servidor não emitiu uma sessão válida para este login do Google.');
@@ -74,15 +75,22 @@ export default function Login() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
+        setError('');
         try {
-            const success = await base44.auth.login(email, password);
-            if (success) {
+            const response = await httpClient('/auth/login', { 
+                method: 'POST', 
+                body: JSON.stringify({ email: email.trim(), password: password }) 
+            });
+            
+            if (response?.token) {
+                localStorage.setItem('auth_token', response.token);
+                toast.success('Login realizado com sucesso!');
                 window.location.href = '/Dashboard';
             } else {
-                setError('Falha no login');
+                setError('Credenciais inválidas ou erro no servidor');
             }
         } catch (err) {
-            setError('Erro ao conectar');
+            setError(err.message || 'Erro ao conectar ao servidor');
         }
     };
 

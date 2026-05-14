@@ -6,7 +6,7 @@ import { Pencil, TrendingUp, Trash2, Check } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -32,9 +32,12 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
 
   const marcarPagoMutation = useMutation({
     mutationFn: ({ id }) => {
-      return base44.entities.Venda.update(id, {
-        pago: true,
-        data_pagamento_efetivo: new Date().toISOString().split('T')[0]
+      return httpClient(`/vendas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          pago: true,
+          data_pagamento_efetivo: new Date().toISOString().split('T')[0]
+        })
       });
     },
     onSuccess: () => {
@@ -84,7 +87,7 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
     );
   }
 
-  if (vendas.length === 0) {
+  if (!vendas || (Array.isArray(vendas) && vendas.length === 0)) {
     return (
       <Card>
         <CardContent className="p-8 text-center">
@@ -102,7 +105,7 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5" />
-            Suas Vendas ({vendas.length})
+            Suas Vendas ({vendas?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -122,30 +125,33 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
               </thead>
               <tbody>
                 {vendas.map((venda) => {
-                  const quantidade = venda.quantidade || venda.quantidade_kg || 0;
-                  const unidade = venda.unidade_venda || "kg";
-                  const precoUnidade = venda.preco_por_unidade || venda.preco_por_kg || 0;
+                  const itemPrincipal = (venda.itens && venda.itens.length > 0) ? venda.itens[0] : {};
+                  const nomeProduto = itemPrincipal.nome_produto || venda.produto || "-";
+                  const quantidade = itemPrincipal.quantidade || venda.quantidade || venda.quantidade_kg || 0;
+                  const unidade = itemPrincipal.unidade || venda.unidade_venda || "kg";
+                  const precoUnidade = Number(itemPrincipal.preco_unitario || venda.preco_por_unidade || venda.preco_por_kg || 0);
+                  const cliente = venda.cliente_nome || (venda.cliente && typeof venda.cliente === 'string' ? venda.cliente : (venda.cliente?.nome || '-'));
                   
                   return (
                     <tr key={venda.id} className="border-b hover:bg-gray-50">
                       <td className="p-3">
                         <div>
-                          <p className="font-medium">{venda.produto}</p>
-                          {venda.cliente && (
-                            <p className="text-sm text-gray-500">{venda.cliente}</p>
+                          <p className="font-medium">{nomeProduto}</p>
+                          {cliente !== '-' && (
+                            <p className="text-sm text-gray-500">{cliente}</p>
                           )}
                         </div>
                       </td>
                       <td className="p-3">
                         <Badge variant="secondary" className="bg-green-100 text-green-800">
-                          {quantidade} {unidadeLabels[unidade]}
+                          {quantidade} {unidadeLabels[unidade] || unidade}
                         </Badge>
                       </td>
                       <td className="p-3 font-medium">
-                        R$ {precoUnidade.toFixed(2)}/{unidadeLabels[unidade]}
+                        R$ {precoUnidade.toFixed(2)}/{unidadeLabels[unidade] || unidade}
                       </td>
                       <td className="p-3 font-bold text-green-600">
-                        R$ {venda.valor_total.toFixed(2)}
+                        R$ {Number(venda?.valor_total || 0).toFixed(2)}
                       </td>
                       <td className="p-3">
                         {formatarData(venda.data_venda)}
@@ -209,22 +215,25 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
       <div className="md:hidden space-y-4">
         <div className="flex items-center gap-2 mb-4">
           <TrendingUp className="w-5 h-5" />
-          <h3 className="font-bold text-lg">Suas Vendas ({vendas.length})</h3>
+          <h3 className="font-bold text-lg">Suas Vendas ({vendas?.length || 0})</h3>
         </div>
         {vendas.map((venda) => {
-          const quantidade = venda.quantidade || venda.quantidade_kg || 0;
-          const unidade = venda.unidade_venda || "kg";
-          const precoUnidade = venda.preco_por_unidade || venda.preco_por_kg || 0;
+          const itemPrincipal = (venda.itens && venda.itens.length > 0) ? venda.itens[0] : {};
+          const nomeProduto = itemPrincipal.nome_produto || venda.produto || "-";
+          const quantidade = itemPrincipal.quantidade || venda.quantidade || venda.quantidade_kg || 0;
+          const unidade = itemPrincipal.unidade || venda.unidade_venda || "kg";
+          const precoUnidade = Number(itemPrincipal.preco_unitario || venda.preco_por_unidade || venda.preco_por_kg || 0);
+          const cliente = venda.cliente_nome || (venda.cliente && typeof venda.cliente === 'string' ? venda.cliente : (venda.cliente?.nome || '-'));
           
           return (
             <Card key={venda.id} className="shadow-md">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-3">
                   <div className="flex-1">
-                    <h4 className="font-bold text-lg">{venda.produto}</h4>
+                    <h4 className="font-bold text-lg">{nomeProduto}</h4>
                     <div className="flex gap-2 mt-1">
                       <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        {quantidade} {unidadeLabels[unidade]}
+                        {quantidade} {unidadeLabels[unidade] || unidade}
                       </Badge>
                       <Badge className={venda.pago ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
                         {venda.pago ? 'Pago' : 'Pendente'}
@@ -235,12 +244,12 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
 
                 <div className="space-y-2 mb-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Preço/{unidadeLabels[unidade]}:</span>
+                    <span className="text-sm text-gray-600">Preço/{unidadeLabels[unidade] || unidade}:</span>
                     <span className="font-medium">R$ {precoUnidade.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Valor Total:</span>
-                    <span className="font-bold text-green-600">R$ {venda.valor_total.toFixed(2)}</span>
+                    <span className="font-bold text-green-600">R$ {Number(venda.valor_total || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">Data Venda:</span>
@@ -252,10 +261,10 @@ export default function ListaVendas({ vendas, loading, onEditar, onDeletar }) {
                       <span className="text-sm">{formatarData(venda.data_pagamento)}</span>
                     </div>
                   )}
-                  {venda.cliente && (
+                  {cliente !== '-' && (
                     <div className="flex justify-between">
                       <span className="text-sm text-gray-600">Cliente:</span>
-                      <span className="text-sm">{venda.cliente}</span>
+                      <span className="text-sm">{cliente}</span>
                     </div>
                   )}
                 </div>

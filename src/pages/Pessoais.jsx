@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { handleApiError } from '@/api/errorHandler';
 import { toast } from 'sonner';
-import { GastoPessoal } from "@/api/entities";
-import { User } from "@/api/entities";
+import { httpClient } from "@/api/httpClient";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
@@ -15,7 +14,6 @@ export default function PessoaisPage() {
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
     carregarGastos();
@@ -24,27 +22,34 @@ export default function PessoaisPage() {
   const carregarGastos = async () => {
     setLoading(true);
     try {
-      const currentUser = await User.me();
-      setUser(currentUser);
-      const data = await GastoPessoal.filter({ created_by: currentUser.email }, '-data');
-      setGastos(data);
+      const data = await httpClient('/gastos-pessoais');
+      setGastos(Array.isArray(data) ? data : (data?.data || []));
     } catch (error) {
-      handleApiError(error, 'carregar os gastos pessoais')
-      handleApiError(error, 'carregar os gastos pessoais')
+      handleApiError(error, 'carregar os gastos pessoais');
       console.error('Erro ao carregar gastos pessoais:', error);
     }
     setLoading(false);
   };
 
   const handleSubmit = async (dados) => {
-    if (editando) {
-      await GastoPessoal.update(editando.id, dados);
-    } else {
-      await GastoPessoal.create(dados);
+    try {
+      if (editando) {
+        await httpClient(`/gastos-pessoais/${editando.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(dados)
+        });
+      } else {
+        await httpClient('/gastos-pessoais', {
+          method: 'POST',
+          body: JSON.stringify(dados)
+        });
+      }
+      setShowForm(false);
+      setEditando(null);
+      carregarGastos();
+    } catch (error) {
+      handleApiError(error, 'salvar gasto pessoal');
     }
-    setShowForm(false);
-    setEditando(null);
-    carregarGastos();
   };
 
   const handleEditar = (gasto) => {
@@ -53,8 +58,12 @@ export default function PessoaisPage() {
   };
 
   const handleDeletar = async (gasto) => {
-    await GastoPessoal.delete(gasto.id);
-    carregarGastos();
+    try {
+      await httpClient(`/gastos-pessoais/${gasto.id}`, { method: 'DELETE' });
+      carregarGastos();
+    } catch (error) {
+      handleApiError(error, 'deletar gasto pessoal');
+    }
   };
 
   return (

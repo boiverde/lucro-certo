@@ -4,7 +4,7 @@ import { handleApiError } from '@/api/errorHandler';
 import { toast } from 'sonner';
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { usePlan } from "@/api/usePlan";
 import {
   LayoutDashboard,
@@ -84,7 +84,7 @@ export default function Layout({ children, currentPageName }) {
     }
     const checkUser = async () => {
       try {
-        const currentUser = await base44.auth.me();
+        const currentUser = await httpClient('/auth/me');
         setUser(currentUser);
       } catch (error) {
         handleApiError(error, 'validar sessão');
@@ -100,7 +100,7 @@ export default function Layout({ children, currentPageName }) {
   }, [currentPageName, isPaginaPublica]);
 
   const handleLogout = async () => {
-    await base44.auth.logout();
+    await httpClient('/auth/logout', { method: 'POST' });
     window.location.href = createPageUrl("Home");
   };
 

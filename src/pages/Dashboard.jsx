@@ -1,5 +1,4 @@
 import React from "react";
-import { base44 } from "@/api/base44Client";
 import { httpClient } from "@/api/httpClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +27,7 @@ export default function Dashboard() {
 
   const { data: user, isLoading: userLoading } = useQuery({
     queryKey: ['user-me'],
-    queryFn: async () => await base44.auth.me(),
+    queryFn: async () => await httpClient('/auth/me'),
     staleTime: 1000 * 60 * 30,
   });
 
@@ -95,7 +94,7 @@ export default function Dashboard() {
                   <TrendingUp className="h-4 w-4 opacity-70" />
                 </CardHeader>
                 <CardContent className="px-6 pb-6">
-                  <div className="text-xl font-black">R$ {totalVendasMes.toFixed(2)}</div>
+                  <div className="text-xl font-black">R$ {(totalVendasMes || 0).toFixed(2)}</div>
                 </CardContent>
               </Card>
 
@@ -105,7 +104,7 @@ export default function Dashboard() {
                   <ShoppingCart className="h-4 w-4 opacity-70" />
                 </CardHeader>
                 <CardContent className="px-6 pb-6">
-                  <div className="text-xl font-black">R$ {totalComprasMes.toFixed(2)}</div>
+                  <div className="text-xl font-black">R$ {(totalComprasMes || 0).toFixed(2)}</div>
                 </CardContent>
               </Card>
 
@@ -115,7 +114,7 @@ export default function Dashboard() {
                   <Receipt className="h-4 w-4 opacity-70" />
                 </CardHeader>
                 <CardContent className="px-6 pb-6">
-                  <div className="text-xl font-black">R$ {totalGastosMes.toFixed(2)}</div>
+                  <div className="text-xl font-black">R$ {(totalGastosMes || 0).toFixed(2)}</div>
                 </CardContent>
               </Card>
 
@@ -125,7 +124,7 @@ export default function Dashboard() {
                   <DollarSign className="h-4 w-4 opacity-70" />
                 </CardHeader>
                 <CardContent className="px-6 pb-6">
-                  <div className="text-xl font-black">R$ {Math.abs(lucroBrutoMes).toFixed(2)}</div>
+                  <div className="text-xl font-black">R$ {(Math.abs(lucroBrutoMes) || 0).toFixed(2)}</div>
                 </CardContent>
               </Card>
             </div>
@@ -139,7 +138,7 @@ export default function Dashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-slate-50 p-4 rounded-2xl">
                     <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Este Mês</p>
-                    <p className="text-lg font-black text-slate-700">R$ {comissoesMes.toFixed(2)}</p>
+                    <p className="text-lg font-black text-slate-700">R$ {(comissoesMes || 0).toFixed(2)}</p>
                   </div>
                   <div className="bg-slate-50 p-4 rounded-2xl">
                     <p className="text-[10px] font-black text-gray-400 uppercase mb-1">A Receber</p>

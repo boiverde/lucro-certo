@@ -44,8 +44,8 @@ export default function PagamentosControle({ vendas = [], compras = [] }) {
   const comprasHoje = comprasPendentes.filter(c => isToday(new Date(c.data_pagamento)));
   const comprasFuturas = comprasPendentes.filter(c => !isPast(new Date(c.data_pagamento)) && !isToday(new Date(c.data_pagamento)));
 
-  const totalVendasPendentes = vendasPendentes.reduce((sum, v) => sum + v.valor_total, 0);
-  const totalComprasPendentes = comprasPendentes.reduce((sum, c) => sum + c.valor_total, 0);
+  const totalVendasPendentes = vendasPendentes.reduce((sum, v) => sum + Number(v.valor_total || 0), 0);
+  const totalComprasPendentes = comprasPendentes.reduce((sum, c) => sum + Number(c.valor_total || 0), 0);
   const saldoPendente = totalVendasPendentes - totalComprasPendentes;
 
   const VendaCard = ({ venda }) => {
@@ -55,9 +55,11 @@ export default function PagamentosControle({ vendas = [], compras = [] }) {
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-2">
             <div className="flex-1">
-              <h4 className="font-bold text-lg">{venda.produto}</h4>
-              {venda.cliente && (
-                <p className="text-sm text-gray-500">{venda.cliente}</p>
+              <h4 className="font-bold text-lg">
+                {venda.produto || (venda.itens?.[0]?.nome_produto) || "Venda sem nome"}
+              </h4>
+              {(venda.cliente || venda.cliente_nome) && (
+                <p className="text-sm text-gray-500">{venda.cliente || venda.cliente_nome}</p>
               )}
             </div>
             <Badge className={status.color}>{status.label}</Badge>
@@ -67,7 +69,7 @@ export default function PagamentosControle({ vendas = [], compras = [] }) {
               <Calendar className="w-4 h-4" />
               {formatarData(venda.data_pagamento)}
             </div>
-            <span className="text-lg font-bold text-green-600">R$ {venda.valor_total.toFixed(2)}</span>
+            <span className="text-lg font-bold text-green-600">R$ {Number(venda.valor_total || 0).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
@@ -81,9 +83,11 @@ export default function PagamentosControle({ vendas = [], compras = [] }) {
         <CardContent className="p-4">
           <div className="flex justify-between items-start mb-2">
             <div className="flex-1">
-              <h4 className="font-bold text-lg">{compra.produto}</h4>
-              {compra.fornecedor && (
-                <p className="text-sm text-gray-500">{compra.fornecedor}</p>
+              <h4 className="font-bold text-lg">
+                {compra.produto || (compra.itens?.[0]?.nome_produto) || "Compra sem nome"}
+              </h4>
+              {(compra.fornecedor || compra.fornecedor_nome) && (
+                <p className="text-sm text-gray-500">{compra.fornecedor || compra.fornecedor_nome}</p>
               )}
             </div>
             <Badge className={status.color}>{status.label}</Badge>
@@ -93,7 +97,7 @@ export default function PagamentosControle({ vendas = [], compras = [] }) {
               <Calendar className="w-4 h-4" />
               {formatarData(compra.data_pagamento)}
             </div>
-            <span className="text-lg font-bold text-red-600">R$ {compra.valor_total.toFixed(2)}</span>
+            <span className="text-lg font-bold text-red-600">R$ {Number(compra.valor_total || 0).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>

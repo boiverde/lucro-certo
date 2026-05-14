@@ -31,7 +31,7 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
     );
   }
 
-  if (receitas.length === 0) {
+  if (!receitas || (Array.isArray(receitas) && receitas.length === 0)) {
     return (
       <Card>
         <CardContent className="p-12 text-center">
@@ -41,7 +41,7 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
     );
   }
 
-  const receitasAtivas = receitas.filter(r => r.ativo);
+  const receitasAtivas = (receitas || []).filter(r => r?.ativo);
 
   const categorias = {
     pizza: { label: "Pizza", cor: "bg-red-100 text-red-800" },
@@ -56,13 +56,13 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Receitas Cadastradas ({receitasAtivas.length})</CardTitle>
+          <CardTitle className="text-lg">Receitas Cadastradas ({receitasAtivas?.length || 0})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {receitasAtivas.map(receita => {
               const categoria = categorias[receita.categoria] || categorias.outros;
-              const lucro = receita.preco_venda_sugerido ? (receita.preco_venda_sugerido - receita.custo_total) : 0;
+              const lucro = receita.preco_venda_sugerido ? (receita.preco_venda_sugerido - (receita.custo_total || 0)) : 0;
               
               return (
                 <div key={receita.id} className="border rounded-lg p-4">
@@ -76,13 +76,13 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-2">
                         <div>
                           <span className="text-gray-500">Custo:</span>
-                          <span className="ml-1 font-semibold text-red-600">R$ {receita.custo_total?.toFixed(2)}</span>
+                          <span className="ml-1 font-semibold text-red-600">R$ {(receita.custo_total || 0).toFixed(2)}</span>
                         </div>
-                        {receita.preco_venda_sugerido > 0 && (
+                        {(receita.preco_venda_sugerido || 0) > 0 && (
                           <>
                             <div>
                               <span className="text-gray-500">Venda:</span>
-                              <span className="ml-1 font-semibold text-green-600">R$ {receita.preco_venda_sugerido?.toFixed(2)}</span>
+                              <span className="ml-1 font-semibold text-green-600">R$ {(receita.preco_venda_sugerido || 0).toFixed(2)}</span>
                             </div>
                             <div>
                               <span className="text-gray-500">Lucro:</span>
@@ -90,7 +90,7 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
                             </div>
                           </>
                         )}
-                        {receita.tempo_preparo > 0 && (
+                        {(receita.tempo_preparo || 0) > 0 && (
                           <div>
                             <span className="text-gray-500">Tempo:</span>
                             <span className="ml-1 font-semibold">{receita.tempo_preparo} min</span>
@@ -99,7 +99,7 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
                       </div>
 
                       <div className="text-xs text-gray-600">
-                        <strong>Ingredientes:</strong> {receita.ingredientes?.map(i => i.ingrediente_nome).join(", ")}
+                        <strong>Ingredientes:</strong> {receita.ingredientes?.map(i => i.ingrediente_nome).filter(Boolean).join(", ")}
                       </div>
                     </div>
                     

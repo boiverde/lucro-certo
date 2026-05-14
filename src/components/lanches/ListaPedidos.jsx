@@ -37,7 +37,7 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
     );
   }
 
-  if (pedidos.length === 0) {
+  if (!pedidos || (Array.isArray(pedidos) && pedidos.length === 0)) {
     return (
       <Card>
         <CardContent className="p-8 text-center">
@@ -80,22 +80,23 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
     <>
       <div className="space-y-4">
         {pedidos.map(pedido => {
-          const diasPendente = pedido.status === 'pendente' 
-            ? differenceInDays(new Date(), new Date(pedido.data_pedido))
+          const dataPedido = pedido?.data_pedido ? new Date(pedido.data_pedido) : new Date();
+          const diasPendente = pedido?.status === 'pendente' 
+            ? differenceInDays(new Date(), dataPedido)
             : 0;
-          const alertaPendente = diasPendente >= diasAlertaPendente;
-          const StatusIcon = statusIcons[pedido.status];
+          const alertaPendente = diasPendente >= (diasAlertaPendente || 3);
+          const StatusIcon = statusIcons[pedido?.status || 'pendente'] || Clock;
 
           return (
-            <Card key={pedido.id} className={alertaPendente ? 'border-2 border-orange-500' : ''}>
+            <Card key={pedido?.id} className={alertaPendente ? 'border-2 border-orange-500' : ''}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <CardTitle className="text-lg">Pedido #{pedido.numero_pedido}</CardTitle>
-                      <Badge className={statusColors[pedido.status]}>
+                      <CardTitle className="text-lg">Pedido #{pedido?.numero_pedido}</CardTitle>
+                      <Badge className={statusColors[pedido?.status || 'pendente']}>
                         <StatusIcon className="w-3 h-3 mr-1" />
-                        {statusLabels[pedido.status]}
+                        {statusLabels[pedido?.status || 'pendente']}
                       </Badge>
                       {alertaPendente && (
                         <Badge className="bg-orange-500 text-white">
@@ -104,9 +105,9 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
                       )}
                     </div>
                     <div className="text-sm text-gray-500">
-                      {format(new Date(pedido.data_pedido), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                      {pedido?.data_pedido ? format(dataPedido, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}
                     </div>
-                    {pedido.cliente && (
+                    {pedido?.cliente && (
                       <div className="text-sm text-gray-700 mt-1">
                         <strong>Cliente:</strong> {pedido.cliente}
                       </div>
@@ -115,7 +116,7 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
                     {onAtualizarStatus && (
                       <div className="mt-3">
                         <Select 
-                          value={pedido.status} 
+                          value={pedido?.status || 'pendente'} 
                           onValueChange={(novoStatus) => onAtualizarStatus(pedido, novoStatus)}
                         >
                           <SelectTrigger className="w-48">
@@ -143,7 +144,7 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 mb-4">
-                  {pedido.itens?.map((item, idx) => (
+                  {pedido?.itens?.map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded">
                       <div className="flex items-center gap-2 flex-1">
                         {item.tipo === "receita" ? (
@@ -154,12 +155,12 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
                         <div>
                           <div className="font-medium">{item.nome}</div>
                           <div className="text-sm text-gray-500">
-                            {item.quantidade}x R$ {item.valor_unitario.toFixed(2)}
+                            {item.quantidade}x R$ {(item.valor_unitario || 0).toFixed(2)}
                           </div>
                         </div>
                       </div>
                       <div className="font-semibold">
-                        R$ {item.valor_total.toFixed(2)}
+                        R$ {(item.valor_total || 0).toFixed(2)}
                       </div>
                     </div>
                   ))}
@@ -168,22 +169,22 @@ export default function ListaPedidos({ pedidos, loading, onDeletar, onAtualizarS
                 <div className="border-t pt-3 space-y-1">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
-                    <span>R$ {pedido.valor_total.toFixed(2)}</span>
+                    <span>R$ {(pedido?.valor_total || 0).toFixed(2)}</span>
                   </div>
-                  {pedido.desconto > 0 && (
+                  {(pedido?.desconto || 0) > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Desconto:</span>
-                      <span>- R$ {pedido.desconto.toFixed(2)}</span>
+                      <span>- R$ {(pedido.desconto || 0).toFixed(2)}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-bold text-lg border-t pt-2">
                     <span>Total:</span>
-                    <span className="text-green-600">R$ {pedido.valor_final.toFixed(2)}</span>
+                    <span className="text-green-600">R$ {(pedido?.valor_final || 0).toFixed(2)}</span>
                   </div>
                   <div className="text-sm text-gray-600 mt-2">
-                    <strong>Pagamento:</strong> {formaPagamentoLabels[pedido.forma_pagamento] || pedido.forma_pagamento}
+                    <strong>Pagamento:</strong> {formaPagamentoLabels[pedido?.forma_pagamento] || pedido?.forma_pagamento || '-'}
                   </div>
-                  {pedido.observacoes && (
+                  {pedido?.observacoes && (
                     <div className="text-sm text-gray-600 mt-2">
                       <strong>Obs:</strong> {pedido.observacoes}
                     </div>

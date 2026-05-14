@@ -80,7 +80,7 @@ export default function ListaGastos({ gastos, loading, onEditar, onDeletar }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Receipt className="w-5 h-5" />
-            Seus Gastos ({gastos.length})
+            Seus Gastos ({gastos?.length || 0})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -97,7 +97,7 @@ export default function ListaGastos({ gastos, loading, onEditar, onDeletar }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {gastos.map((gasto) => (
+                {(gastos || []).map((gasto) => (
                   <TableRow key={gasto.id} className="hover:bg-gray-50">
                     <TableCell>
                       <div>
@@ -113,10 +113,10 @@ export default function ListaGastos({ gastos, loading, onEditar, onDeletar }) {
                       </Badge>
                     </TableCell>
                     <TableCell className="font-bold text-orange-600">
-                      R$ {gasto.valor.toFixed(2)}
+                      R$ {(gasto.valor || 0).toFixed(2)}
                     </TableCell>
                     <TableCell>
-                      {formatarData(gasto.data)}
+                      {gasto.data ? formatarData(gasto.data) : '-'}
                     </TableCell>
                     <TableCell>
                       {gasto.funcionario || '-'}
@@ -144,7 +144,7 @@ export default function ListaGastos({ gastos, loading, onEditar, onDeletar }) {
                     </TableCell>
                   </TableRow>
                 ))}
-                {gastos.length === 0 && (
+                {(!gastos || gastos.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       Nenhum gasto registrado ainda.

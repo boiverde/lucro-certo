@@ -223,7 +223,7 @@ export default function Relatorios() {
                         </div>
                         <div className="space-y-1">
                             {(() => {
-                                const totalRealista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(calculatePriceSuggestion(p.custoBase, p.precoAtual, configs, canal, p.deltaRaw, p.cv, p.concentracao).ganhoRealista) * p.quantidade), 0) || 0;
+                                const totalRealista = rankings?.detalhado?.reduce((acc, p) => acc + (Number(calculatePriceSuggestion(p.custoBase, p.precoAtual, userData, canal, p.deltaRaw, p.cv, p.concentracao).ganhoRealista) * p.quantidade), 0) || 0;
                                 return (
                                     <>
                                         <h3 className="text-3xl font-black text-white">R$ {totalRealista.toFixed(2)}</h3>

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { handleApiError } from '@/api/errorHandler';
 import { toast } from 'sonner';
-import { Compra } from "@/api/entities";
-import { User } from "@/api/entities";
+import { httpClient } from "@/api/httpClient";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { AnimatePresence } from "framer-motion";
@@ -15,7 +14,6 @@ export default function ComprasPage() {
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
     carregarCompras();
@@ -24,27 +22,34 @@ export default function ComprasPage() {
   const carregarCompras = async () => {
     setLoading(true);
     try {
-      const currentUser = await User.me();
-      setUser(currentUser);
-      const data = await Compra.filter({ created_by: currentUser.email }, '-data_compra');
-      setCompras(data);
+      const data = await httpClient('/compras');
+      setCompras(Array.isArray(data) ? data : (data?.data || []));
     } catch (error) {
-      handleApiError(error, 'carregar suas compras')
-      handleApiError(error, 'carregar suas compras')
+      handleApiError(error, 'carregar suas compras');
       console.error('Erro ao carregar compras:', error);
     }
     setLoading(false);
   };
 
   const handleSubmit = async (dados) => {
-    if (editando) {
-      await Compra.update(editando.id, dados);
-    } else {
-      await Compra.create(dados);
+    try {
+      if (editando) {
+        await httpClient(`/compras/${editando.id}`, {
+          method: 'PUT',
+          body: JSON.stringify(dados)
+        });
+      } else {
+        await httpClient('/compras', {
+          method: 'POST',
+          body: JSON.stringify(dados)
+        });
+      }
+      setShowForm(false);
+      setEditando(null);
+      carregarCompras();
+    } catch (error) {
+      handleApiError(error, 'salvar compra');
     }
-    setShowForm(false);
-    setEditando(null);
-    carregarCompras();
   };
 
   const handleEditar = (compra) => {
@@ -53,8 +58,12 @@ export default function ComprasPage() {
   };
 
   const handleDeletar = async (compra) => {
-    await Compra.delete(compra.id);
-    carregarCompras();
+    try {
+      await httpClient(`/compras/${compra.id}`, { method: 'DELETE' });
+      carregarCompras();
+    } catch (error) {
+      handleApiError(error, 'deletar compra');
+    }
   };
 
   return (

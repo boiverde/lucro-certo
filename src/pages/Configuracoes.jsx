@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { handleApiError } from '@/api/errorHandler';
 import { toast } from 'sonner';
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ export default function ConfiguracoesPage() {
 
 
 
-  const { data: userData } = useQuery({ queryKey: ['auth-me-configs'], queryFn: () => base44.auth.me(), staleTime: 1000 * 60 * 5 });
+  const { data: userData } = useQuery({ queryKey: ['auth-me-configs'], queryFn: () => httpClient('/auth/me'), staleTime: 1000 * 60 * 5 });
 
   useEffect(() => { if (userData) { setUser(userData); setMargemPadrao(userData.margem_lucro_padrao || 30); setFaturamentoMedio(userData.faturamento_medio_mensal || ""); setCustoFixo(userData.custo_fixo_mensal || ""); setTaxaImpostos(userData.taxa_impostos || 5); setTaxaCartao(userData.taxa_cartao || 4); setCustoMaoObraHora(userData.custo_mao_obra_hora || ""); setCustoFixoUnidade(userData.custo_fixo_por_unidade || ""); setProducaoMensalEstimada(userData.producao_mensal_estimada || ""); } }, [userData]);
 
@@ -40,7 +40,7 @@ export default function ConfiguracoesPage() {
 
     // Aplicar automaticamente
     try {
-      await base44.auth.updateMe({
+      await httpClient('/auth/me', { method: 'PUT', body: JSON.stringify({
         margem_lucro_padrao: config.margem_lucro_padrao,
         taxa_impostos: config.taxa_impostos,
         taxa_cartao: config.taxa_cartao,
@@ -49,12 +49,11 @@ export default function ConfiguracoesPage() {
         custo_fixo_mensal: parseFloat(custoFixo) || 0,
         producao_mensal_estimada: parseFloat(producaoMensalEstimada) || 0,
         custo_fixo_por_unidade: parseFloat(custoFixoUnidade) || 0
-      });
+      }) });
 
       toast.success('Template aplicado com sucesso!', { id: 'Template aplicado com sucesso!' })
     } catch (error) {
-      handleApiError(error, 'aplicar o tema')
-      handleApiError(error, 'aplicar o tema')
+      handleApiError(error, 'aplicar o tema');
       console.error('Erro ao aplicar template:', error);
       toast.error('Erro ao aplicar template')
     }
@@ -86,7 +85,7 @@ export default function ConfiguracoesPage() {
         finalMarkup = (100 - custosTotais - margemVal) > 0 ? 100 / (100 - custosTotais - margemVal) : 0;
       }
 
-      await base44.auth.updateMe({
+      await httpClient('/auth/me', { method: 'PUT', body: JSON.stringify({
         margem_lucro_padrao: margemVal,
         faturamento_medio_mensal: faturamentoVal,
         custo_fixo_mensal: custoFixoVal,
@@ -96,15 +95,13 @@ export default function ConfiguracoesPage() {
         custo_mao_obra_hora: custoMaoObraVal,
         custo_fixo_por_unidade: custoFixoPorUnidadeCalc,
         producao_mensal_estimada: producaoEstimada
-      });
+      }) });
 
       setSucesso(true);
       setTimeout(() => setSucesso(false), 3000);
     } catch (error) {
-      handleApiError(error, 'salvar as alterações')
-      handleApiError(error, 'salvar as alterações')
+      handleApiError(error, 'salvar as configurações');
       console.error('Erro ao salvar:', error);
-      handleApiError(error, 'salvar as configurações')
     }
 
     setSalvando(false);

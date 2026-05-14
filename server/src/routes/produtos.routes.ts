@@ -50,11 +50,9 @@ export async function produtosRoutes(app: FastifyInstance) {
                 estoque_atual: z.number().optional(),
                 estoque_minimo: z.number().optional(),
                 unidade: z.string().default('un'),
-                codigo_barras: z.string().optional(),
                 controla_estoque: z.boolean().default(true),
-                notificar_estoque_baixo: z.boolean().default(true),
                 ativo: z.boolean().default(true),
-                observacoes: z.string().optional(),
+                descricao: z.string().optional(),
             }),
         },
     }, async (request) => {

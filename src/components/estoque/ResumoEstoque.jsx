@@ -3,28 +3,28 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, TrendingUp, TrendingDown, AlertTriangle } from "lucide-react";
 import { startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
 
-export default function ResumoEstoque({ produtos, movimentacoes }) {
+export default function ResumoEstoque({ produtos = [], movimentacoes = [] }) {
   const hoje = new Date();
   const inicioMes = startOfMonth(hoje);
   const fimMes = endOfMonth(hoje);
 
   // Produtos ativos
-  const produtosAtivos = produtos.filter(p => p.ativo).length;
+  const produtosAtivos = (Array.isArray(produtos) ? produtos : []).filter(p => p.ativo).length;
 
   // Produtos com estoque baixo
-  const produtosEstoqueBaixo = produtos.filter(
+  const produtosEstoqueBaixo = (Array.isArray(produtos) ? produtos : []).filter(
     p => p.ativo && p.estoque_minimo > 0 && p.estoque_atual <= p.estoque_minimo
   ).length;
 
   // Movimentações do mês
-  const movimentacoesMes = movimentacoes.filter(m => {
+  const movimentacoesMes = (Array.isArray(movimentacoes) ? movimentacoes : []).filter(m => {
     const dataMovimentacao = new Date(m.data);
     return isWithinInterval(dataMovimentacao, { start: inicioMes, end: fimMes });
   });
 
   const entradasMes = movimentacoesMes.filter(m => m.tipo === 'entrada').length;
   const saidasMes = movimentacoesMes.filter(m => m.tipo === 'saida').length;
-  const perdasMes = movimentacoesMes.filter(m => m.tipo === 'perda').reduce((sum, m) => sum + m.quantidade, 0);
+  const perdasMes = movimentacoesMes.filter(m => m.tipo === 'perda').reduce((sum, m) => sum + (m.quantidade || 0), 0);
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Plus, Store, Users, DollarSign, Calendar, Wallet, Receipt } from "lucide-react";
@@ -28,27 +28,18 @@ export default function RevendasPage() {
   const [editandoVenda, setEditandoVenda] = useState(null);
   const [editandoGasto, setEditandoGasto] = useState(null);
   const [vendaSelecionada, setVendaSelecionada] = useState(null);
-  const [user, setUser] = useState(null);
   const formVendaRef = useRef(null);
   const formEmpresaRef = useRef(null);
   const formGastoRef = useRef(null);
 
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const loadUser = async () => {
-      const currentUser = await base44.auth.me();
-      setUser(currentUser);
-    };
-    loadUser();
-  }, []);
-
   // Scroll para o formulário de venda quando ele aparecer ou mudar
   useEffect(() => {
     if (showFormVenda && formVendaRef.current) {
       setTimeout(() => {
-        formVendaRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
+        formVendaRef.current.scrollIntoView({
+          behavior: 'smooth',
           block: 'start',
           inline: 'nearest'
         });
@@ -60,8 +51,8 @@ export default function RevendasPage() {
   useEffect(() => {
     if (showFormEmpresa && formEmpresaRef.current) {
       setTimeout(() => {
-        formEmpresaRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
+        formEmpresaRef.current.scrollIntoView({
+          behavior: 'smooth',
           block: 'start',
           inline: 'nearest'
         });
@@ -73,8 +64,8 @@ export default function RevendasPage() {
   useEffect(() => {
     if (showFormGasto && formGastoRef.current) {
       setTimeout(() => {
-        formGastoRef.current.scrollIntoView({ 
-          behavior: 'smooth', 
+        formGastoRef.current.scrollIntoView({
+          behavior: 'smooth',
           block: 'start',
           inline: 'nearest'
         });
@@ -84,54 +75,26 @@ export default function RevendasPage() {
 
   const { data: empresas = [], isLoading: loadingEmpresas } = useQuery({
     queryKey: ['empresas-revenda'],
-    queryFn: async () => {
-      const result = await base44.entities.EmpresaRevenda.filter(
-        { created_by: user?.email },
-        '-created_date'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/revendas/empresas'),
   });
 
   const { data: vendas = [], isLoading: loadingVendas } = useQuery({
     queryKey: ['vendas-revenda'],
-    queryFn: async () => {
-      const result = await base44.entities.VendaRevenda.filter(
-        { created_by: user?.email },
-        '-data_primeira_parcela'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/revendas/vendas'),
   });
 
   const { data: gastos = [], isLoading: loadingGastos } = useQuery({
     queryKey: ['gastos-revenda'],
-    queryFn: async () => {
-      const result = await base44.entities.GastoRevenda.filter(
-        { created_by: user?.email },
-        '-data'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/revendas/gastos'),
   });
 
   const { data: clientes = [] } = useQuery({
     queryKey: ['clientes'],
-    queryFn: async () => {
-      const result = await base44.entities.Cliente.filter(
-        { created_by: user?.email },
-        'nome'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/clientes'),
   });
 
   const createEmpresaMutation = useMutation({
-    mutationFn: (data) => base44.entities.EmpresaRevenda.create(data),
+    mutationFn: (data) => httpClient('/revendas/empresas', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['empresas-revenda'] });
       setShowFormEmpresa(false);
@@ -140,7 +103,7 @@ export default function RevendasPage() {
   });
 
   const updateEmpresaMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.EmpresaRevenda.update(id, data),
+    mutationFn: ({ id, data }) => httpClient(`/revendas/empresas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['empresas-revenda'] });
       setShowFormEmpresa(false);
@@ -150,25 +113,22 @@ export default function RevendasPage() {
 
   const createVendaMutation = useMutation({
     mutationFn: async (data) => {
-      // Primeiro criar/atualizar o cliente se necessário
       const nomeCliente = data.cliente.trim();
-      
-      // Verificar se o cliente já existe
-      const clientesExistentes = await base44.entities.Cliente.filter({ 
-        nome: nomeCliente,
-        created_by: user?.email 
-      });
 
-      if (clientesExistentes.length === 0) {
+      // Verificar se o cliente já existe
+      const clientesExistentes = await httpClient(`/clientes?nome=${encodeURIComponent(nomeCliente)}`);
+      const lista = Array.isArray(clientesExistentes) ? clientesExistentes : (clientesExistentes?.data || []);
+
+      if (lista.length === 0) {
         // Criar novo cliente
-        await base44.entities.Cliente.create({
-          nome: nomeCliente,
-          ativo: true
+        await httpClient('/clientes', {
+          method: 'POST',
+          body: JSON.stringify({ nome: nomeCliente, ativo: true })
         });
       }
 
-      // Depois criar a venda
-      return base44.entities.VendaRevenda.create(data);
+      // Criar a venda
+      return httpClient('/revendas/vendas', { method: 'POST', body: JSON.stringify(data) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas-revenda'] });
@@ -179,7 +139,7 @@ export default function RevendasPage() {
   });
 
   const updateVendaMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.VendaRevenda.update(id, data),
+    mutationFn: ({ id, data }) => httpClient(`/revendas/vendas/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas-revenda'] });
       setShowFormVenda(false);
@@ -188,14 +148,14 @@ export default function RevendasPage() {
   });
 
   const deleteVendaMutation = useMutation({
-    mutationFn: (id) => base44.entities.VendaRevenda.delete(id),
+    mutationFn: (id) => httpClient(`/revendas/vendas/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendas-revenda'] });
     },
   });
 
   const createGastoMutation = useMutation({
-    mutationFn: (data) => base44.entities.GastoRevenda.create(data),
+    mutationFn: (data) => httpClient('/revendas/gastos', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gastos-revenda'] });
       setShowFormGasto(false);
@@ -204,7 +164,7 @@ export default function RevendasPage() {
   });
 
   const updateGastoMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.GastoRevenda.update(id, data),
+    mutationFn: ({ id, data }) => httpClient(`/revendas/gastos/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gastos-revenda'] });
       setShowFormGasto(false);
@@ -213,7 +173,7 @@ export default function RevendasPage() {
   });
 
   const deleteGastoMutation = useMutation({
-    mutationFn: (id) => base44.entities.GastoRevenda.delete(id),
+    mutationFn: (id) => httpClient(`/revendas/gastos/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gastos-revenda'] });
     },
@@ -244,11 +204,8 @@ export default function RevendasPage() {
   };
 
   const handleEditarEmpresa = (empresa) => {
-    // Limpar estado anterior e definir novo
     setEditandoEmpresa(null);
     setShowFormEmpresa(false);
-    
-    // Usar setTimeout para garantir que o estado seja limpo antes de definir o novo
     setTimeout(() => {
       setEditandoEmpresa(empresa);
       setShowFormEmpresa(true);
@@ -256,11 +213,8 @@ export default function RevendasPage() {
   };
 
   const handleEditarVenda = (venda) => {
-    // Limpar estado anterior e definir novo
     setEditandoVenda(null);
     setShowFormVenda(false);
-    
-    // Usar setTimeout para garantir que o estado seja limpo antes de definir o novo
     setTimeout(() => {
       setEditandoVenda(venda);
       setShowFormVenda(true);
@@ -270,7 +224,6 @@ export default function RevendasPage() {
   const handleEditarGasto = (gasto) => {
     setEditandoGasto(null);
     setShowFormGasto(false);
-    
     setTimeout(() => {
       setEditandoGasto(gasto);
       setShowFormGasto(true);
@@ -289,8 +242,7 @@ export default function RevendasPage() {
     setVendaSelecionada(venda);
   };
 
-  // Buscar dados do cliente quando abrir o modal
-  const clienteSelecionado = vendaSelecionada 
+  const clienteSelecionado = vendaSelecionada
     ? clientes.find(c => c.nome === vendaSelecionada.cliente)
     : null;
 
@@ -305,7 +257,7 @@ export default function RevendasPage() {
   });
 
   const totalVendasMes = vendasMes.reduce((sum, v) => sum + v.valor_total, 0);
-  
+
   const totalComissaoMes = vendas.reduce((total, venda) => {
     if (venda.status === 'cancelada' || !venda.numero_parcelas || venda.numero_parcelas === 0) return total;
     const comissaoPorParcela = venda.valor_comissao_total / venda.numero_parcelas;
@@ -334,10 +286,8 @@ export default function RevendasPage() {
           </p>
         </div>
 
-        {/* Lembretes de Pagamento */}
         <LembretePagamentos vendas={vendas} />
 
-        {/* Cards de Resumo */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 mb-6">
           <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
             <CardHeader className="pb-2 pt-4 px-3 md:px-4">
@@ -405,10 +355,7 @@ export default function RevendasPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h2 className="text-lg md:text-xl font-bold">Minhas Vendas</h2>
               <Button
-                onClick={() => {
-                  setEditandoVenda(null);
-                  setShowFormVenda(!showFormVenda);
-                }}
+                onClick={() => { setEditandoVenda(null); setShowFormVenda(!showFormVenda); }}
                 className="bg-purple-600 hover:bg-purple-700 w-full sm:w-auto"
               >
                 <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2" />
@@ -416,7 +363,6 @@ export default function RevendasPage() {
               </Button>
             </div>
 
-            {/* Ref para scroll automático */}
             <div ref={formVendaRef}>
               <AnimatePresence mode="wait">
                 {showFormVenda && (
@@ -425,10 +371,7 @@ export default function RevendasPage() {
                     venda={editandoVenda}
                     empresas={empresas}
                     onSubmit={handleSubmitVenda}
-                    onCancel={() => {
-                      setShowFormVenda(false);
-                      setEditandoVenda(null);
-                    }}
+                    onCancel={() => { setShowFormVenda(false); setEditandoVenda(null); }}
                   />
                 )}
               </AnimatePresence>
@@ -453,10 +396,7 @@ export default function RevendasPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h2 className="text-lg md:text-xl font-bold">Empresas de Revenda</h2>
               <Button
-                onClick={() => {
-                  setEditandoEmpresa(null);
-                  setShowFormEmpresa(!showFormEmpresa);
-                }}
+                onClick={() => { setEditandoEmpresa(null); setShowFormEmpresa(!showFormEmpresa); }}
                 className="bg-pink-600 hover:bg-pink-700 w-full sm:w-auto"
               >
                 <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2" />
@@ -464,7 +404,6 @@ export default function RevendasPage() {
               </Button>
             </div>
 
-            {/* Ref para scroll automático */}
             <div ref={formEmpresaRef}>
               <AnimatePresence mode="wait">
                 {showFormEmpresa && (
@@ -472,10 +411,7 @@ export default function RevendasPage() {
                     key={editandoEmpresa?.id || 'novo'}
                     empresa={editandoEmpresa}
                     onSubmit={handleSubmitEmpresa}
-                    onCancel={() => {
-                      setShowFormEmpresa(false);
-                      setEditandoEmpresa(null);
-                    }}
+                    onCancel={() => { setShowFormEmpresa(false); setEditandoEmpresa(null); }}
                   />
                 )}
               </AnimatePresence>
@@ -489,8 +425,8 @@ export default function RevendasPage() {
           </TabsContent>
 
           <TabsContent value="calendario" className="space-y-6">
-            <CalendarioPagamentos 
-              vendas={vendas} 
+            <CalendarioPagamentos
+              vendas={vendas}
               onClickParcela={handleClickParcela}
             />
           </TabsContent>
@@ -499,10 +435,7 @@ export default function RevendasPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
               <h2 className="text-lg md:text-xl font-bold">Gastos de Revenda</h2>
               <Button
-                onClick={() => {
-                  setEditandoGasto(null);
-                  setShowFormGasto(!showFormGasto);
-                }}
+                onClick={() => { setEditandoGasto(null); setShowFormGasto(!showFormGasto); }}
                 className="bg-orange-600 hover:bg-orange-700 w-full sm:w-auto"
               >
                 <Plus className="w-4 h-4 md:w-5 md:h-5 mr-2" />
@@ -510,7 +443,6 @@ export default function RevendasPage() {
               </Button>
             </div>
 
-            {/* Ref para scroll automático */}
             <div ref={formGastoRef}>
               <AnimatePresence mode="wait">
                 {showFormGasto && (
@@ -520,10 +452,7 @@ export default function RevendasPage() {
                     empresas={empresas}
                     gastosAnteriores={gastos}
                     onSubmit={handleSubmitGasto}
-                    onCancel={() => {
-                      setShowFormGasto(false);
-                      setEditandoGasto(null);
-                    }}
+                    onCancel={() => { setShowFormGasto(false); setEditandoGasto(null); }}
                   />
                 )}
               </AnimatePresence>
@@ -539,7 +468,6 @@ export default function RevendasPage() {
         </Tabs>
       </div>
 
-      {/* Modal de Detalhes */}
       <DetalhesVendaModal
         venda={vendaSelecionada}
         cliente={clienteSelecionado}

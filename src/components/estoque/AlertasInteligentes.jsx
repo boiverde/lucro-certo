@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { base44 } from "@/api/base44Client";
+import { httpClient } from "@/api/httpClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,80 +20,43 @@ export default function AlertasInteligentes() {
   const [gerandoAlertas, setGerandoAlertas] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data: user } = useQuery({
-    queryKey: ['user'],
-    queryFn: () => base44.auth.me(),
-  });
-
   const { data: alertas = [], isLoading } = useQuery({
     queryKey: ['alertas-estoque'],
-    queryFn: async () => {
-      const result = await base44.entities.AlertaEstoque.filter(
-        { created_by: user?.email },
-        '-data_alerta'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/alertas-estoque'),
   });
 
   const { data: produtos = [] } = useQuery({
     queryKey: ['produtos'],
-    queryFn: async () => {
-      const result = await base44.entities.Produto.filter(
-        { created_by: user?.email },
-        'nome'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/produtos'),
   });
 
   const { data: ingredientes = [] } = useQuery({
     queryKey: ['ingredientes'],
-    queryFn: async () => {
-      const result = await base44.entities.Ingrediente.filter(
-        { created_by: user?.email },
-        'nome'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/ingredientes'),
   });
 
   const { data: vendas = [] } = useQuery({
     queryKey: ['vendas'],
     queryFn: async () => {
-      const result = await base44.entities.Venda.filter(
-        { created_by: user?.email },
-        '-data_venda'
-      );
-      return result.slice(0, 100); // últimas 100 vendas
+      const result = await httpClient('/vendas');
+      return Array.isArray(result) ? result.slice(0, 100) : (result?.data || []).slice(0, 100);
     },
-    enabled: !!user,
   });
 
   const { data: lotes = [] } = useQuery({
     queryKey: ['lotes'],
-    queryFn: async () => {
-      const result = await base44.entities.Lote.filter(
-        { created_by: user?.email },
-        '-data_validade'
-      );
-      return result;
-    },
-    enabled: !!user,
+    queryFn: () => httpClient('/lotes'),
   });
 
   const updateAlertaMutation = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.AlertaEstoque.update(id, data),
+    mutationFn: ({ id, data }) => httpClient(`/alertas-estoque/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alertas-estoque'] });
     },
   });
 
   const createAlertaMutation = useMutation({
-    mutationFn: (data) => base44.entities.AlertaEstoque.create(data),
+    mutationFn: (data) => httpClient('/alertas-estoque', { method: 'POST', body: JSON.stringify(data) }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['alertas-estoque'] });
     },
@@ -108,16 +71,15 @@ export default function AlertasInteligentes() {
     // 1. Alertas de estoque mínimo para produtos
     produtos.forEach(produto => {
       if (produto.ativo && produto.estoque_atual <= produto.estoque_minimo && produto.estoque_minimo > 0) {
-        // Calcular média de vendas dos últimos 30 dias
-        const vendasProduto = vendas.filter(v => 
-          v.produto === produto.nome && 
+        const vendasProduto = vendas.filter(v =>
+          v.produto === produto.nome &&
           differenceInDays(hoje, parseISO(v.data_venda)) <= 30
         );
         const qtdVendida = vendasProduto.reduce((sum, v) => sum + (v.quantidade || 0), 0);
         const mediaDiaria = qtdVendida / 30;
-        const sugestao = Math.ceil(mediaDiaria * 30); // sugestão para 30 dias
+        const sugestao = Math.ceil(mediaDiaria * 30);
 
-        const prioridade = produto.estoque_atual === 0 ? 'critica' : 
+        const prioridade = produto.estoque_atual === 0 ? 'critica' :
                           produto.estoque_atual < produto.estoque_minimo * 0.5 ? 'alta' : 'media';
 
         novosAlertas.push({
@@ -131,7 +93,6 @@ export default function AlertasInteligentes() {
           quantidade_sugerida: Math.max(sugestao, produto.estoque_minimo * 2),
           data_alerta: new Date().toISOString(),
           status: 'pendente',
-          created_by: user?.email
         });
       }
     });
@@ -139,7 +100,7 @@ export default function AlertasInteligentes() {
     // 2. Alertas de estoque mínimo para ingredientes
     ingredientes.forEach(ing => {
       if (ing.ativo && ing.estoque_atual <= ing.estoque_minimo && ing.estoque_minimo > 0) {
-        const prioridade = ing.estoque_atual === 0 ? 'critica' : 
+        const prioridade = ing.estoque_atual === 0 ? 'critica' :
                           ing.estoque_atual < ing.estoque_minimo * 0.5 ? 'alta' : 'media';
 
         novosAlertas.push({
@@ -153,7 +114,6 @@ export default function AlertasInteligentes() {
           quantidade_sugerida: ing.estoque_minimo * 3,
           data_alerta: new Date().toISOString(),
           status: 'pendente',
-          created_by: user?.email
         });
       }
     });
@@ -164,7 +124,7 @@ export default function AlertasInteligentes() {
         const diasRestantes = differenceInDays(parseISO(lote.data_validade), hoje);
         if (diasRestantes >= 0 && diasRestantes <= 7) {
           const prioridade = diasRestantes <= 2 ? 'critica' : diasRestantes <= 5 ? 'alta' : 'media';
-          
+
           novosAlertas.push({
             produto_id: lote.produto_id,
             produto_nome: lote.produto_nome,
@@ -176,7 +136,6 @@ export default function AlertasInteligentes() {
             data_alerta: new Date().toISOString(),
             data_validade: lote.data_validade,
             status: 'pendente',
-            created_by: user?.email
           });
         }
       }
@@ -185,11 +144,11 @@ export default function AlertasInteligentes() {
     // 4. Detectar produtos com baixo giro (não vendidos nos últimos 60 dias)
     produtos.forEach(produto => {
       if (produto.ativo && produto.estoque_atual > 0) {
-        const vendasRecentes = vendas.filter(v => 
-          v.produto === produto.nome && 
+        const vendasRecentes = vendas.filter(v =>
+          v.produto === produto.nome &&
           differenceInDays(hoje, parseISO(v.data_venda)) <= 60
         );
-        
+
         if (vendasRecentes.length === 0) {
           novosAlertas.push({
             produto_id: produto.id,
@@ -201,7 +160,6 @@ export default function AlertasInteligentes() {
             quantidade_atual: produto.estoque_atual,
             data_alerta: new Date().toISOString(),
             status: 'pendente',
-            created_by: user?.email
           });
         }
       }
@@ -209,13 +167,12 @@ export default function AlertasInteligentes() {
 
     // Criar alertas que ainda não existem
     for (const alerta of novosAlertas) {
-      // Verificar se já existe alerta pendente para este produto/tipo
-      const existe = alertas.some(a => 
-        a.produto_id === alerta.produto_id && 
-        a.tipo_alerta === alerta.tipo_alerta && 
+      const existe = alertas.some(a =>
+        a.produto_id === alerta.produto_id &&
+        a.tipo_alerta === alerta.tipo_alerta &&
         a.status === 'pendente'
       );
-      
+
       if (!existe) {
         await createAlertaMutation.mutateAsync(alerta);
       }
@@ -226,11 +183,11 @@ export default function AlertasInteligentes() {
 
   // Gerar alertas automaticamente ao carregar
   useEffect(() => {
-    if (user && !isLoading && alertas.length === 0) {
+    if (!isLoading && alertas.length === 0) {
       gerarAlertas();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isLoading]);
+  }, [isLoading]);
 
   const handleMarcarResolvido = (alerta, acao) => {
     updateAlertaMutation.mutate({
@@ -346,8 +303,8 @@ export default function AlertasInteligentes() {
               </div>
             ) : (
               alertasPendentes.map(alerta => (
-                <Card 
-                  key={alerta.id} 
+                <Card
+                  key={alerta.id}
                   className={`border-2 ${getPrioridadeColor(alerta.nivel_prioridade)} cursor-pointer hover:shadow-md transition-shadow`}
                   onClick={() => setAlertaSelecionado(alerta)}
                 >
@@ -365,9 +322,9 @@ export default function AlertasInteligentes() {
                             {format(parseISO(alerta.data_alerta), "dd/MM/yyyy HH:mm", { locale: ptBR })}
                           </span>
                         </div>
-                        
+
                         <p className="font-medium">{alerta.mensagem}</p>
-                        
+
                         {alerta.quantidade_sugerida && (
                           <p className="text-sm text-gray-600 mt-1">
                             Sugestão de compra: {alerta.quantidade_sugerida} unidades
@@ -376,9 +333,9 @@ export default function AlertasInteligentes() {
                       </div>
 
                       <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleMarcarVisualizado(alerta);
@@ -442,7 +399,7 @@ export default function AlertasInteligentes() {
               <div>
                 <p className="text-sm text-gray-500 mb-2">Ações</p>
                 <div className="flex gap-2">
-                  <Button 
+                  <Button
                     onClick={() => handleMarcarResolvido(alertaSelecionado, "Compra realizada")}
                     className="bg-green-600 hover:bg-green-700"
                     size="sm"
@@ -450,7 +407,7 @@ export default function AlertasInteligentes() {
                     <ShoppingCart className="w-4 h-4 mr-2" />
                     Compra Realizada
                   </Button>
-                  <Button 
+                  <Button
                     onClick={() => handleMarcarResolvido(alertaSelecionado, "Ação tomada")}
                     variant="outline"
                     size="sm"
