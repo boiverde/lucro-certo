@@ -117,7 +117,7 @@ export default function RevendasPage() {
 
       // Verificar se o cliente já existe
       const clientesExistentes = await httpClient(`/clientes?nome=${encodeURIComponent(nomeCliente)}`);
-      const lista = Array.isArray(clientesExistentes) ? clientesExistentes : (clientesExistentes?.data || []);
+      const lista = Array.isArray(clientesExistentes) ? clientesExistentes : (clientesExistentes?.results || []);
 
       if (lista.length === 0) {
         // Criar novo cliente

@@ -23,7 +23,7 @@ export default function ComprasPage() {
     setLoading(true);
     try {
       const data = await httpClient('/compras');
-      setCompras(Array.isArray(data) ? data : (data?.data || []));
+      setCompras(Array.isArray(data) ? data : (data?.results || []));
     } catch (error) {
       handleApiError(error, 'carregar suas compras');
       console.error('Erro ao carregar compras:', error);

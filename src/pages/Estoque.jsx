@@ -32,8 +32,8 @@ export default function EstoquePage() {
     placeholderData: keepPreviousData,
   });
 
-  const produtos = Array.isArray(produtosData) ? produtosData : (produtosData.data || []);
-  const meta = Array.isArray(produtosData) ? null : produtosData.meta;
+  const produtos = Array.isArray(produtosData) ? produtosData : (produtosData?.results || []);
+  const meta = Array.isArray(produtosData) ? null : (produtosData?.meta || { total: produtosData?.total, page: produtosData?.page, totalPages: produtosData?.totalPages });
 
   const { data: movimentacoes = [], isLoading: loadingMovimentacoes } = useQuery({
     queryKey: ['movimentacoes-estoque'],

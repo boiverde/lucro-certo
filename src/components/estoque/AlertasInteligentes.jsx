@@ -39,7 +39,7 @@ export default function AlertasInteligentes() {
     queryKey: ['vendas'],
     queryFn: async () => {
       const result = await httpClient('/vendas');
-      return Array.isArray(result) ? result.slice(0, 100) : (result?.data || []).slice(0, 100);
+      return Array.isArray(result) ? result.slice(0, 100) : (result?.results || []).slice(0, 100);
     },
   });
 

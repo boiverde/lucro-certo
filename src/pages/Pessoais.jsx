@@ -23,7 +23,7 @@ export default function PessoaisPage() {
     setLoading(true);
     try {
       const data = await httpClient('/gastos-pessoais');
-      setGastos(Array.isArray(data) ? data : (data?.data || []));
+      setGastos(Array.isArray(data) ? data : (data?.results || []));
     } catch (error) {
       handleApiError(error, 'carregar os gastos pessoais');
       console.error('Erro ao carregar gastos pessoais:', error);

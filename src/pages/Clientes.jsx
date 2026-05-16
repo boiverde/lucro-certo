@@ -27,8 +27,8 @@ export default function ClientesPage() {
     placeholderData: keepPreviousData,
   });
 
-  const clientes = Array.isArray(clientesData) ? clientesData : (clientesData.data || []);
-  const meta = Array.isArray(clientesData) ? null : clientesData.meta;
+  const clientes = Array.isArray(clientesData) ? clientesData : (clientesData?.results || []);
+  const meta = Array.isArray(clientesData) ? null : (clientesData?.meta || { total: clientesData?.total, page: clientesData?.page, totalPages: clientesData?.totalPages });
 
   const { data: vendasRevendaRaw = {} } = useQuery({
     queryKey: ['vendas-revenda-clientes'],

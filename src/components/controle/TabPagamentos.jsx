@@ -59,7 +59,7 @@ export default function TabPagamentos({ vendas, compras, isOnline, addToQueue })
       if (data.tipo === 'diaria_funcionario' && data.funcionario) {
         const nomeFuncionario = data.funcionario.trim();
         const res = await httpClient(`/funcionarios?nome=${encodeURIComponent(nomeFuncionario)}`);
-        const lista = Array.isArray(res) ? res : (res?.data || []);
+        const lista = Array.isArray(res) ? res : (res?.results || []);
         if (lista.length === 0) {
           await httpClient('/funcionarios', { method: 'POST', body: JSON.stringify({ nome: nomeFuncionario, ativo: true }) });
         }
@@ -138,7 +138,7 @@ export default function TabPagamentos({ vendas, compras, isOnline, addToQueue })
 
       const nomeFuncionario = data.funcionario_nome.trim();
       const res = await httpClient(`/funcionarios?nome=${encodeURIComponent(nomeFuncionario)}`);
-      const lista = Array.isArray(res) ? res : (res?.data || []);
+      const lista = Array.isArray(res) ? res : (res?.results || []);
 
       let funcionarioId;
       if (lista.length === 0) {
@@ -307,7 +307,7 @@ export async function syncPagamentos(item, queryClient) {
     if (item.data.tipo === 'diaria_funcionario' && item.data.funcionario) {
       const nomeFuncionario = item.data.funcionario.trim();
       const res = await httpClient(`/funcionarios?nome=${encodeURIComponent(nomeFuncionario)}`);
-      const lista = Array.isArray(res) ? res : (res?.data || []);
+      const lista = Array.isArray(res) ? res : (res?.results || []);
       if (lista.length === 0) {
         await httpClient('/funcionarios', { method: 'POST', body: JSON.stringify({ nome: nomeFuncionario, ativo: true }) });
       }
@@ -321,7 +321,7 @@ export async function syncPagamentos(item, queryClient) {
   } else if (item.type === 'create_diaria') {
     const nomeFuncionario = item.data.funcionario_nome.trim();
     const res = await httpClient(`/funcionarios?nome=${encodeURIComponent(nomeFuncionario)}`);
-    const lista = Array.isArray(res) ? res : (res?.data || []);
+    const lista = Array.isArray(res) ? res : (res?.results || []);
 
     let funcionarioId;
     if (lista.length === 0) {

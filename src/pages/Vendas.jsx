@@ -27,8 +27,8 @@ export default function VendasPage() {
     placeholderData: keepPreviousData,
   });
 
-  const vendas = Array.isArray(vendasData) ? vendasData : (vendasData.data || []);
-  const meta = Array.isArray(vendasData) ? null : vendasData.meta;
+  const vendas = Array.isArray(vendasData) ? vendasData : (vendasData?.results || []);
+  const meta = Array.isArray(vendasData) ? null : (vendasData?.meta || { total: vendasData?.total, page: vendasData?.page, totalPages: vendasData?.totalPages });
 
   const { data: produtos = [] } = useQuery({
     queryKey: ['produtos'],
