@@ -7,6 +7,7 @@ import QRCode from 'qrcode';
  * Diferente do cliente legado v2 (urlencoded/xml) usado para Checkout
  */
 const PAGSEGURO_TOKEN = process.env.PAGSEGURO_TOKEN;
+const MERCHANT_EMAIL  = (process.env.PAGSEGURO_EMAIL || '').toLowerCase().trim();
 const IS_SANDBOX = process.env.PAGSEGURO_BASE_URL?.includes('sandbox');
 
 const PAGBANK_API_URL = IS_SANDBOX
@@ -30,7 +31,7 @@ export interface PixChargeInput {
     customerTaxId: string; // CPF do comprador (obrigatório pela API)
     amountCents: number;   // Em centavos (ex: 2999 = R$29,99)
     notificationUrl: string;
-    expirationDate?: string; // ISO 8601, default: 24h
+    expirationDate?: string; // ISO 8601, default: 30min
 }
 
 export interface PixChargeResult {
@@ -41,8 +42,10 @@ export interface PixChargeResult {
 }
 
 /**
- * Cria uma cobrança Pix via API PagBank v4
- * Não usa o cliente legado v2 (que usa xml/urlencoded)
+ * Cria uma cobrança Pix via API PagBank v4.
+ * Regra PagBank: o email do comprador não pode ser igual ao email do merchant.
+ * Se forem iguais, usa um email neutro de placeholder — o campo email
+ * é apenas obrigatório pelo schema mas não é exibido ao pagador no QR Code Pix.
  */
 export async function createPixCharge(data: PixChargeInput): Promise<PixChargeResult> {
     // Validade padrão: 30 minutos
@@ -52,11 +55,17 @@ export async function createPixCharge(data: PixChargeInput): Promise<PixChargeRe
         return d.toISOString().replace('Z', '-03:00');
     })();
 
+    // Regra PagBank: buyer email != merchant email
+    const customerEmailNormalizado = data.customerEmail.toLowerCase().trim();
+    const customerEmail = customerEmailNormalizado === MERCHANT_EMAIL
+        ? 'comprador@lucrocerto.com.br'
+        : customerEmailNormalizado;
+
     const payload = {
         reference_id: data.referenceId,
         customer: {
             name: data.customerName.trim().substring(0, 50),
-            email: data.customerEmail,
+            email: customerEmail,
             tax_id: data.customerTaxId.replace(/\D/g, ''), // Remove formatação CPF
         },
         items: [
