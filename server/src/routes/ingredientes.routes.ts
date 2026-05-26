@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function ingredientesRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -19,7 +19,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         const { nome, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (nome) {
@@ -48,7 +48,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const ingrediente = await prisma.ingrediente.findFirst({
             where: { id, userId }
@@ -73,7 +73,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         // Hardening: Cálculo exato no servidor
@@ -116,7 +116,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         // Buscar dados atuais para recalcular se necessário
@@ -145,7 +145,7 @@ export async function ingredientesRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         // Verificação: O ingrediente está em alguma receita?
         const emUso = await prisma.receitaIngrediente.findFirst({

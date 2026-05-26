@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma'
 import { addMonths } from 'date-fns'
 
 export async function revendasRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // --- EMPRESAS --- //
 
@@ -17,7 +17,7 @@ export async function revendasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const empresas = await prisma.empresaRevenda.findMany({
             where: { userId },
             orderBy: { nome: 'asc' }
@@ -36,7 +36,7 @@ export async function revendasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const empresa = await prisma.empresaRevenda.create({
@@ -59,15 +59,19 @@ export async function revendasRoutes(app: FastifyInstance) {
                 cor: z.string().optional()
             }),
         },
-    }, async (request) => {
+    }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
-        const empresa = await prisma.empresaRevenda.updateMany({
+        const updated = await prisma.empresaRevenda.updateMany({
             where: { id, userId },
             data
         })
+
+        if (updated.count === 0) return reply.status(404).send({ message: 'Empresa não encontrada' })
+
+        const empresa = await prisma.empresaRevenda.findUnique({ where: { id } })
         return empresa
     })
 
@@ -81,7 +85,7 @@ export async function revendasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         // Ignora sort complexo por enquanto, ordena por data desc
         const gastos = await prisma.gastoRevenda.findMany({
             where: { userId },
@@ -102,7 +106,7 @@ export async function revendasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const gasto = await prisma.gastoRevenda.create({
@@ -130,7 +134,7 @@ export async function revendasRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const updateData: any = { ...data }
@@ -148,7 +152,7 @@ export async function revendasRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         await prisma.gastoRevenda.deleteMany({ where: { id, userId } })
         return reply.status(204).send()
     })
@@ -164,7 +168,7 @@ export async function revendasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const vendas = await prisma.vendaRevenda.findMany({
             where: { userId },
             include: {
@@ -231,8 +235,8 @@ export async function revendasRoutes(app: FastifyInstance) {
                 parcelas_pagas: z.number().optional().default(0) // Frontend manda 0
             }),
         },
-    }, async (request) => {
-        const userId = request.user.sub
+    }, async (request, reply) => {
+        const userId = (request.user as any).sub
         const data = request.body
 
         // Se veio nome de cliente e não ID, deveria ter sido tratado no frontend (que cria cliente antes).
@@ -307,7 +311,7 @@ export async function revendasRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const result = await prisma.$transaction(async (tx) => {
@@ -359,7 +363,7 @@ export async function revendasRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         await prisma.vendaRevenda.deleteMany({ where: { id, userId } })
         return reply.status(204).send()
     })

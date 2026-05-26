@@ -10,7 +10,7 @@ import { startOfMonth, endOfMonth, startOfDay, endOfDay, subDays, format } from 
  */
 
 export async function reportsRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Esquema de Validação Rigoroso (Zod)
     const performanceSchema = z.object({
@@ -21,7 +21,7 @@ export async function reportsRoutes(app: FastifyInstance) {
     app.withTypeProvider<ZodTypeProvider>().get('/performance', {
         schema: { querystring: performanceSchema }
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const from = request.query.from ? startOfDay(new Date(request.query.from)) : startOfMonth(new Date())
         const to = request.query.to ? endOfDay(new Date(request.query.to)) : endOfMonth(new Date())
         
@@ -109,7 +109,7 @@ export async function reportsRoutes(app: FastifyInstance) {
                 id: p.produtoId,
                 nome: p.nome_produto,
                 quantidade: p._sum.quantidade || 0,
-                lucroTotal: Number(((p._sum.lucro_unitario || 0) * (p._sum.quantidade || 0)).toFixed(2)),
+                lucroTotal: Number((Number(p._sum.lucro_unitario || 0) * Number(p._sum.quantidade || 0)).toFixed(2)),
                 margemMedia: Number((p._avg.margem_liquida || 0).toFixed(1)),
                 precoAtual: Number(prod?.preco || 0),
                 custoBase: Number(prod?.custo || 0),

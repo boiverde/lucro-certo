@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function gastosPessoaisRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -16,7 +16,7 @@ export async function gastosPessoaisRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { data_inicio, data_fim } = request.query
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (data_inicio) {
@@ -45,7 +45,7 @@ export async function gastosPessoaisRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const gasto = await prisma.gastoPessoal.create({
@@ -74,7 +74,7 @@ export async function gastosPessoaisRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const updateData: any = { ...data }
@@ -96,7 +96,7 @@ export async function gastosPessoaisRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.gastoPessoal.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

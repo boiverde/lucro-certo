@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function lotesRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Lotes
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -20,7 +20,7 @@ export async function lotesRoutes(app: FastifyInstance) {
         const { produto_id, ingrediente_id, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (produto_id) where.produtoId = produto_id
@@ -56,7 +56,7 @@ export async function lotesRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const lote = await prisma.lote.create({
@@ -88,7 +88,7 @@ export async function lotesRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const updateData: any = { ...data }
@@ -109,7 +109,7 @@ export async function lotesRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.lote.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

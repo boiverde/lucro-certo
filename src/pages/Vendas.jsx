@@ -30,10 +30,11 @@ export default function VendasPage() {
   const vendas = Array.isArray(vendasData) ? vendasData : (vendasData?.results || []);
   const meta = Array.isArray(vendasData) ? null : (vendasData?.meta || { total: vendasData?.total, page: vendasData?.page, totalPages: vendasData?.totalPages });
 
-  const { data: produtos = [] } = useQuery({
+  const { data: produtosData } = useQuery({
     queryKey: ['produtos'],
-    queryFn: () => httpClient('/produtos?ativo=true'),
+    queryFn: () => httpClient('/produtos?ativo=true&limit=500'),
   });
+  const produtos = Array.isArray(produtosData) ? produtosData : (produtosData?.results || []);
 
   const createVendaMutation = useMutation({
     mutationFn: async (data) => {

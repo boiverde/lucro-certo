@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function receitasRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Receitas
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -19,7 +19,7 @@ export async function receitasRoutes(app: FastifyInstance) {
         const { categoria, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (categoria) where.categoria = categoria
@@ -47,7 +47,7 @@ export async function receitasRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const receita = await prisma.receitaProduto.findFirst({
             where: { id, userId },
@@ -63,7 +63,7 @@ export async function receitasRoutes(app: FastifyInstance) {
         // 1. Calcular Custo Atualizado (Monitor de Margem - Parte 4)
         let custoAtualizadoTotal = 0
         const ingredientesProcessados = receita.ingredientes.map(ri => {
-            const precoKg = ri.ingrediente?.preco_corrigido_kg || 0
+            const precoKg = Number(ri.ingrediente?.preco_corrigido_kg || 0)
             const custoItem = Number((precoKg * ri.quantidade_kg).toFixed(2))
             custoAtualizadoTotal += custoItem
             
@@ -110,7 +110,7 @@ export async function receitasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const receita = await prisma.receitaProduto.create({
@@ -164,7 +164,7 @@ export async function receitasRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         // Confirmar acesso
@@ -225,7 +225,7 @@ export async function receitasRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.receitaProduto.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

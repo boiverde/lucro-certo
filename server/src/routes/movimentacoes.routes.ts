@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function movimentacoesRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Movimentações
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -15,7 +15,7 @@ export async function movimentacoesRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { limit } = request.query
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const movimentacoes = await prisma.movimentacaoEstoque.findMany({
             where: { userId },
@@ -40,7 +40,7 @@ export async function movimentacoesRoutes(app: FastifyInstance) {
             })
         }
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const result = await prisma.$transaction(async (tx) => {

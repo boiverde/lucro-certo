@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma'
 
 export async function clientesRoutes(app: FastifyInstance) {
     // Middleware de Auth para todas as rotas
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Clientes
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -18,7 +18,7 @@ export async function clientesRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { nome, page, limit } = request.query
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where = {
             userId,
@@ -54,7 +54,7 @@ export async function clientesRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { nome, email, telefone } = request.body
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const cliente = await prisma.cliente.create({
             data: {
@@ -82,7 +82,7 @@ export async function clientesRoutes(app: FastifyInstance) {
     }, async (request, reply) => {
         const { id } = request.params
         const data = request.body
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         // Validar propriedade
         const exists = await prisma.cliente.findFirst({ where: { id, userId } })
@@ -108,7 +108,7 @@ export async function clientesRoutes(app: FastifyInstance) {
         },
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const exists = await prisma.cliente.findFirst({ where: { id, userId } })
         if (!exists) return reply.status(404).send({ message: 'Cliente não encontrado' })

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function alertasRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Alertas
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -12,7 +12,7 @@ export async function alertasRoutes(app: FastifyInstance) {
             // Opcional: filtro por resolvido
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const alertas = await prisma.alertaEstoque.findMany({
             where: { userId, resolvido: false },
@@ -34,7 +34,7 @@ export async function alertasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const alerta = await prisma.alertaEstoque.create({
@@ -60,7 +60,7 @@ export async function alertasRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const alerta = await prisma.alertaEstoque.updateMany({
             where: { id, userId },
@@ -76,7 +76,7 @@ export async function alertasRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.alertaEstoque.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

@@ -9,12 +9,16 @@ export function calculateFinancials(
     configs: {
         taxa_impostos: number;
         taxa_cartao: number;
-        custo_fixo_por_unidade: number;
+        custo_fixo_mensal: number;      // Custo fixo total do mês (do User)
+        unidades_vendidas_mes: number;  // Estimativa de unidades para ratear custo fixo
         margem_lucro_padrao: number;
     }
 ) {
     const taxasVariaveisDec = (configs.taxa_impostos + configs.taxa_cartao) / 100;
-    const custoFixoUnid = configs.custo_fixo_por_unidade || 0;
+    // Rateio do custo fixo por unidade (evita divisão por zero)
+    const custoFixoUnid = configs.unidades_vendidas_mes > 0
+        ? configs.custo_fixo_mensal / configs.unidades_vendidas_mes
+        : 0;
     const custoTotalBase = cost + custoFixoUnid;
 
     // Fórmula: Lucro = Preço - CT - (Preço * taxas)
@@ -25,9 +29,9 @@ export function calculateFinancials(
     const margemDesejadaDec = configs.margem_lucro_padrao / 100;
     const divisor = 1 - (taxasVariaveisDec + margemDesejadaDec);
     const precoSugerido = divisor > 0 ? (custoTotalBase / divisor) : 0;
-    
+
     // Lucro que o usuário ganharia se usasse o preço ideal
-    const lucroIdealUnitario = precoSugerido > 0 
+    const lucroIdealUnitario = precoSugerido > 0
         ? (precoSugerido - custoTotalBase - (precoSugerido * taxasVariaveisDec))
         : 0;
 

@@ -19,7 +19,7 @@ export function handleApiError(error, contextoAcao) {
   if (error.status === 401) {
     toast.error('Sessão expirada. Faça login novamente.', { id: 'auth-err' });
     setTimeout(() => {
-        if (window.location.pathname !== '/Login') {
+        if (window.location.pathname !== '/Login' && window.location.pathname !== '/login') {
             window.location.href = '/Login';
         }
     }, 1500);

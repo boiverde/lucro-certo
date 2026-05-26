@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function producoesRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -16,7 +16,7 @@ export async function producoesRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { data_inicio, data_fim } = request.query
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (data_inicio) {
@@ -48,7 +48,7 @@ export async function producoesRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         // 1. Validar receita existe e tem ingredientes
@@ -93,7 +93,7 @@ export async function producoesRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const producao = await prisma.producaoLanche.findFirst({
             where: { id, userId },

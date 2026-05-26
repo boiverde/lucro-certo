@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function pedidosRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Pedidos
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -15,7 +15,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { status } = request.query
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (status) where.status = status
@@ -39,7 +39,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const pedido = await prisma.pedido.create({
@@ -67,7 +67,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const pedido = await prisma.pedido.updateMany({
@@ -84,7 +84,7 @@ export async function pedidosRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.pedido.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

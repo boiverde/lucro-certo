@@ -78,14 +78,11 @@ export async function createPixCharge(data: PixChargeInput): Promise<PixChargeRe
         notification_urls: [data.notificationUrl]
     };
 
-    console.log('[PIX] Creating charge:', JSON.stringify(payload, null, 2));
-    console.log('[PIX] Using API URL:', PAGBANK_API_URL);
-    console.log('[PIX] Token prefix:', PAGSEGURO_TOKEN?.substring(0, 8) + '...');
+    console.log('[PIX] Creating charge | referenceId:', data.referenceId, '| amount:', data.amountCents);
 
     const response = await pagbankClient.post('/orders', payload);
 
-    console.log('[PIX] Response status:', response.status);
-    console.log('[PIX] Response data:', JSON.stringify(response.data, null, 2));
+    console.log('[PIX] Charge created | orderId:', response.data?.id, '| status:', response.status);
 
     const qrCode = response.data?.qr_codes?.[0];
 

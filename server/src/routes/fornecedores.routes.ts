@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function fornecedoresRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Fornecedores
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -19,7 +19,7 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
         const { nome, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (nome) {
@@ -50,7 +50,7 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const fornecedor = await prisma.fornecedor.create({
@@ -75,7 +75,7 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const fornecedor = await prisma.fornecedor.updateMany({
@@ -92,7 +92,7 @@ export async function fornecedoresRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.fornecedor.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

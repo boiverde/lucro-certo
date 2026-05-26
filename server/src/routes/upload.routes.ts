@@ -3,7 +3,7 @@ import { uploadPublic, uploadPrivate, getFileSignedUrl } from '../lib/storage'
 import { z } from 'zod'
 
 export async function uploadRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Upload Público (Imagens de Produto, etc)
     app.post('/public', async (request, reply) => {

@@ -5,7 +5,7 @@ import { prisma } from '../lib/prisma'
 import { calculateFinancials } from '../utils/pricing'
 
 export async function vendasRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Vendas
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -21,7 +21,7 @@ export async function vendasRoutes(app: FastifyInstance) {
         const { data_inicio, data_fim, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (data_inicio) {
@@ -69,7 +69,7 @@ export async function vendasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const { itens, ...vendaData } = request.body
 
         // 1. Validar plano e buscar configurações
@@ -93,7 +93,7 @@ export async function vendasRoutes(app: FastifyInstance) {
                 where: { userId, createdAt: { gte: startOfMonth } }
             })
 
-            if (total >= 5) { // Reduzido para teste de QA
+            if (total >= 30) { // Limite do plano gratuito: 30 vendas/mês
                 return reply.status(403).send({
                     error: "LIMIT_REACHED",
                     message: "Você atingiu o limite de teste de 5 vendas no plano gratuito."
@@ -130,8 +130,9 @@ export async function vendasRoutes(app: FastifyInstance) {
             const finance = calculateFinancials(custoBase, item.preco_unitario, {
                 taxa_impostos: Number(user.taxa_impostos) || 0,
                 taxa_cartao: Number(user.taxa_cartao) || 0,
-                // Rateio adaptativo: Custo Mensal / Limite de referência do plano
-                custo_fixo_por_unidade: (Number(user.custo_fixo_mensal) / 150) || 0,
+                // Rateio adaptativo: Custo Mensal / quantidade de unidades de referência
+                custo_fixo_mensal: Number(user.custo_fixo_mensal) || 0,
+                unidades_vendidas_mes: 150, // Referência de volume mensal
                 margem_lucro_padrao: Number(user.margem_balcao) || 30,
             })
 
@@ -240,7 +241,7 @@ export async function vendasRoutes(app: FastifyInstance) {
         },
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         // 1. Verificar se a venda existe e pertence ao usuário
         const venda = await prisma.venda.findFirst({ 

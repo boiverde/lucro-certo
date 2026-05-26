@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function comprasRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Compras
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -21,7 +21,7 @@ export async function comprasRoutes(app: FastifyInstance) {
         const { data_inicio, data_fim, fornecedor, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
 
@@ -74,7 +74,7 @@ export async function comprasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         // Definir data pagamento
@@ -156,7 +156,7 @@ export async function comprasRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const compra = await prisma.compra.findFirst({
             where: { id, userId },

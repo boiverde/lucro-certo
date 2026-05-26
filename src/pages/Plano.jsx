@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Zap, CheckCircle2, Crown, Rocket, ShieldCheck, ArrowRight, QrCode, Copy, Check, Loader2, Clock, BarChart3, Store, Users } from 'lucide-react';
 import { usePlan } from '@/api/usePlan';
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import UsageTracker from "../components/dashboard/UsageTracker";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,8 @@ const BENEFITS_PRO = [
 ];
 
 export default function Plano() {
-    const { plan, loading, refresh } = usePlan();
+    const { plan, loading, refresh, expiresAt } = usePlan();
+    const queryClient = useQueryClient();
     const [step, setStep] = useState('idle'); // 'idle' | 'cpf' | 'loading' | 'qrcode' | 'confirmed'
     const [cpf, setCpf] = useState('');
     const [pix, setPix] = useState(null);
@@ -38,8 +39,13 @@ export default function Plano() {
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     }, []);
 
-    const checkPixStatus = useCallback(async (orderId, count) => {
-        if (count >= MAX_POLLS) {
+    const pollCountRef = React.useRef(0);
+
+    const checkPixStatus = useCallback(async (orderId) => {
+        pollCountRef.current += 1;
+        setPollCount(pollCountRef.current);
+
+        if (pollCountRef.current >= MAX_POLLS) {
             stopPolling();
             toast.warning('PIX expirado', { description: 'Gere um novo código para tentar novamente.' });
             setStep('idle');
@@ -53,15 +59,13 @@ export default function Plano() {
                 if (refresh) refresh(); // Atualiza cache global do plano
             }
         } catch { /* silencia */ }
-    }, [stopPolling]);
+    }, [stopPolling, refresh]);
 
     useEffect(() => {
         if (step === 'qrcode' && pix?.orderId) {
-            let count = pollCount;
+            pollCountRef.current = 0;
             pollRef.current = setInterval(() => {
-                count++;
-                setPollCount(count);
-                checkPixStatus(pix.orderId, count);
+                checkPixStatus(pix.orderId);
             }, POLL_INTERVAL_MS);
         }
         return stopPolling;
@@ -71,7 +75,10 @@ export default function Plano() {
     useEffect(() => {
         if (step === 'confirmed') {
             toast.success('🎉 Plano Pro ativado!', { description: 'Suas vendas agora são ilimitadas!' });
-            const t = setTimeout(() => window.location.reload(), 3000);
+            const t = setTimeout(() => {
+                queryClient.invalidateQueries();
+                refresh();
+            }, 3000);
             return () => clearTimeout(t);
         }
     }, [step]);
@@ -119,8 +126,6 @@ export default function Plano() {
 
     // ── PLANO PRO ──────────────────────────────────────────────────
     if (plan === 'pro' || step === 'confirmed') {
-        const { expiresAt } = usePlan();
-        
         let daysRemaining = 0;
         if (expiresAt) {
             const now = new Date();

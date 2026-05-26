@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function produtosRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Produtos
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -20,7 +20,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         const { nome, ativo, limit, page } = request.query
         const take = Math.min(Number(limit) || 50, 100)
         const skip = (Math.max(Number(page) || 1, 1) - 1) * take
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const produtos = await prisma.produto.findMany({
             where: {
@@ -56,7 +56,7 @@ export async function produtosRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const produto = await prisma.produto.create({
@@ -88,7 +88,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         },
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const { margem_prevista, margem_realizada, canal, origem, ...body } = request.body as any
 
         const oldProduto = await prisma.produto.findFirst({ 
@@ -139,7 +139,7 @@ export async function produtosRoutes(app: FastifyInstance) {
         },
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const check = await prisma.produto.findFirst({ where: { id, userId } })
         if (!check) return reply.status(404).send()

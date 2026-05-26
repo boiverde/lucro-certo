@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function diariasRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     // Listar Diarias
     app.withTypeProvider<ZodTypeProvider>().get('/', {
@@ -16,7 +16,7 @@ export async function diariasRoutes(app: FastifyInstance) {
         },
     }, async (request) => {
         const { funcionario_id, foi_pago } = request.query
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         const where: any = { userId }
         if (funcionario_id) where.funcionarioId = funcionario_id
@@ -43,7 +43,7 @@ export async function diariasRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const diaria = await prisma.diaria.create({
@@ -72,7 +72,7 @@ export async function diariasRoutes(app: FastifyInstance) {
         }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const data = request.body
 
         const diaria = await prisma.diaria.updateMany({
@@ -89,7 +89,7 @@ export async function diariasRoutes(app: FastifyInstance) {
         schema: { params: z.object({ id: z.string().uuid() }) }
     }, async (request, reply) => {
         const { id } = request.params
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
 
         await prisma.diaria.deleteMany({ where: { id, userId } })
         return reply.status(204).send()

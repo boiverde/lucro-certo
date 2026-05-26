@@ -3,10 +3,10 @@ import { prisma } from '../lib/prisma'
 import { addMonths } from 'date-fns'
 
 export async function dashboardRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     app.get('/stats', async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         
         // Ajuste de Fuso Horário (Brasil GMT-3) para o Mês Atual
         const agora = new Date()

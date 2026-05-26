@@ -3,6 +3,8 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod'
 import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 import bcrypt from 'bcryptjs'
+import { createClient } from '@supabase/supabase-js'
+import crypto from 'node:crypto'
 
 export async function authRoutes(app: FastifyInstance) {
     // Login
@@ -97,11 +99,14 @@ export async function authRoutes(app: FastifyInstance) {
     }, async (request, reply) => {
         const { token } = request.body
 
-        // Ideal é ler as chaves de process.env, usando dummy fallback temporário
         const supabaseUrl = process.env.SUPABASE_URL || 'https://qfahagyxugfjzrigkmkp.supabase.co';
-        const supabaseKey = process.env.SUPABASE_ANON_KEY || 'SUBNSTITUA_PELA_SUA_ANON_KEY';
-        
-        const { createClient } = require('@supabase/supabase-js');
+        const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+        if (!supabaseKey) {
+            console.error('[Auth] SUPABASE_ANON_KEY nao configurada. Login Google indisponivel.');
+            return reply.status(503).send({ message: 'Login com Google temporariamente indisponível. Use email e senha.' });
+        }
+
         const supabase = createClient(supabaseUrl, supabaseKey);
 
         try {
@@ -120,7 +125,6 @@ export async function authRoutes(app: FastifyInstance) {
 
             if (!userLocal) {
                 console.log('[Auth] Criando novo usuário via Google:', sbUser.email);
-                const crypto = require('crypto');
                 const randomPassword = crypto.randomUUID();
                 const password_hash = await bcrypt.hash(randomPassword, 6);
                 
@@ -155,8 +159,10 @@ export async function authRoutes(app: FastifyInstance) {
                 name: z.string().optional(),
                 taxa_impostos: z.number().optional(),
                 taxa_cartao: z.number().optional(),
-                custo_fixo_por_unidade: z.number().optional(),
-                margem_lucro_padrao: z.number().optional(),
+                custo_fixo_mensal: z.number().optional(),
+                margem_balcao: z.number().optional(),
+                margem_delivery: z.number().optional(),
+                margem_marketplace: z.number().optional(),
             })
         }
     }, async (request) => {
@@ -169,8 +175,10 @@ export async function authRoutes(app: FastifyInstance) {
                 name: data.name,
                 taxa_impostos: data.taxa_impostos,
                 taxa_cartao: data.taxa_cartao,
-                custo_fixo_por_unidade: data.custo_fixo_por_unidade,
-                margem_lucro_padrao: data.margem_lucro_padrao
+                custo_fixo_mensal: (data as any).custo_fixo_mensal,
+                margem_balcao: (data as any).margem_balcao,
+                margem_delivery: (data as any).margem_delivery,
+                margem_marketplace: (data as any).margem_marketplace
             },
             select: {
                 id: true,
@@ -179,8 +187,10 @@ export async function authRoutes(app: FastifyInstance) {
                 plan: true,
                 taxa_impostos: true,
                 taxa_cartao: true,
-                custo_fixo_por_unidade: true,
-                margem_lucro_padrao: true
+                custo_fixo_mensal: true,
+                margem_balcao: true,
+                margem_delivery: true,
+                margem_marketplace: true
             }
         })
 
@@ -190,7 +200,7 @@ export async function authRoutes(app: FastifyInstance) {
     // Obter Dados do Usuário (Identidade)
     app.get('/me', {
         onRequest: [(app as any).authenticate]
-    }, async (request) => {
+    }, async (request, reply) => {
         const userId = (request.user as any).sub
         
         const user = await prisma.user.findUnique({
@@ -199,7 +209,14 @@ export async function authRoutes(app: FastifyInstance) {
                 id: true,
                 name: true,
                 email: true,
-                plan: true
+                plan: true,
+                planExpiresAt: true,
+                taxa_impostos: true,
+                taxa_cartao: true,
+                custo_fixo_mensal: true,
+                margem_balcao: true,
+                margem_delivery: true,
+                margem_marketplace: true
             }
         })
 

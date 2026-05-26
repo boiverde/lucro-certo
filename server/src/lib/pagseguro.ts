@@ -47,9 +47,6 @@ export async function createCheckoutRequest(data: {
     params.append('redirectURL', redirectURL);
 
     try {
-        console.log("=== PAGSEGURO DIAGOSTICO START ===");
-        console.log("PAGSEGURO REQUEST PAYLOAD:", params.toString());
-        
         const response = await pagseguroClient.post('/v2/checkout', params.toString(), {
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=ISO-8859-1',
@@ -57,27 +54,14 @@ export async function createCheckoutRequest(data: {
             }
         });
         
-        console.log("PAGSEGURO SUCCESS RESPONSE RAW:", response.data);
-        
         const { XMLParser } = require('fast-xml-parser');
         const parser = new XMLParser();
         const parsed = parser.parse(response.data);
         
-        console.log("PAGSEGURO PARSED XML:", JSON.stringify(parsed, null, 2));
-        console.log("=== PAGSEGURO DIAGOSTICO END ===");
-        
         // O PagSeguro retorna o code do checkout para montar a URL
         return { code: parsed?.checkout?.code, ...parsed?.checkout };
     } catch (error: any) {
-        console.error("=== PAGSEGURO ERROR START ===");
-        console.error("PAGSEGURO ERROR MESSAGE:", error.message);
-        if (error.response) {
-            console.error("PAGSEGURO ERROR DATA:", JSON.stringify(error.response.data, null, 2));
-            console.error("PAGSEGURO ERROR STATUS:", error.response.status);
-        } else {
-            console.error("PAGSEGURO FULL ERROR OBJ:", error);
-        }
-        console.error("=== PAGSEGURO ERROR END ===");
+        console.error("[PAGSEGURO] Erro ao criar checkout:", error.response?.status, error.message);
         throw error;
     }
 }

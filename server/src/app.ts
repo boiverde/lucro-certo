@@ -29,6 +29,8 @@ import { paymentsRoutes } from './routes/payments.routes'
 import { analyticsRoutes } from './routes/analytics.routes'
 import { reportsRoutes } from './routes/reports.routes'
 
+import { prisma } from './lib/prisma'
+
 export const app = fastify().withTypeProvider<ZodTypeProvider>()
 
 // Configuração Zod

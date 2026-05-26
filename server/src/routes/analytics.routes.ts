@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { prisma } from '../lib/prisma'
 
 export async function analyticsRoutes(app: FastifyInstance) {
-    app.addHook('onRequest', app.authenticate)
+    app.addHook('onRequest', (app as any).authenticate)
 
     app.withTypeProvider<ZodTypeProvider>().post('/event', {
         schema: {
@@ -15,7 +15,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
             }),
         },
     }, async (request, reply) => {
-        const userId = request.user.sub
+        const userId = (request.user as any).sub
         const { event, origin, metadata } = request.body
 
         await prisma.analyticsEvent.create({
@@ -30,7 +30,7 @@ export async function analyticsRoutes(app: FastifyInstance) {
         return reply.status(204).send()
     })
 
-    app.get('/funnel', async (request, reply) => {
+    app.get('/funnel', { onRequest: [(app as any).authenticate] }, async (request, reply) => {
         try {
             const events = await prisma.analyticsEvent.groupBy({
                 by: ['event'],
