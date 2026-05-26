@@ -1,6 +1,5 @@
 
-
-
 export function createPageUrl(pageName: string) {
-    return '/' + pageName.toLowerCase().replace(/ /g, '-');
+    // Preserva o casing original para bater com as rotas /Dashboard, /Plano, etc.
+    return '/' + pageName.replace(/ /g, '-');
 }

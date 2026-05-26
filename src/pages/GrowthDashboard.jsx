@@ -22,6 +22,13 @@ export default function GrowthDashboard() {
     useEffect(() => {
         const fetchGrowthData = async () => {
             try {
+                // Verificar se é admin antes de carregar dados sensíveis
+                const me = await httpClient('/auth/me');
+                if (me?.email !== 'admin@lucrocerto.com') {
+                    setData({ accessDenied: true });
+                    setLoading(false);
+                    return;
+                }
                 // Consumindo o endpoint de inteligência de canal e funil
                 const response = await httpClient('/analytics/funnel');
                 setData(response);
@@ -33,6 +40,16 @@ export default function GrowthDashboard() {
         };
         fetchGrowthData();
     }, []);
+
+    if (data?.accessDenied) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+                <ShieldCheck className="w-16 h-16 text-gray-300" />
+                <h2 className="text-xl font-bold text-gray-500">Acesso Restrito</h2>
+                <p className="text-gray-400 text-sm">Esta página é exclusiva para administradores.</p>
+            </div>
+        );
+    }
 
     if (loading) return (
         <div className="flex h-screen w-full items-center justify-center bg-slate-50">
