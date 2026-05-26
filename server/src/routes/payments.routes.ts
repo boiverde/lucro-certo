@@ -5,6 +5,26 @@ import { prisma } from '../lib/prisma'
 import { createCheckoutRequest, getTransactionStatus } from '../lib/pagseguro'
 import { createPixCharge, pagbankClient } from '../lib/pagseguro-pix'
 
+
+// Validacao de CPF (digitos verificadores)
+function isValidCPF(cpf: string): boolean {
+    const digits = cpf.replace(/\D/g, '');
+    if (digits.length !== 11) return false;
+    if (/^(\d)\1{10}$/.test(digits)) return false; // todos iguais ex: 00000000000
+
+    let sum = 0;
+    for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
+    let first = (sum * 10) % 11;
+    if (first === 10 || first === 11) first = 0;
+    if (first !== parseInt(digits[9])) return false;
+
+    sum = 0;
+    for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
+    let second = (sum * 10) % 11;
+    if (second === 10 || second === 11) second = 0;
+    return second === parseInt(digits[10]);
+}
+
 export async function paymentsRoutes(app: FastifyInstance) {
     // 1. Iniciar checkout PagSeguro para upgrade Plano Pro
     app.withTypeProvider<ZodTypeProvider>().post('/upgrade', {
@@ -131,6 +151,11 @@ export async function paymentsRoutes(app: FastifyInstance) {
         const user = await prisma.user.findUnique({ where: { id: userId } })
         if (!user) return reply.status(401).send({ message: 'Acesso negado' })
 
+        // Validar CPF antes de chamar a API (evita erro 400 do PagBank)
+        if (!isValidCPF(cpf)) {
+            return reply.status(400).send({ message: 'CPF inválido. Verifique e tente novamente.' })
+        }
+
         const referenceId = `pix_pro_${userId}_${Date.now()}`
         const amountCents = planId === 'pro_yearly' ? 24900 : 2999 // R$ 249,00 ou R$ 29,99
 
@@ -164,6 +189,19 @@ export async function paymentsRoutes(app: FastifyInstance) {
                 planId: planId
             })
         } catch (err: any) {
+            const apiError = err?.response?.data
+            const apiStatus = err?.response?.status
+            console.error('[PIX-ERROR] Status:', apiStatus, '| Body:', JSON.stringify(apiError))
+            console.error('[PIX-ERROR] Message:', err?.message)
+
+            // Retornar mensagem mais especifica quando possivel
+            if (apiStatus === 400) {
+                const desc = apiError?.error_messages?.[0]?.description
+                return reply.status(400).send({ message: desc ? `Erro Pix: ${desc}` : 'Dados inválidos para geração do Pix' })
+            }
+            if (apiStatus === 401 || apiStatus === 403) {
+                return reply.status(500).send({ message: 'Erro de autenticação com o gateway de pagamento' })
+            }
             return reply.status(500).send({ message: 'Erro ao criar Pix' })
         }
     })
