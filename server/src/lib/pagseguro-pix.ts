@@ -1,4 +1,5 @@
 import axios from 'axios';
+import QRCode from 'qrcode';
 
 /**
  * Cliente PagSeguro API v4 (moderna, JSON, Bearer Token)
@@ -92,10 +93,13 @@ export async function createPixCharge(data: PixChargeInput): Promise<PixChargeRe
         throw new Error('[PIX] QR Code não retornado pela API. Resposta: ' + JSON.stringify(response.data));
     }
 
+    const qrCodeText = qrCode.text;
+    const base64Image = await QRCode.toDataURL(qrCodeText);
+
     return {
         orderId: response.data.id,
-        qrCodeBase64: qrCode.links?.find((l: any) => l.media === 'image/png')?.href || '',
-        qrCodeText: qrCode.text,
+        qrCodeBase64: base64Image,
+        qrCodeText: qrCodeText,
         expiresAt: qrCode.expiration_date || expiresAt
     };
 }
