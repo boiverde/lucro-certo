@@ -99,9 +99,10 @@ export default function Layout({ children, currentPageName }) {
     checkUser();
   }, [currentPageName, isPaginaPublica]);
 
-  const handleLogout = async () => {
-    await httpClient('/auth/logout', { method: 'POST' });
-    window.location.href = createPageUrl("Home");
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('lc_plan_cache');
+    window.location.href = '/Login';
   };
 
   const goToPlano = () => {

@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import Layout from "./Layout.jsx";
-import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes, useLocation, Navigate } from 'react-router-dom';
 
 const Compras = lazy(() => import("./Compras"));
 const Dashboard = lazy(() => import("./Dashboard"));
@@ -67,6 +67,12 @@ function _getCurrentPage(url) {
     return pageName || Object.keys(PAGES)[0];
 }
 
+// Redireciona a rota raiz com base no estado de autenticacao
+function RootRedirect() {
+    const hasToken = !!localStorage.getItem('auth_token');
+    return hasToken ? <Navigate to="/Dashboard" replace /> : <Navigate to="/Login" replace />;
+}
+
 // Create a wrapper component that uses useLocation inside the Router context
 function PagesContent() {
     const location = useLocation();
@@ -76,7 +82,7 @@ function PagesContent() {
         <Layout currentPageName={currentPage}>
             <Suspense fallback={<div className="flex h-[50vh] w-full items-center justify-center text-gray-500">Carregando página...</div>}>
                 <Routes>
-                    <Route path="/" element={<Compras />} />
+                    <Route path="/" element={<RootRedirect />} />
                     <Route path="/Compras" element={<Compras />} />
                     <Route path="/Dashboard" element={<Dashboard />} />
                     <Route path="/Vendas" element={<Vendas />} />

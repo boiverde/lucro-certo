@@ -30,7 +30,21 @@ export default function ConfiguracoesPage() {
 
   const { data: userData } = useQuery({ queryKey: ['auth-me-configs'], queryFn: () => httpClient('/auth/me'), staleTime: 1000 * 60 * 5 });
 
-  useEffect(() => { if (userData) { setUser(userData); setMargemPadrao(userData.margem_lucro_padrao || 30); setFaturamentoMedio(userData.faturamento_medio_mensal || ""); setCustoFixo(userData.custo_fixo_mensal || ""); setTaxaImpostos(userData.taxa_impostos || 5); setTaxaCartao(userData.taxa_cartao || 4); setCustoMaoObraHora(userData.custo_mao_obra_hora || ""); setCustoFixoUnidade(userData.custo_fixo_por_unidade || ""); setProducaoMensalEstimada(userData.producao_mensal_estimada || ""); } }, [userData]);
+  useEffect(() => {
+    if (userData) {
+      setUser(userData);
+      // Campos que existem no schema Prisma
+      setTaxaImpostos(userData.taxa_impostos ?? 5);
+      setTaxaCartao(userData.taxa_cartao ?? 4);
+      setCustoFixo(userData.custo_fixo_mensal ?? "");
+      setMargemPadrao(userData.margem_balcao ?? 30);
+      // Campos locais de UX que nao sao persistidos — mantidos para calculo local
+      setFaturamentoMedio(userData.faturamento_medio_mensal ?? "");
+      setCustoMaoObraHora("");
+      setCustoFixoUnidade("");
+      setProducaoMensalEstimada("");
+    }
+  }, [userData]);
 
   const aplicarTemplate = async (config) => {
     setMargemPadrao(config.margem_lucro_padrao);
@@ -40,15 +54,13 @@ export default function ConfiguracoesPage() {
 
     // Aplicar automaticamente
     try {
-      await httpClient('/auth/me', { method: 'PUT', body: JSON.stringify({
-        margem_lucro_padrao: config.margem_lucro_padrao,
+      await httpClient('/auth/me', { method: 'PATCH', body: JSON.stringify({
         taxa_impostos: config.taxa_impostos,
         taxa_cartao: config.taxa_cartao,
-        custo_mao_obra_hora: config.custo_mao_obra_hora,
-        faturamento_medio_mensal: parseFloat(faturamentoMedio) || 0,
         custo_fixo_mensal: parseFloat(custoFixo) || 0,
-        producao_mensal_estimada: parseFloat(producaoMensalEstimada) || 0,
-        custo_fixo_por_unidade: parseFloat(custoFixoUnidade) || 0
+        margem_balcao: config.margem_lucro_padrao,
+        margem_delivery: config.margem_lucro_padrao,
+        margem_marketplace: config.margem_lucro_padrao
       }) });
 
       toast.success('Template aplicado com sucesso!', { id: 'Template aplicado com sucesso!' })
@@ -85,16 +97,14 @@ export default function ConfiguracoesPage() {
         finalMarkup = (100 - custosTotais - margemVal) > 0 ? 100 / (100 - custosTotais - margemVal) : 0;
       }
 
-      await httpClient('/auth/me', { method: 'PUT', body: JSON.stringify({
-        margem_lucro_padrao: margemVal,
-        faturamento_medio_mensal: faturamentoVal,
-        custo_fixo_mensal: custoFixoVal,
+      // Envia apenas campos que existem no schema Prisma User
+      await httpClient('/auth/me', { method: 'PATCH', body: JSON.stringify({
         taxa_impostos: impostosVal,
         taxa_cartao: cartaoVal,
-        markup_calculado: finalMarkup,
-        custo_mao_obra_hora: custoMaoObraVal,
-        custo_fixo_por_unidade: custoFixoPorUnidadeCalc,
-        producao_mensal_estimada: producaoEstimada
+        custo_fixo_mensal: custoFixoVal,
+        margem_balcao: margemVal,
+        margem_delivery: margemVal,
+        margem_marketplace: margemVal
       }) });
 
       setSucesso(true);
