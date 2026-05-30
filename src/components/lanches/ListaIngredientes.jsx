@@ -66,7 +66,7 @@ export default function ListaIngredientes({ ingredientes, loading, onEditar, onD
                       </div>
                       <div className="flex flex-wrap gap-2 text-sm">
                         <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                          R$ {(ingrediente.preco_por_kg || 0).toFixed(2)}/{ingrediente.unidade === 'kg' ? 'kg' : ingrediente.unidade === 'litros' ? 'L' : 'un'}
+                          R$ {Number(ingrediente.preco_por_kg || 0).toFixed(2)}/kg
                         </Badge>
                         <Badge variant="outline" className={estoqueAbaixoMinimo ? 'bg-orange-100 text-orange-700' : 'bg-green-50 text-green-700'}>
                           Estoque: {(ingrediente.estoque_atual || 0)} {ingrediente.unidade === 'kg' ? 'kg' : ingrediente.unidade === 'litros' ? 'L' : 'un'}

@@ -62,7 +62,7 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
           <div className="space-y-3">
             {receitasAtivas.map(receita => {
               const categoria = categorias[receita.categoria] || categorias.outros;
-              const lucro = receita.preco_venda_sugerido ? (receita.preco_venda_sugerido - (receita.custo_total || 0)) : 0;
+              const lucro = receita.preco_venda_sugerido ? (Number(receita.preco_venda_sugerido) - Number(receita.custo_total || 0)) : 0;
               
               return (
                 <div key={receita.id} className="border rounded-lg p-4">
@@ -76,13 +76,13 @@ export default function ListaReceitas({ receitas, loading, onEditar, onDeletar, 
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-2">
                         <div>
                           <span className="text-gray-500">Custo:</span>
-                          <span className="ml-1 font-semibold text-red-600">R$ {(receita.custo_total || 0).toFixed(2)}</span>
+                          <span className="ml-1 font-semibold text-red-600">R$ {Number(receita.custo_total || 0).toFixed(2)}</span>
                         </div>
                         {(receita.preco_venda_sugerido || 0) > 0 && (
                           <>
                             <div>
                               <span className="text-gray-500">Venda:</span>
-                              <span className="ml-1 font-semibold text-green-600">R$ {(receita.preco_venda_sugerido || 0).toFixed(2)}</span>
+                              <span className="ml-1 font-semibold text-green-600">R$ {Number(receita.preco_venda_sugerido || 0).toFixed(2)}</span>
                             </div>
                             <div>
                               <span className="text-gray-500">Lucro:</span>
