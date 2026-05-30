@@ -85,7 +85,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
       qtdKg = converterParaKg(item.quantidade || 0, item.unidade || 'kg');
     }
     
-    const precoUsar = ing.preco_corrigido_kg || ing.preco_por_kg;
+    const precoUsar = Number(ing.preco_corrigido_kg || ing.preco_por_kg || 0);
     return total + (precoUsar * qtdKg);
     }, 0);
 
@@ -216,10 +216,10 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
                   </SelectTrigger>
                   <SelectContent>
                     {ingredientesDisponiveis.map(ing => {
-                      const precoUsar = ing.preco_corrigido_kg || ing.preco_por_kg;
+                      const precoUsar = Number(ing.preco_corrigido_kg || ing.preco_por_kg || 0);
                       return (
                         <SelectItem key={ing.id} value={ing.id}>
-                          {ing.nome} (R$ {precoUsar?.toFixed(2)}/kg{ing.fator_correcao > 1 ? ' ✓' : ''})
+                          {ing.nome} (R$ {Number(precoUsar || 0).toFixed(2)}/kg{ing.fator_correcao > 1 ? ' ✓' : ''})
                         </SelectItem>
                       );
                     })}
@@ -266,7 +266,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
                       qtdKg = converterParaKg(item.quantidade || 0, item.unidade || 'kg');
                     }
 
-                    const precoUsar = ing ? (ing.preco_corrigido_kg || ing.preco_por_kg) : 0;
+                    const precoUsar = ing ? Number(ing.preco_corrigido_kg || ing.preco_por_kg || 0) : 0;
                     const custo = precoUsar * qtdKg;
 
                     return (
@@ -274,7 +274,7 @@ export default function FormReceita({ receita, ingredientes, onSubmit, onCancel 
                         <div className="flex-1">
                           <span className="font-medium">{item.ingrediente_nome}</span>
                           <div className="text-sm text-gray-600">
-                            {item.quantidade} {item.unidade || 'kg'} × R$ {precoUsar?.toFixed(2)}/kg = R$ {custo.toFixed(2)}
+                            {item.quantidade} {item.unidade || 'kg'} × R$ {Number(precoUsar || 0).toFixed(2)}/kg = R$ {Number(custo || 0).toFixed(2)}
                             {ing?.fator_correcao > 1 && (
                               <span className="text-blue-600 ml-1">(corrigido)</span>
                             )}
